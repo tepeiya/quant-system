@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}信号历史 - 量化系统{% endblock %}
+{% block content %}
+
+<div class="panel">
+    <div class="flex mb-12" style="justify-content:space-between">
+        <h2>📜 信号历史 (最近90天)</h2>
+        <button class="btn" onclick="refreshHistory()">🔄 刷新</button>
+    </div>
+    <div class="table-wrapper">
+    <table>
+        <thead>
+            <tr>
+                <th>日期</th><th>趋势</th><th>建议</th>
+                <th>Top3</th><th>候选数</th><th>最高分</th><th></th>
+            </tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+    </table>
+    </div>
+</div>
+
+<!-- 详情弹窗 -->
+<div id="detailModal" class="modal" style="display:none">
+    <div class="modal-content panel">
+        <div class="flex mb-12" style="justify-content:space-between">
+            <h2 id="detailDate">-</h2>
+            <button class="btn" onclick="closeDetail()">✕</button>
+        </div>
+        <div id="detailBody"></div>
+    </div>
+</div>
+
+<style>
+.modal {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7); display: flex;
+    justify-content: center; align-items: center; z-index: 100;
+}
+.modal-content {
+    max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;
+}
+</style>
+
+<script>
+async function refreshHistory() {
+    const r = await fetch('/history/api/list');
+    const d = await r.json();
+    const signals = d.signals || [];
+
+    const body = $('historyBody');
+    if (signals.length === 0) {
+        body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#8b949e;">暂无信号历史</td></tr>';
+        return;
+    }
+
+    body.innerHTML = signals.map(s => {
+        const trendClass = s.trend?.includes('多头') ? 'positive' : (s.trend?.includes('熊') ? 'negative' : 'neutral');
+        return `<tr>
+            <td>${s.date}</td>
+            <td class="${trendClass}">${s.trend || '?'}</td>
+            <td>${s.action || '?'}</td>
+            <td>${(s.top3 || []).join(', ')}</td>
+            <td>${s.candidate_count || 0}</td>
+            <td>${s.top_score?.toFixed(1) || '-'}</td>
+            <td><button class="btn" onclick="showDetail('${s.date}')">详情</button></td>
+        </tr>`;
+    }).join('');
+}
+
+async function showDetail(date) {
+    $('detailDate').textContent = '📊 ' + date + ' 信号详情';
+    $('detailModal').style.display = 'flex';
+    $('detailBody').innerHTML = '<p style="color:#8b949e;">加载中...</p>';
+
+    const r = await fetch(`/history/api/detail?date=${date}`);
+    const d = await r.json();
+
+    let html = '';
+    // 大盘
+    const m = d.market || {};
+    html += `<div class="card-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px;">
+        <div class="card"><div class="label">趋势</div><div class="value">${m.trend || '?'}</div></div>
+        <div class="card"><div class="label">建议</div><div class="value">${m.action || '?'}</div></div>
+        <div class="card"><div class="label">SPY</div><div class="value">$${(m.spy || 0).toFixed(0)}</div></div>
+    </div>`;
+
+    // Top 10
+    const top = d.top_scores || [];
+    if (top.length > 0) {
+        html += '<h3 style="margin:12px 0 8px;font-size:13px;color:#8b949e;">🏆 评分 Top 10</h3>';
+        html += '<div class="table-wrapper"><table><thead><tr><th>股票</th><th>评分</th><th>价格</th><th>动量%</th><th>质量分</th></tr></thead><tbody>';
+        top.slice(0, 10).forEach(s => {
+            html += `<tr>
+                <td><b>${s.ticker}</b></td>
+                <td>${s.score?.toFixed(1)}</td>
+                <td>$${(s.price || 0).toFixed(2)}</td>
+                <td class="${pnlClass(s.momentum_pct)}">${formatPct(s.momentum_pct)}</td>
+                <td>${(s.quality || 0).toFixed(1)}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+    }
+
+    // 买入候选
+    const cand = d.buy_candidates || [];
+    if (cand.length > 0) {
+        html += '<h3 style="margin:12px 0 8px;font-size:13px;color:#8b949e;">🟢 买入候选</h3>';
+        html += '<table><thead><tr><th>股票</th><th>评分</th><th>价格</th><th>动量%</th></tr></thead><tbody>';
+        cand.forEach(c => {
+            html += `<tr>
+                <td><b>${c.ticker}</b></td>
+                <td>${c.score?.toFixed(1)}</td>
+                <td>$${(c.price || 0).toFixed(2)}</td>
+                <td class="${pnlClass(c.momentum_pct)}">${formatPct(c.momentum_pct)}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+    }
+
+    $('detailBody').innerHTML = html;
+}
+
+function closeDetail() {
+    $('detailModal').style.display = 'none';
+}
+
+refreshHistory();
+</script>
+{% endblock %}

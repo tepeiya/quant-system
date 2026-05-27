@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}轮式策略 - M+{% endblock %}
+{% block content %}
+
+<div class="card-grid" id="summaryCards">
+    <div class="card"><div class="label">月收入预估</div><div class="value positive" id="monthlyIncome">-</div></div>
+    <div class="card"><div class="label">年化收益率</div><div class="value positive" id="annualYield">-</div></div>
+    <div class="card"><div class="label">占用保证金</div><div class="value" id="collateral">-</div></div>
+    <div class="card"><div class="label">活跃头寸</div><div class="value" id="activeCount">-</div></div>
+</div>
+
+<div class="row-2">
+    <div class="panel">
+        <h2>🔄 轮式计划（卖Put）</h2>
+        <div id="planBody">
+            <div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>
+        </div>
+    </div>
+    <div class="panel">
+        <h2>⚙️ 参数配置</h2>
+        <div style="margin-bottom:10px;">
+            <label style="font-size:12px;color:#8b949e;">Put虚值程度 (Delta)</label>
+            <input type="range" id="putDelta" min="0.1" max="0.4" step="0.05" value="0.25"
+                   style="width:100%;" oninput="updateConfig()">
+            <div style="font-size:11px;color:#484f58;display:flex;justify-content:space-between;">
+                <span>保守</span><span id="putDeltaVal">0.25</span><span>激进</span>
+            </div>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label style="font-size:12px;color:#8b949e;">到期天数</label>
+            <input type="range" id="dte" min="14" max="60" step="1" value="35"
+                   style="width:100%;" oninput="updateConfig()">
+            <div style="font-size:11px;color:#484f58;display:flex;justify-content:space-between;">
+                <span>14天</span><span id="dteVal">35</span><span>60天</span>
+            </div>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label style="font-size:12px;color:#8b949e;">只做高评分 (≥80分)</label>
+            <label style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                <input type="checkbox" id="highQuality" checked onchange="updateConfig()">
+                <span style="font-size:13px;">启用</span>
+            </label>
+        </div>
+        <button class="btn primary" onclick="refreshPlan()" style="width:100%;">🔄 刷新计划</button>
+        <div id="configResult" style="margin-top:6px;font-size:12px;"></div>
+    </div>
+</div>
+
+<div class="panel">
+    <h2 class="flex-between">
+        <span>📖 轮式说明</span>
+        <span style="font-size:11px;color:#8b949e;">Wheel Strategy</span>
+    </h2>
+    <div style="font-size:13px;line-height:1.8;color:#c9d1d9;">
+        <p><b>核心逻辑：</b>围绕好公司无限循环 —— 低价卖Put等接货 → 接货后卖Call收租 → 被行权后重新卖Put。</p>
+        <div class="card-grid" style="margin-top:10px;grid-template-columns:repeat(2,1fr);">
+            <div class="card compact">
+                <div class="label">阶段1（空仓）</div>
+                <div style="font-size:13px;">卖虚值Put → 收权利金<br>跌了低价接货 → 没跌白拿钱</div>
+            </div>
+            <div class="card compact">
+                <div class="label">阶段2（持仓）</div>
+                <div style="font-size:13px;">卖虚值Call → 收权利金<br>涨了高价卖出 → 没涨继续收租</div>
+            </div>
+        </div>
+        <p style="margin-top:10px;font-size:12px;color:#8b949e;">
+        ⚠️ Alpaca纸交易暂不支持期权。计划将在券商端手动执行。
+        </p>
+    </div>
+</div>
+
+<script>
+async function refreshPlan() {
+    const r = await fetch('/wheel/api/plan');
+    const d = await r.json();
+    
+    if (d.error) {
+        $('planBody').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>' + d.error + '</p></div>';
+        return;
+    }
+    
+    $('monthlyIncome').textContent = '$' + (d.estimated_monthly_income || 0).toFixed(0);
+    $('annualYield').textContent = (d.estimated_annual_yield || 0).toFixed(1) + '%';
+    $('collateral').textContent = '$' + (d.total_collateral || 0).toLocaleString();
+    $('activeCount').textContent = (d.positions || []).length;
+    
+    const pos = d.positions || [];
+    if (pos.length === 0) {
+        $('planBody').innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>无可用的轮式候选，检查信号评分</p></div>';
+        return;
+    }
+    
+    $('planBody').innerHTML = pos.map(p => {
+        const yr = (p.monthly_return || 0).toFixed(1);
+        return '<div class="card" style="margin-bottom:8px;">' +
+            '<div class="flex-between">' +
+                '<div><b>' + p.ticker + '</b> <span class="badge buy">评分' + (p.score || 0).toFixed(0) + '</span></div>' +
+                '<span class="positive">月' + yr + '%</span>' +
+            '</div>' +
+            '<div class="flex-between" style="margin-top:6px;font-size:12px;">' +
+                '<span>卖Put @$' + (p.strike || 0).toFixed(1) + '</span>' +
+                '<span>权利金 $' + (p.premium || 0).toFixed(0) + '</span>' +
+                '<span>保证金 $' + (p.collateral || 0).toLocaleString() + '</span>' +
+            '</div>' +
+            '<div style="margin-top:4px;font-size:11px;color:#8b949e;">' +
+                '保本价 $' + (p.break_even || 0).toFixed(1) +
+            '</div>' +
+        '</div>';
+    }).join('');
+}
+
+async function updateConfig() {
+    const cfg = {
+        put_delta_target: parseFloat($('putDelta').value),
+        put_dte: parseInt($('dte').value),
+        call_dte: parseInt($('dte').value),
+        only_high_quality: $('highQuality').checked,
+    };
+    $('putDeltaVal').textContent = cfg.put_delta_target.toFixed(2);
+    $('dteVal').textContent = cfg.put_dte;
+    
+    try {
+        const r = await fetch('/wheel/api/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(cfg),
+        });
+        const d = await r.json();
+        $('configResult').textContent = '✅ 已保存';
+        setTimeout(() => { $('configResult').textContent = ''; }, 2000);
+        refreshPlan();
+    } catch(e) {
+        $('configResult').textContent = '❌ 保存失败';
+    }
+}
+
+refreshPlan();
+</script>
+{% endblock %}

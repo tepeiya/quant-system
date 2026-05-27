@@ -1,0 +1,300 @@
+"""
+每日信号输出系统
+"""
+
+import logging
+import sys
+import os
+from datetime import datetime
+import json
+import pickle
+import numpy as np
+import pandas as pd
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s", stream=sys.stdout)
+logger = logging.getLogger("quant.signal")
+
+from data_prod import load_price_cache, compute_indicators
+from quality_factor import compute_quality_scores
+from multi_asset import multi_asset_signal
+
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "signals")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+SPY_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data_cache/spy_cache.pkl")
+MAX_POS = 8
+
+
+def _update_realtime_prices(cache: dict, max_tickers: int = 100) -> dict:
+    """
+    用Alpaca实时API更新缓存中每只股票的最新价格。
+    只更新Top200（策略用到的），每只单独请求。
+    """
+    KEY = os.environ.get("ALPACA_API_KEY_ID", "")
+    SECRET = os.environ.get("ALPACA_SECRET_KEY", "")
+    if not KEY or not SECRET:
+        return cache
+
+    import requests
+    base = "https://data.alpaca.markets"
+    auth = (KEY, SECRET)
+
+    tickers = sorted(cache.keys())[:max_tickers]
+    logger.info(f"实时数据: {len(tickers)}只...")
+    updated = 0
+
+    for sym in tickers:
+        df = cache.get(sym)
+        if df is None:
+            continue
+        try:
+            r = requests.get(f"{base}/v2/stocks/{sym}/trades/latest",
+                             auth=auth, timeout=5)
+            if r.status_code == 200:
+                t = r.json().get("trade", {})
+                price = float(t.get("p", 0))
+                ts = t.get("t", "")
+                volume = int(t.get("s", 0))
+                if price > 0 and ts:
+                    dt = pd.Timestamp(ts).tz_convert("UTC").tz_localize(None)
+                    last_dt = df.index[-1]
+                    if dt > last_dt:
+                        nr = pd.DataFrame([[price, price, price, price, volume]],
+                                          columns=df.columns, index=[dt])
+                        cache[sym] = pd.concat([df, nr])
+                        updated += 1
+        except:
+            pass
+
+        if updated > 0 and updated % 20 == 0:
+            pass  # silent
+    
+    if updated > 0:
+        logger.info(f"实时更新: {updated}只")
+    else:
+        logger.info("缓存已是最新，无需更新")
+    return cache
+
+
+import datetime as _dt
+
+# 加载因子权重
+def load_factor_weights() -> dict:
+    import os, json
+    wf = "config/factor_weights.json"
+    if os.path.exists(wf):
+        with open(wf) as f:
+            return json.load(f)
+    return {"momentum": 45, "quality": 25, "trend": 13, "value": 8, "lowvol": 5, "volume": 4}
+
+_ts = _dt.datetime.now()
+
+def generate_signals(use_cached_quality=True):
+    import datetime as _dt
+    
+    # 0. 先增量更新数据（联网），静默执行
+    try:
+        import subprocess, sys
+        subprocess.run(
+            [sys.executable, "data_update.py"],
+            capture_output=True, timeout=60
+        )
+    except:
+        pass  # 更新失败不影响运行，用旧缓存
+
+    ts = _dt.datetime.now()
+    dt_str = _dt.datetime.now().strftime("%Y-%m-%d")
+    weekday = _dt.datetime.now().weekday()
+    logger.info(f"信号: {dt_str}")
+
+    # 1. 加载缓存
+    cache = load_price_cache()
+    if not cache:
+        logger.error("无数据"); return
+
+    # 1.5 实时价格更新（只更新Top30，加快速度）
+    cache = _update_realtime_prices(cache, max_tickers=30)
+
+    # 2. SPY大盘——优先用真实SPY，回退到合成
+    spy = None
+    try:
+        from spy_source import get_spy
+        spy = get_spy()
+        if spy is not None:
+            spy = compute_indicators(spy)
+    except:
+        pass
+
+    if spy is None or len(spy) < 50:
+        # 备选：从个股缓存构造合成SPY
+        closes = {}
+        for t, df in cache.items():
+            if df is None or len(df) < 200: continue
+            for date, row in df.tail(500).iterrows():
+                d = str(date)[:10]
+                closes.setdefault(d, []).append(row["Close"])
+        dates = sorted(closes.keys())
+        spy = pd.DataFrame({"Close": [np.mean(closes[d]) for d in dates]},
+                           index=pd.to_datetime(dates)).sort_index()
+        spy = compute_indicators(spy)
+
+    if spy is None or len(spy) < 50:
+        logger.error("SPY不可用"); return
+
+    ls = spy.iloc[-1]
+    spy_price = ls["Close"]
+    sma20, sma50, sma200 = ls.get("SMA20",0), ls.get("SMA50",0), ls.get("SMA200",0)
+    rsi = ls.get("RSI", 50)
+    atr = ls.get("ATR_Pct", 0)
+    
+    # 4态择时
+    uptrend = sma20 > sma50 > sma200
+    bearish = spy_price < sma200 * 0.85 if sma200 > 0 else False
+    extreme = rsi > 85
+    # 高波震荡：多头但波动加剧
+    high_vol = atr > 1.5 if not pd.isna(atr) else False
+    choppy = uptrend and (high_vol or rsi > 72)
+
+    if bearish:
+        ml, ma = "🔴 熊市", "空仓"
+    elif extreme:
+        ml, ma = "🔴 极端过热", "减仓25%"
+    elif choppy:
+        ml, ma = "🟡 震荡偏多", "半仓操作"
+    elif uptrend:
+        ml, ma = "🟢 多头", "正常买入"  
+    else:
+        ml, ma = "⚪ 震荡", "部分仓位"
+
+    # 3. 多资产信号
+    try:
+        multi = multi_asset_signal()
+    except:
+        multi = None
+    if multi and multi.get("top2"):
+        top_names = [ASSETS.get(s, {}).get("name", s) if False else s for s in multi["top2"]]
+
+    # 4. 质量分
+    qc = f"{OUTPUT_DIR}/quality_scores.json"
+    if use_cached_quality and os.path.exists(qc):
+        with open(qc) as f:
+            quality = json.load(f)
+    else:
+        quality = compute_quality_scores(cache)
+        with open(qc, "w") as f:
+            json.dump(quality, f, default=str)
+
+    # 4. 评分
+    tickers = sorted(cache.keys())[:200]
+    scores = []
+    for t in tickers:
+        df = cache.get(t)
+        if df is None: continue
+        target_ts = pd.Timestamp(dt_str).tz_localize("UTC")
+        idx = df.index.get_indexer([target_ts], method="nearest")
+        if idx[0] < 0 or idx[0] >= len(df): continue
+        row = df.iloc[idx[0]]
+        c = row["Close"]
+        mom = row.get("Momentum_12M", np.nan)
+        s200 = row.get("SMA200", np.nan)
+        rsi_v = row.get("RSI", np.nan)
+        atr = row.get("ATR_Pct", np.nan)
+        vr = row.get("Volume_Ratio", np.nan)
+        if pd.isna(mom) or mom <= 0 or pd.isna(s200) or c < s200: continue
+        if not pd.isna(rsi_v) and rsi_v > 80: continue
+
+        # 从factor_weights.json读取动态权重
+        weights = load_factor_weights()
+        w_mom = weights.get("momentum", 45)
+        w_qual = weights.get("quality", 25)
+        w_trend = weights.get("trend", 15)
+        w_value = weights.get("value", 8)
+        w_lowvol = weights.get("lowvol", 7)
+
+        ms = min(w_mom, mom * w_mom)
+        qs = quality.get(t, 15) / 100 * w_qual if quality.get(t, 0) > 0 else 15 / 100 * w_qual
+        ts = 12 if c > row.get("SMA20",0) > row.get("SMA50",0) and not pd.isna(row.get("SMA20")) else 6
+        ts += 4 if not pd.isna(vr) and vr > 1.2 else 0
+        ts = ts / 20 * w_trend
+        # 价值 + 低波：从quality分派生（低PE>高分, 低ATR>高分）
+        # 成交量独立因子
+        vs = 0
+        if not pd.isna(vr):
+            if vr > 1.5: vs += w_volume
+            elif vr > 1.2: vs += w_volume * 0.6
+            elif vr < 0.5: vs -= w_volume * 0.3
+        # 低波 + 价值
+        lv = 0
+        if not pd.isna(atr):
+            if atr < 2.0: lv += w_lowvol
+            elif atr < 3.5: lv += w_lowvol * 0.6
+            elif atr < 5.0: lv += w_lowvol * 0.3
+        if not pd.isna(rsi_v) and 30 < rsi_v < 70:
+            lv += w_value * 0.5
+        else:
+            lv += w_value * 0.2
+        scores.append({
+            "ticker": t, "score": round(ms+qs+ts+vs+lv, 1), "price": round(c,2),
+            "mom": round(mom*100,1), "quality": round(qs,1),
+            "volume": round(vs,1), "value_lv": round(lv,1),
+            "rsi": round(rsi_v,0) if not pd.isna(rsi_v) else None,
+            "atr": round(atr,1) if not pd.isna(atr) else None,
+        })
+    scores.sort(key=lambda x: -x["score"])
+
+    # 5. 输出
+    print(f"\n{'='*65}")
+    print(f"  📊 Multi-Factor Momentum+ - 每日信号")
+    print(f"  {dt_str} (周{'一二三四五六日'[weekday]})")
+    print(f"{'='*65}")
+    print(f"\n📈 大盘: SPY ${spy_price:.0f} | RSI {rsi:.0f} | {ml}")
+    print(f"  {sma20:.0f}/{sma50:.0f}/{sma200:.0f} | 建议: {ma}")
+
+    # 多资产轮动
+    try:
+        multi = multi_asset_signal()
+    except:
+        multi = None
+    if multi and multi.get("top2"):
+        from multi_asset import ASSETS as MA
+        names = [f"{MA.get(s,{}).get('name',s)}" for s in multi["top2"]]
+        print(f"\n🌍 多资产轮动: {' + '.join(names)}")
+    else:
+        print(f"\n🌍 多资产轮动: 数据不可用")
+
+    # Top10
+    print(f"\n🏆 全市场评分 Top 10")
+    print(f"  {'股票':>6} {'评分':>6} {'价格':>8} {'动量%':>7} {'质量分':>6} {'RSI':>4}")
+    for s in scores[:10]:
+        print(f"  {s['ticker']:>6} {s['score']:>6.1f} ${s['price']:>7.2f} "
+              f"{s['mom']:>+6.1f}% {s['quality']:>6.1f} {s['rsi'] or '':>4}")
+
+    # 买入候选
+    if not bearish and not extreme:
+        held = set()
+        cand = [s for s in scores if s["ticker"] not in held][:5]
+        print(f"\n🟢 买入候选 Top 5")
+        print(f"  {'股票':>6} {'评分':>6} {'价格':>8} {'动量%':>7} {'质量分':>6}")
+        for s in cand:
+            print(f"  {s['ticker']:>6} {s['score']:>6.1f} ${s['price']:>7.2f} "
+                  f"{s['mom']:>+6.1f}% {s['quality']:>6.1f}")
+    else:
+        print(f"\n⚠️ 大盘风险，不买入")
+
+    # 保存
+    output = {
+        "date": dt_str,
+        "market": {"spy": float(spy_price), "rsi": float(rsi), "trend": ml, "action": ma},
+        "top_scores": scores[:10],
+        "buy_candidates": [s for s in scores if s["ticker"] not in set()][:5],
+    }
+    op = f"{OUTPUT_DIR}/signal_{dt_str}.json"
+    with open(op, "w") as f:
+        json.dump(output, f, indent=2, default=str)
+    logger.info(f"已保存: {op}")
+    logger.info(f"耗时: {(_dt.datetime.now()-_ts).total_seconds():.1f}s")
+    return output
+
+
+if __name__ == "__main__":
+    generate_signals()

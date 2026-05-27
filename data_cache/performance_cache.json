@@ -1,0 +1,53 @@
+{
+  "time": "2026-05-25 23:59",
+  "trade_stats": {
+    "total_trades": 0,
+    "message": "\u6682\u65e0\u4ea4\u6613\u8bb0\u5f55"
+  },
+  "factor_contribution": {
+    "factors": [
+      {
+        "key": "quality",
+        "name": "\u8d28\u91cf",
+        "weight": 26,
+        "ic": 0.2226,
+        "contribution": 0.0579,
+        "pct": 74.4
+      },
+      {
+        "key": "momentum",
+        "name": "\u52a8\u91cf",
+        "weight": 45,
+        "ic": 0.0294,
+        "contribution": 0.0132,
+        "pct": 17.0
+      },
+      {
+        "key": "trend",
+        "name": "\u8d8b\u52bf",
+        "weight": 16,
+        "ic": 0.0418,
+        "contribution": 0.0067,
+        "pct": 8.6
+      },
+      {
+        "key": "value",
+        "name": "\u4ef7\u503c",
+        "weight": 7,
+        "ic": 0,
+        "contribution": 0.0,
+        "pct": 0.0
+      },
+      {
+        "key": "lowvol",
+        "name": "\u4f4e\u6ce2",
+        "weight": 6,
+        "ic": 0,
+        "contribution": 0.0,
+        "pct": 0.0
+      }
+    ],
+    "total_weight": 100,
+    "estimated_monthly_return": 0.0778
+  }
+}

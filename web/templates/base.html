@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}量化系统{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <span style="font-size:20px;">📊</span>
+                <h1>Momentum+</h1>
+            </div>
+            <div class="user-info" id="loginUser">
+                <span class="user-dot"></span>
+                <span>加载中...</span>
+            </div>
+            <ul class="nav-list">
+                <li><a href="/dashboard" class="nav-item active" data-page="dashboard"><span class="nav-icon">📈</span> <span>大盘</span></a></li>
+                <li><a href="/positions" class="nav-item" data-page="positions"><span class="nav-icon">📋</span> <span>持仓</span></a></li>
+                <li><a href="/signals" class="nav-item" data-page="signals"><span class="nav-icon">🏆</span> <span>信号</span></a></li>
+                <li><a href="/history" class="nav-item" data-page="history"><span class="nav-icon">📜</span> <span>历史</span></a></li>
+                <li><a href="/trades" class="nav-item" data-page="trades"><span class="nav-icon">📝</span> <span>交易</span></a></li>
+                <li><a href="/macro" class="nav-item" data-page="macro"><span class="nav-icon">🌍</span> <span>宏观</span></a></li>
+                <li><a href="/factors" class="nav-item" data-page="factors"><span class="nav-icon">🧬</span> <span>因子</span></a></li>
+                <li><a href="/wheel" class="nav-item" data-page="wheel"><span class="nav-icon">🔄</span> <span>轮式</span></a></li>
+                <li><a href="/trading" class="nav-item" data-page="trading"><span class="nav-icon">🛒</span> <span>下单</span></a></li>
+                <li><a href="/settings" class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> <span>设置</span></a></li>
+            </ul>
+            <div class="nav-footer" style="border-top:1px solid #21262d;">
+                <div id="tradeModeToggle" style="padding: 8px 20px; cursor:pointer;" onclick="toggleTradeMode()">
+                    <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">交易模式</div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span id="modeBadge" class="badge" style="font-size:11px;">📄 纸交易</span>
+                        <span style="font-size:10px;color:#484f58;" id="modeHint">点此切换</span>
+                    </div>
+                </div>
+                <div id="themeToggle" style="padding: 8px 20px; cursor:pointer;border-top:1px solid #21262d;" onclick="toggleTheme()">
+                    <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">主题</div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span id="themeIcon">🌙</span>
+                        <span id="themeLabel" style="font-size:12px;">深色</span>
+                    </div>
+                </div>
+                <a href="/auth/logout" class="nav-item logout" style="border-top:1px solid #21262d;"><span class="nav-icon">🚪</span> <span>退出</span></a>
+            </div>
+        </nav>
+        <main class="main" id="mainContent">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

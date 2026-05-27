@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - Multi-Factor Momentum+</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="auth-page">
+        <div class="auth-card">
+            <h1>📊 创建账户</h1>
+            <p class="subtitle">Multi-Factor Momentum+</p>
+            <div id="errorBox" class="error-box"></div>
+            <div id="successBox" class="success-box"></div>
+            <div class="form-group">
+                <label>用户名（至少3个字符）</label>
+                <input type="text" id="username" placeholder="输入用户名" autocomplete="username" autofocus>
+            </div>
+            <div class="form-group">
+                <label>密码（至少6个字符）</label>
+                <input type="password" id="password" placeholder="输入密码" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label>确认密码</label>
+                <input type="password" id="confirm" placeholder="再次输入密码" autocomplete="new-password">
+            </div>
+            <button class="submit-btn" onclick="doRegister()" id="regBtn">注册</button>
+            <p class="auth-footer">已有账号？<a href="/login">返回登录</a></p>
+        </div>
+    </div>
+
+    <script>
+        async function doRegister() {
+            const btn = document.getElementById('regBtn');
+            const errorBox = document.getElementById('errorBox');
+            const successBox = document.getElementById('successBox');
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const confirm = document.getElementById('confirm').value;
+
+            errorBox.style.display = 'none';
+            successBox.style.display = 'none';
+
+            if (!username || !password || !confirm) {
+                errorBox.textContent = '所有字段都必须填写';
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            btn.textContent = '注册中...';
+            btn.disabled = true;
+            try {
+                const r = await fetch('/register', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password, confirm})
+                });
+                const d = await r.json();
+                if (d.status === 'ok') {
+                    successBox.textContent = '注册成功，跳转中...';
+                    successBox.style.display = 'block';
+                    setTimeout(() => { window.location.href = '/dashboard/'; }, 800);
+                } else {
+                    errorBox.textContent = d.message;
+                    errorBox.style.display = 'block';
+                }
+            } catch(e) {
+                errorBox.textContent = '网络错误';
+                errorBox.style.display = 'block';
+            }
+            btn.textContent = '注册';
+            btn.disabled = false;
+        }
+    </script>
+</body>
+</html>

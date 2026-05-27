@@ -1,0 +1,16 @@
+# 量化系统环境变量模板
+# 拷贝为 .env 并填入你的API Key
+# cp env_template .env && 填入key && docker compose up -d
+
+# Alpaca 纸交易（必填）
+ALPACA_API_KEY_ID=PKRWW72JMMGOQJZOKIFBKDQRTJ
+ALPACA_SECRET_KEY=K6sSwz4NczuPQmp4V7tdUwuBuBuGyjoH6T5bBbXsB41
+
+# Tiingo 数据源（必填，数据补全用）
+TIINGO_API_KEY=9f2dc7b53b58fed32cf4d2b106cc9bd87058e04e
+
+# FRED 宏观数据（可选）
+FRED_API_KEY=d2bf5a934920a0b53ce51f48fa6a7f4a
+
+# PushPlus 微信推送（可选）
+PUSHPLUS_TOKEN=3d9dc312a9914c6896b310b56eccba6f

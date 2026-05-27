@@ -1,0 +1,32 @@
+/* ===== 亮色主题 ===== */
+.theme-light {
+    background: #ffffff;
+    color: #1f2328;
+}
+.theme-light .sidebar { background: #f6f8fa; border-color: #d0d7de; }
+.theme-light .sidebar-header { border-color: #d0d7de; }
+.theme-light .sidebar-header h1 { color: #1f2328; }
+.theme-light .user-info { color: #656d76; }
+.theme-light .nav-item { color: #656d76; }
+.theme-light .nav-item:hover { background: #eaeef2; color: #1f2328; }
+.theme-light .nav-item.active { color: #0969da; background: #ddf4ff; border-left-color: #0969da; }
+.theme-light .nav-footer { border-color: #d0d7de; }
+.theme-light .panel { background: #ffffff; border-color: #d0d7de; }
+.theme-light .panel h2 { color: #656d76; }
+.theme-light .card { background: #f6f8fa; border-color: #d0d7de; }
+.theme-light .card .label { color: #656d76; }
+.theme-light .card .value { color: #1f2328; }
+.theme-light th { background: #f6f8fa; color: #656d76; border-color: #d0d7de; }
+.theme-light td { border-color: #eaeef2; color: #1f2328; }
+.theme-light .macro-item { background: #f6f8fa; border-color: #d0d7de; }
+.theme-light input, .theme-light select { background: #ffffff; border-color: #d0d7de; color: #1f2328; }
+.theme-light .auth-card { background: #ffffff; border-color: #d0d7de; }
+.theme-light .btn { background: #f6f8fa; border-color: #d0d7de; color: #1f2328; }
+.theme-light .btn:hover { background: #eaeef2; }
+.theme-light .btn.primary { background: #0969da; border-color: #0969da; color: #ffffff; }
+.theme-light .btn:hover.primary { background: #0550ae; }
+.theme-light .btn.danger { background: #cf222e; border-color: #cf222e; color: #ffffff; }
+.theme-light .error-box { background: #ffebe9; border-color: rgba(248,81,73,0.3); }
+.theme-light .positive { color: #1a7f37 !important; }
+.theme-light .negative { color: #cf222e !important; }
+.theme-light .neutral { color: #9a6700 !important; }

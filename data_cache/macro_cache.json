@@ -1,0 +1,30 @@
+{
+  "_time": "2026-05-25 16:51:22.504902",
+  "data": {
+    "total_score": 23.6,
+    "verdict": "\ud83d\udd34 \u504f\u7a7a",
+    "advice": "\u8c28\u614e\u4e50\u89c2\uff0c\u63a7\u5236\u4ed3\u4f4d",
+    "bond": {
+      "score": 23.599999999999994,
+      "10y_yield": 4.32
+    },
+    "dollar": {
+      "score": 0,
+      "dxy": 0,
+      "vix": 0,
+      "above_200ma": true,
+      "trend": "?"
+    },
+    "gold": {
+      "score": 0,
+      "gld": 0,
+      "real_rate": 0,
+      "gld_trend": "?"
+    },
+    "inflation": {
+      "score": 0,
+      "cpi_yoy": 0
+    },
+    "time": "2026-05-25 16:51"
+  }
+}

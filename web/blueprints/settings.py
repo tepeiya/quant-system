@@ -1,0 +1,175 @@
+"""
+设置 - Blueprint
+"""
+from flask import Blueprint, jsonify, render_template
+import numpy as np
+
+bp = Blueprint("settings", __name__, url_prefix="/settings")
+
+def _fix(obj):
+    if isinstance(obj, dict):
+        return {k: _fix(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_fix(v) for v in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+@bp.route("/api/env")
+def api_env():
+    """环境变量状态（读+改）"""
+    import os
+    keys = {"ALPACA_API_KEY_ID": "Alpaca Key", "ALPACA_SECRET_KEY": "Alpaca Secret",
+            "FRED_API_KEY": "FRED API Key"}
+    envs = []
+    for key, label in keys.items():
+        val = os.environ.get(key, "")
+        envs.append({"key": key, "label": label, "status": "已设置" if val else "未设置", "value": val[:8] + "****" if val else ""})
+    return jsonify(_fix(envs))
+
+
+@bp.route("/api/save_env", methods=["POST"])
+def api_save_env():
+    """保存环境变量到 .env 文件"""
+    data = __import__("flask").request.json or {}
+    key = data.get("key", "")
+    value = data.get("value", "").strip()
+    if not key or not value:
+        return jsonify({"status": "error", "message": "参数错误"})
+
+    import os
+    env_file = ".env"
+    if os.path.exists(env_file):
+        with open(env_file) as f:
+            lines = f.readlines()
+    else:
+        lines = []
+
+    found = False
+    for i, line in enumerate(lines):
+        if line.strip().startswith(f"{key}="):
+            lines[i] = f"{key}={value}\n"
+            found = True
+            break
+
+    if not found:
+        lines.append(f"{key}={value}\n")
+
+    with open(env_file, "w") as f:
+        f.writelines(lines)
+
+    os.environ[key] = value
+    return jsonify({"status": "ok", "message": f"{key} 已保存，重启后生效"})
+
+
+@bp.route("/api/broker_keys")
+def api_broker_keys():
+    """获取券商 Key 配置（可修改）"""
+    from broker_keys import get_broker_keys_status
+    return jsonify(_fix(get_broker_keys_status()))
+
+
+@bp.route("/api/save_broker_key", methods=["POST"])
+def api_save_broker_key():
+    """保存券商 Key 到配置文件"""
+    from broker_keys import set_key
+    data = __import__("flask").request.json or {}
+    key = data.get("key", "")
+    value = data.get("value", "").strip()
+    if not key or not value:
+        return jsonify({"status": "error", "message": "参数错误"})
+    if value == "******":
+        return jsonify({"status": "ok", "message": "未修改"})
+    set_key(key, value)
+    return jsonify({"status": "ok", "message": f"{key} 已保存，重启后生效"})
+
+
+@bp.route("/api/brokers")
+def api_brokers():
+    """券商列表（可切换）"""
+    from broker_manager import list_brokers, load_config, save_config
+    return jsonify(_fix(list_brokers()))
+
+
+@bp.route("/api/add_broker", methods=["POST"])
+def api_add_broker():
+    """添加自定义券商"""
+    from broker_manager import load_config, save_config
+    data = __import__("flask").request.json or {}
+    broker_id = data.get("broker_id", "").strip()
+    name = data.get("name", "").strip()
+    btype = data.get("type", "alpaca")
+    if not broker_id or not name:
+        return jsonify({"status": "error", "message": "券商ID和名称不能为空"})
+    config = load_config()
+    if broker_id in config:
+        return jsonify({"status": "error", "message": f"券商 {broker_id} 已存在"})
+    config[broker_id] = {
+        "name": name, "enabled": True, "type": btype, "paper": True,
+        "env_key_id": f"CUSTOM_{broker_id.upper()}_KEY",
+        "env_secret": f"CUSTOM_{broker_id.upper()}_SECRET",
+    }
+    save_config(config)
+    return jsonify({"status": "ok", "message": f"已添加: {name}"})
+
+
+@bp.route("/api/delete_broker", methods=["POST"])
+def api_delete_broker():
+    """删除券商"""
+    from broker_manager import load_config, save_config
+    data = __import__("flask").request.json or {}
+    broker_id = data.get("broker_id", "").strip()
+    if not broker_id:
+        return jsonify({"status": "error", "message": "缺少券商ID"})
+    config = load_config()
+    if broker_id in config:
+        del config[broker_id]
+        save_config(config)
+        return jsonify({"status": "ok", "message": f"已删除: {broker_id}"})
+    return jsonify({"status": "error", "message": "券商不存在"})
+
+
+@bp.route("/api/switch_broker", methods=["POST"])
+def api_switch_broker():
+    """切换券商"""
+    from broker_manager import BrokerManager
+    data = __import__("flask").request.json or {}
+    broker_id = data.get("broker_id", "")
+    try:
+        bm = BrokerManager()
+        bm.use(broker_id)
+        return jsonify({"status": "ok", "message": f"已切换到 {broker_id}"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@bp.route("/api/all_config")
+def api_all_config():
+    from system_config import load
+    return jsonify(_fix(load()))
+
+@bp.route("/api/save_config", methods=["POST"])
+def api_save_config():
+    from system_config import load, save
+    data = __import__("flask").request.json or {}
+    current = load()
+    for k, v in data.items():
+        if k in current:
+            current[k] = v
+    save(current)
+    return jsonify({"status": "ok", "message": "配置已保存"})
+
+@bp.route("/api/reset_config", methods=["POST"])
+def api_reset_config():
+    from system_config import reset
+    reset()
+    return jsonify({"status": "ok", "message": "配置已重置"})
+
+@bp.route("/")
+def page():
+    return render_template("settings.html")

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - Multi-Factor Momentum+</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="auth-page">
+        <div class="auth-card">
+            <h1>📊 Momentum+</h1>
+            <p class="subtitle">Multi-Factor 量化系统</p>
+            <div id="errorBox" class="error-box"></div>
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" id="username" placeholder="输入用户名" autocomplete="username" autofocus>
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" id="password" placeholder="输入密码" autocomplete="current-password">
+            </div>
+            <button class="submit-btn" onclick="doLogin()" id="loginBtn">登录</button>
+            <p class="auth-footer">没有账号？<a href="/register">立即注册</a></p>
+        </div>
+    </div>
+
+    <script>
+        async function doLogin() {
+            const btn = document.getElementById('loginBtn');
+            const errorBox = document.getElementById('errorBox');
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            errorBox.style.display = 'none';
+            if (!username || !password) {
+                errorBox.textContent = '用户名和密码不能为空';
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            btn.textContent = '登录中...';
+            btn.disabled = true;
+            try {
+                const r = await fetch('/login', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password})
+                });
+                const d = await r.json();
+                if (d.status === 'ok') window.location.href = '/dashboard/';
+                else { errorBox.textContent = d.message; errorBox.style.display = 'block'; }
+            } catch(e) {
+                errorBox.textContent = '网络错误，请检查服务器是否运行';
+                errorBox.style.display = 'block';
+            }
+            btn.textContent = '登录';
+            btn.disabled = false;
+        }
+        document.getElementById('password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') doLogin();
+        });
+    </script>
+</body>
+</html>

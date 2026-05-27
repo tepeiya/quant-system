@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}宏观 - 量化系统{% endblock %}
+{% block content %}
+
+<div class="card-grid" id="macroSummary">
+    <div class="card"><div class="label">综合评分</div><div class="value" id="totalScore">-</div><div class="sub" id="verdict"></div></div>
+    <div class="card"><div class="label">建议</div><div class="value" id="advice" style="font-size:16px;">-</div></div>
+    <div class="card"><div class="label">更新时间</div><div class="value" id="updateTime" style="font-size:16px;">-</div></div>
+</div>
+
+<div class="macro-grid" id="macroCards" style="margin-bottom:16px;">
+    <div class="macro-item" style="background:#161b22;border:1px solid #30363d;border-radius:8px;">
+        <div class="name" style="font-size:13px;">📄 美债</div>
+        <div class="score" id="bondScore">-</div>
+        <div style="font-size:12px;color:#8b949e;" id="bondDetail"></div>
+    </div>
+    <div class="macro-item" style="background:#161b22;border:1px solid #30363d;border-radius:8px;">
+        <div class="name" style="font-size:13px;">💵 美元</div>
+        <div class="score" id="dollarScore">-</div>
+        <div style="font-size:12px;color:#8b949e;" id="dollarDetail"></div>
+    </div>
+    <div class="macro-item" style="background:#161b22;border:1px solid #30363d;border-radius:8px;">
+        <div class="name" style="font-size:13px;">🥇 黄金</div>
+        <div class="score" id="goldScore">-</div>
+        <div style="font-size:12px;color:#8b949e;" id="goldDetail"></div>
+    </div>
+    <div class="macro-item" style="background:#161b22;border:1px solid #30363d;border-radius:8px;">
+        <div class="name" style="font-size:13px;">📊 通胀</div>
+        <div class="score" id="inflationScore">-</div>
+        <div style="font-size:12px;color:#8b949e;" id="inflationDetail"></div>
+    </div>
+</div>
+
+<script>
+function scoreEmoji(v) {
+    if (v === null || v === undefined) return '⚪';
+    if (v > 1) return '🟢';
+    if (v > -1) return '🟡';
+    return '🔴';
+}
+
+async function loadMacro() {
+    const r = await fetch('/macro/api/data');
+    const d = await r.json();
+
+    $('totalScore').textContent = (d.total_score || 0).toFixed(2);
+    $('totalScore').className = 'value ' + pnlClass(d.total_score);
+    $('verdict').textContent = d.verdict || '?';
+    $('advice').textContent = d.advice || '?';
+    $('updateTime').textContent = d.time || '?';
+
+    const setCard = (idScore, idDetail, data, name) => {
+        const score = data?.score ?? 0;
+        $(idScore).textContent = scoreEmoji(score) + ' ' + score.toFixed(1);
+        $(idScore).className = 'score ' + pnlClass(score);
+    };
+
+    setCard('bondScore', 'bondDetail', d.bond);
+    setCard('dollarScore', 'dollarDetail', d.dollar);
+    setCard('goldScore', 'goldDetail', d.gold);
+    setCard('inflationScore', 'inflationDetail', d.inflation);
+
+    // 详情
+    const b = d.bond || {};
+    $('bondDetail').textContent = `10Y ${(b['10y_yield'] || 0).toFixed(1)}% 利差${(b['10y2y_spread'] || 0).toFixed(1)}%`;
+
+    const dl = d.dollar || {};
+    $('dollarDetail').textContent = `DXY ${(dl.dxy || 0).toFixed(1)} VIX ${(dl.vix || 0).toFixed(1)}`;
+
+    const g = d.gold || {};
+    $('goldDetail').textContent = `GLD $${(g.gld || 0).toFixed(0)} 趋势${g.gld_trend || '?'}`;
+
+    const i = d.inflation || {};
+    $('inflationDetail').textContent = `CPI ${(i.cpi_yoy || 0).toFixed(1)}% 核心${(i.core_cpi_yoy || 0).toFixed(1)}%`;
+}
+
+loadMacro();
+setInterval(loadMacro, 60000);
+</script>
+{% endblock %}

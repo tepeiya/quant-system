@@ -1,0 +1,24 @@
+services:
+  m-plus:
+    build: .
+    ports:
+      - "8765:8765"
+    environment:
+      - ALPACA_API_KEY_ID=${ALPACA_API_KEY_ID}
+      - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY}
+      - TIINGO_API_KEY=${TIINGO_API_KEY}
+      - FRED_API_KEY=${FRED_API_KEY}
+      - PUSHPLUS_TOKEN=${PUSHPLUS_TOKEN}
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./data_cache:/app/data_cache
+      - ./signals:/app/signals
+      - ./config:/app/config
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/login"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

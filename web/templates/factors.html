@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}因子 - 量化系统{% endblock %}
+{% block content %}
+
+<div class="row-2">
+    <div class="panel">
+        <h2>🧬 因子权重配置</h2>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:13px;color:#8b949e;">动量权重 <span id="momVal">55</span>%</label>
+            <input type="range" id="momSlider" min="10" max="70" value="55"
+                   style="width:100%;margin:6px 0;" oninput="updateSliders()">
+            <div style="font-size:10px;color:#484f58;">最近IC: <span id="momIc">-</span></div>
+        </div>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:13px;color:#8b949e;">质量权重 <span id="qualVal">25</span>%</label>
+            <input type="range" id="qualSlider" min="10" max="70" value="25"
+                   style="width:100%;margin:6px 0;" oninput="updateSliders()">
+            <div style="font-size:10px;color:#484f58;">最近IC: <span id="qualIc">-</span></div>
+        </div>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:13px;color:#8b949e;">趋势权重 <span id="trendVal">20</span>%</label>
+            <input type="range" id="trendSlider" min="10" max="70" value="20"
+                   style="width:100%;margin:6px 0;" oninput="updateSliders()">
+            <div style="font-size:10px;color:#484f58;">最近IC: <span id="trendIc">-</span></div>
+        </div>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:13px;color:#8b949e;">价值权重 <span id="valVal">8</span>%</label>
+            <input type="range" id="valSlider" min="5" max="30" value="8"
+                   style="width:100%;margin:6px 0;" oninput="updateSliders()">
+            <div style="font-size:10px;color:#484f58;">最近IC: <span id="valIc">-</span></div>
+        </div>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:13px;color:#8b949e;">低波权重 <span id="lvVal">7</span>%</label>
+            <input type="range" id="lvSlider" min="5" max="30" value="7"
+                   style="width:100%;margin:6px 0;" oninput="updateSliders()">
+            <div style="font-size:10px;color:#484f58;">最近IC: <span id="lvIc">-</span></div>
+        </div>
+        <div class="flex flex-wrap" style="gap:6px;">
+            <span style="font-size:13px;color:#8b949e;">总和: <span id="totalWeight">100</span>%</span>
+            <button class="btn primary" onclick="saveWeights()">💾 保存</button>
+            <button class="btn" id="btnEvolve" onclick="runEvolution()">🧠 自动进化</button>
+        </div>
+        <div id="weightResult" style="margin-top:8px;font-size:12px;"></div>
+    </div>
+    <div class="panel">
+        <div class="flex-between mb-8">
+            <h2>📈 因子IC历史</h2>
+            <button class="btn" onclick="loadIC()">🔄 刷新</button>
+        </div>
+        <canvas id="icChart" height="180"></canvas>
+        <div id="icNote" style="margin-top:8px;font-size:12px;color:#8b949e;"></div>
+    </div>
+</div>
+
+<!-- 进化历史 -->
+<div class="panel">
+    <div class="flex-between mb-8">
+        <h2>📊 进化历史</h2>
+        <span id="evolutionCount" style="font-size:11px;color:#8b949e;"></span>
+    </div>
+    <div class="table-wrapper">
+    <table>
+        <thead>
+            <tr><th>#</th><th>时间</th><th>动量</th><th>质量</th><th>趋势</th><th>价值</th><th>低波</th><th>IC动量</th><th>IC质量</th><th>IC趋势</th></tr>
+        </thead>
+        <tbody id="evolutionBody"></tbody>
+    </table>
+    </div>
+</div>
+
+<script>
+let currentWeights = {};
+
+async function loadWeights() {
+    const r = await fetch('/factors/api/weights');
+    const w = await r.json();
+    currentWeights = w;
+    $('momSlider').value = w.momentum || 45;
+    $('qualSlider').value = w.quality || 25;
+    $('trendSlider').value = w.trend || 15;
+    $('valSlider').value = w.value || 8;
+    $('lvSlider').value = w.lowvol || 7;
+    updateSliders();
+}
+
+function updateSliders() {
+    const m = parseInt($('momSlider').value);
+    const q = parseInt($('qualSlider').value);
+    const tr = parseInt($('trendSlider').value);
+    const v = parseInt($('valSlider').value);
+    const lv = parseInt($('lvSlider').value);
+    $('momVal').textContent = m;
+    $('qualVal').textContent = q;
+    $('trendVal').textContent = tr;
+    $('valVal').textContent = v;
+    $('lvVal').textContent = lv;
+    $('totalWeight').textContent = m + q + tr + v + lv;
+}
+
+async function saveWeights() {
+    const weights = {
+        momentum: parseInt($('momSlider').value),
+        quality: parseInt($('qualSlider').value),
+        trend: parseInt($('trendSlider').value),
+        value: parseInt($('valSlider').value),
+        lowvol: parseInt($('lvSlider').value),
+    };
+    try {
+        const r = await fetch('/factors/api/update_weights', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({weights})
+        });
+        const d = await r.json();
+        $('weightResult').innerHTML = d.status === 'ok' ? '✅ ' + d.message : '❌ ' + d.message;
+    } catch(e) {
+        $('weightResult').innerHTML = '❌ 保存失败';
+    }
+}
+
+async function runEvolution() {
+    const btn = $('btnEvolve');
+    btn.textContent = '⏳ 学习中...';
+    btn.disabled = true;
+    $('weightResult').innerHTML = '⏳ 正在计算因子IC并优化权重...';
+    try {
+        const r = await fetch('/factors/api/evolve', { method: 'POST' });
+        const d = await r.json();
+        if (d.status === 'ok') {
+            $('weightResult').innerHTML = '✅ ' + d.message;
+            loadWeights();
+            loadEvolution();
+            loadIC();
+        } else {
+            $('weightResult').innerHTML = '❌ ' + (d.message || '进化失败');
+        }
+    } catch(e) {
+        $('weightResult').innerHTML = '❌ ' + e;
+    }
+    btn.textContent = '🧠 自动进化';
+    btn.disabled = false;
+}
+
+async function loadIC() {
+    const r = await fetch('/factors/api/ic_history');
+    const icData = await r.json();
+
+    $('icNote').textContent = icData.length + ' 个月数据';
+
+    // 显示最近IC值
+    if (icData.length > 0) {
+        const latest = icData[icData.length - 1];
+        ['mom','qual','trend','val','lv'].forEach(p => {
+            const icVal = latest[p + '_ic'] || 0;
+            const el = $(p + 'Ic');
+            if (el) {
+                el.textContent = icVal.toFixed(4);
+                el.className = icVal > 0.02 ? 'positive' : icVal < -0.02 ? 'negative' : 'neutral';
+            }
+        });
+    }
+
+    if (icData.length > 0 && window.Chart) {
+        const canvas = document.getElementById('icChart');
+        // 销毁旧图表
+        if (window.icChart) window.icChart.destroy();
+        window.icChart = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: icData.map(d => d.month),
+                datasets: [
+                    {
+                        label: '动量IC',
+                        data: icData.map(d => (d.momentum_ic || 0).toFixed(4)),
+                        backgroundColor: icData.map(d => (d.momentum_ic || 0) >= 0 ? 'rgba(63,185,80,0.7)' : 'rgba(248,81,73,0.7)'),
+                        borderRadius: 2,
+                    },
+                    {
+                        label: '质量IC',
+                        data: icData.map(d => (d.quality_ic || 0).toFixed(4)),
+                        backgroundColor: icData.map(d => (d.quality_ic || 0) >= 0 ? 'rgba(88,166,255,0.7)' : 'rgba(248,81,73,0.7)'),
+                        borderRadius: 2,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: '#8b949e', font: { size: 10 } } } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#8b949e', maxTicksLimit: 6, font: { size: 9 } } },
+                    y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 9 } } }
+                }
+            }
+        });
+    }
+}
+
+async function loadEvolution() {
+    const r = await fetch('/factors/api/evolution_history');
+    const data = await r.json();
+    const history = data.history || [];
+    $('evolutionCount').textContent = '共 ' + history.length + ' 次进化';
+    const body = $('evolutionBody');
+    if (history.length === 0) {
+        body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8b949e;">暂无进化历史，点击「自动进化」开始</td></tr>';
+        return;
+    }
+    body.innerHTML = history.slice().reverse().map((h, i) => {
+        const idx = history.length - i;
+        const oldW = h.old_weights || {};
+        const newW = h.new_weights || {};
+        const ic = h.weighted_ic || {};
+        const deltaClass = v => v > 0 ? 'positive' : (v < 0 ? 'negative' : 'muted');
+        const showDelta = (k) => {
+            const d = (newW[k] || 0) - (oldW[k] || 0);
+            return '<span class="' + deltaClass(d) + '" style="font-size:10px;">' + (d >= 0 ? '+' : '') + d + '</span>';
+        };
+        return '<tr>' +
+            '<td>' + idx + '</td>' +
+            '<td>' + (h.timestamp || '').slice(0, 16) + '</td>' +
+            '<td>' + (newW.momentum || 0) + ' ' + showDelta('momentum') + '</td>' +
+            '<td>' + (newW.quality || 0) + ' ' + showDelta('quality') + '</td>' +
+            '<td>' + (newW.trend || 0) + ' ' + showDelta('trend') + '</td>' +
+            '<td>' + (newW.value || 0) + ' ' + showDelta('value') + '</td>' +
+            '<td>' + (newW.lowvol || 0) + ' ' + showDelta('lowvol') + '</td>' +
+            '<td class="' + ((ic.momentum || 0) > 0.02 ? 'positive' : 'neutral') + '">' + (ic.momentum || 0).toFixed(4) + '</td>' +
+            '<td class="' + ((ic.quality || 0) > 0.02 ? 'positive' : 'neutral') + '">' + (ic.quality || 0).toFixed(4) + '</td>' +
+            '<td class="' + ((ic.trend || 0) > 0.02 ? 'positive' : 'neutral') + '">' + (ic.trend || 0).toFixed(4) + '</td>' +
+            '</tr>';
+    }).join('');
+}
+
+loadWeights();
+loadIC();
+loadEvolution();
+</script>
+{% endblock %}
