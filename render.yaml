@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: quant-system
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn web_app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    healthCheckPath: /login
+    envVars:
+      - key: ALPACA_API_KEY_ID
+        value: ""
+      - key: ALPACA_SECRET_KEY
+        value: ""
+      - key: TIINGO_API_KEY
+        value: ""
