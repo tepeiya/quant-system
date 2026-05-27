@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}大盘 - 量化系统{% endblock %}
+{% block content %}
+
+<div class="card-grid" id="statusCards">
+    <div class="card"><div class="label">总权益</div><div class="value" id="equity">-</div></div>
+    <div class="card"><div class="label">现金</div><div class="value" id="cash">-</div></div>
+    <div class="card"><div class="label">持仓数量</div><div class="value" id="posCount">-</div></div>
+    <div class="card"><div class="label">宏观温度</div><div class="value" id="macroScore">-</div></div>
+</div>
+
+<div class="panel mb-12">
+    <h2>🌍 宏观因子</h2>
+    <div class="macro-grid" id="macroGrid">
+        <div class="macro-item"><div class="name">美债</div><div class="score" id="macroBond">-</div></div>
+        <div class="macro-item"><div class="name">美元</div><div class="score" id="macroDollar">-</div></div>
+        <div class="macro-item"><div class="name">黄金</div><div class="score" id="macroGold">-</div></div>
+        <div class="macro-item"><div class="name">通胀</div><div class="score" id="macroInflation">-</div></div>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>📈 资金曲线</h2>
+    <canvas id="equityChart" height="200"></canvas>
+</div>
+
+<script>
+async function loadDashboard() {
+    const r = await fetch('/dashboard/api/data');
+    const d = await r.json();
+    const pf = d.portfolio || {};
+    const mc = d.macro || {};
+
+    $('equity').textContent = formatCurrency(pf.equity);
+    $('cash').textContent = formatCurrency(pf.cash);
+    $('posCount').textContent = (pf.position_count || 0) + '只';
+    $('macroScore').textContent = (mc.total_score || 0).toFixed(1);
+
+    const setMacro = (id, val) => {
+        const el = $(id);
+        if (el) {
+            const v = val || 0;
+            el.textContent = (v > 1 ? '🟢' : v > -1 ? '🟡' : '🔴') + ' ' + v.toFixed(1);
+            el.className = 'score ' + pnlClass(v);
+        }
+    };
+    setMacro('macroBond', mc.bond?.score);
+    setMacro('macroDollar', mc.dollar?.score);
+    setMacro('macroGold', mc.gold?.score);
+    setMacro('macroInflation', mc.inflation?.score);
+
+    // 资金曲线
+    const hr = await fetch('/dashboard/api/equity_history');
+    const hist = await hr.json();
+    if (hist.length > 0 && window.Chart) {
+        const ctx = document.getElementById('equityChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: hist.map(h => h.date),
+                datasets: [{
+                    label: '总权益',
+                    data: hist.map(h => h.equity),
+                    borderColor: '#3fb950',
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(63,185,80,0.1)',
+                    fill: false, tension: 0.3, pointRadius: 0,
+                }, {
+                    label: '初始基准',
+                    data: new Array(hist.length).fill(hist[0]?.equity || 1000),
+                    borderColor: '#8b949e',
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    fill: false, pointRadius: 0,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: '#8b949e' } } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { maxTicksLimit: 10, color: '#8b949e' } },
+                    y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', callback: v => '$' + v.toLocaleString() } }
+                }
+            }
+        });
+    }
+}
+
+loadDashboard();
+setInterval(loadDashboard, 60000);
+</script>
+{% endblock %}

@@ -1,0 +1,52 @@
+    async function saveBrokerKey(keyName) {
+        const input = document.getElementById('key_' + keyName);
+        const value = input.value.trim();
+        if (!value) {
+            alert('请输入密钥');
+            return;
+        }
+        try {
+            const r = await fetch('/settings/api/save_broker_key', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({key: keyName, value})
+            });
+            const d = await r.json();
+            if (d.status === 'ok') {
+                alert('✅ ' + d.message);
+                input.value = '';
+                input.placeholder = '已设置';
+            } else {
+                alert('❌ ' + d.message);
+            }
+        } catch(e) {
+            alert('保存失败: ' + e);
+        }
+    }
+
+    // 加载券商Key
+    try {
+        const rk = await fetch('/settings/api/broker_keys');
+        const kd = await rk.json();
+        const kDiv = document.getElementById('brokerKeys');
+        if (kd.length > 0) {
+            kDiv.innerHTML = kd.map(b => `
+                <div style="background:#0d1117;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #21262d;">
+                    <div style="font-size:13px;font-weight:500;margin-bottom:8px;">${b.name} ${b.all_set ? '✅' : '⚠️'}</div>
+                    ${b.fields.map(f => `
+                        <div style="margin-bottom:6px;">
+                            <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:2px;">${f.label}</label>
+                            <div style="display:flex;gap:6px;">
+                                <input type="${f.secret ? 'password' : 'text'}" id="key_${f.key}" 
+                                       style="flex:1;padding:6px 8px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#c9d1d9;font-size:13px;"
+                                       placeholder="${f.set ? '已设置，留空不修改' : '请输入'}">
+                                <button class="btn" onclick="saveBrokerKey('${f.key}')">保存</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+        }
+    } catch(e) {}
+
+    // 环境变量

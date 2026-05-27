@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}设置 - M+{% endblock %}
+{% block content %}
+
+<div class="row-2">
+    <div class="panel">
+        <h2>🔌 券商管理</h2>
+        <div id="brokerList"></div>
+    </div>
+    <div class="panel">
+        <h2>🔑 环境变量</h2>
+        <div id="envVarList"></div>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>🔐 券商密钥</h2>
+    <div id="brokerKeys"></div>
+</div>
+
+<div class="panel">
+    <h2>🧩 策略参数</h2>
+    <div id="configForm" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;"></div>
+    <div class="flex mt-16 gap-8">
+        <button class="btn primary" onclick="saveConfig()">💾 保存全部</button>
+        <button class="btn danger" onclick="resetConfig()">↩️ 恢复默认</button>
+        <span id="configMsg" style="font-size:13px;"> </span>
+    </div>
+</div>
+
+<script>
+// ===== 加载所有 =====
+async function loadAll() {
+    // 券商管理
+    try {
+        const rb = await fetch('/settings/api/brokers');
+        const brokers = await rb.json();
+        const bDiv = document.getElementById('brokerList');
+        if (brokers.length === 0) {
+            bDiv.innerHTML = '<div style="color:#8b949e;padding:8px;">无可用券商</div>';
+        } else {
+            bDiv.innerHTML = brokers.map(b => `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid #21262d;">
+                    <div><b>${b.name}</b><br><span style="font-size:11px;color:#8b949e;">${b.type} ${b.paper ? '📄' : '🔴'}</span></div>
+                    <div><span class="${b.ready ? 'positive' : 'negative'}">${b.ready ? '✅ 就绪' : '❌ 未配置'}</span></div>
+                    <div><button class="btn" onclick="showIBKRConfig('${b.id}')">🔧</button></div>
+                </div>
+            `).join('');
+        }
+    } catch(e) {}
+
+    // 环境变量
+    try {
+        const re = await fetch('/settings/api/env');
+        const envs = await re.json();
+        const eDiv = document.getElementById('envVarList');
+        if (envs.length > 0) {
+            eDiv.innerHTML = envs.map(e => `
+                <div style="padding:8px;border-bottom:1px solid #21262d;">
+                    <div style="font-size:12px;color:#8b949e;">${e.label}</div>
+                    <div style="display:flex;gap:6px;margin-top:4px;">
+                        <input type="password" id="env_${e.key}" value="${e.value || ''}" 
+                               style="flex:1;padding:6px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#c9d1d9;font-size:13px;"
+                               placeholder="输入${e.label}">
+                        <button class="btn" onclick="saveEnv('${e.key}')">保存</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch(e) {}
+
+    // 券商密钥
+    try {
+        const rk = await fetch('/settings/api/broker_keys');
+        const kd = await rk.json();
+        const kDiv = document.getElementById('brokerKeys');
+        if (kd.length > 0) {
+            kDiv.innerHTML = kd.map(b => `
+                <div style="background:#0d1117;border-radius:8px;padding:12px;margin-bottom:8px;border:1px solid #21262d;">
+                    <div style="font-size:13px;font-weight:500;margin-bottom:8px;">${b.name} ${b.all_set ? '✅' : '⚠️'}</div>
+                    ${b.fields.map(f => `
+                        <div style="margin-bottom:6px;">
+                            <label style="font-size:11px;color:#8b949e;display:block;">${f.label}</label>
+                            <div style="display:flex;gap:6px;">
+                                <input type="password" id="bk_${f.key}" 
+                                       style="flex:1;padding:6px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#c9d1d9;font-size:13px;"
+                                       placeholder="${f.set ? '已设置' : '请输入'}">
+                                <button class="btn" onclick="saveBrokerKey('${f.key}')">保存</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+        }
+    } catch(e) {}
+}
+
+async function saveEnv(key) {
+    const val = document.getElementById('env_' + key).value.trim();
+    if (!val) return;
+    try {
+        const r = await fetch('/settings/api/save_env', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({key, value: val})
+        });
+        const d = await r.json();
+        alert(d.message);
+    } catch(e) {
+        alert('保存失败: ' + e);
+    }
+}
+
+async function saveBrokerKey(key) {
+    const val = document.getElementById('bk_' + key).value.trim();
+    if (!val) return;
+    try {
+        const r = await fetch('/settings/api/save_broker_key', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({key, value: val})
+        });
+        const d = await r.json();
+        alert(d.message);
+        document.getElementById('bk_' + key).placeholder = '已设置';
+        document.getElementById('bk_' + key).value = '';
+    } catch(e) {
+        alert('保存失败: ' + e);
+    }
+}
+
+// ===== 配置参数（已有） =====
+const CONFIG_LABELS = {
+    stop_loss_pct: '止损 (%)', trailing_stop_activate_pct: '移动止损启动 (%)',
+    trailing_stop_distance_pct: '移动止损距离 (%)',
+    stop_loss_atr_multiple: 'ATR止损倍数', trailing_stop_atr_multiple: 'ATR跟踪止损倍数', rsi_exit: 'RSI退出阈值',
+    market_overheat_rsi: '大盘过热RSI', market_extreme_rsi: '大盘极端RSI',
+    market_reduce_ratio: '过热减仓比例', max_positions: '最大持仓数',
+    score_threshold: '评分阈值', rsi_entry: '买入RSI上限',
+    mom_rank_top_pct: '动量排名门槛',
+    max_position_pct: '单票上限', max_sector_pct: '行业上限',
+    semi_single_limit: '半导体单票上限', semi_total_limit: '半导体总上限',
+    momentum_weight: '动量权重', quality_weight: '质量权重', trend_weight: '趋势权重',
+    alert_total_drawdown: '总回撤告警 (%)', alert_single_loss: '单票亏损告警 (%)',
+    buy_cash_ratio: '买入现金比例',
+    atr_low_threshold: '低波ATR阈值%', atr_medium_threshold: '中波ATR阈值%',
+    atr_high_threshold: '高波ATR阈值%',
+    atr_cap_low: '低波仓位上限', atr_cap_medium: '中波仓位上限',
+    atr_cap_high: '高波仓位上限', atr_cap_extreme: '极高波仓位上限',
+    circuit_daily_loss: '单日亏损熔断 (%)', circuit_max_drawdown: '最大回撤熔断 (%)',
+    hedge_vix_trigger: 'VIX触发阈值', hedge_ratio_max: '最大对冲比例',
+};
+
+const CONFIG_GROUPS = {
+    '策略参数': ['stop_loss_pct','stop_loss_atr_multiple','trailing_stop_activate_pct','trailing_stop_atr_multiple','rsi_exit','rsi_entry','score_threshold','mom_rank_top_pct','max_positions'],
+    '仓位控制': ['max_position_pct','max_sector_pct','semi_single_limit','semi_total_limit','buy_cash_ratio','atr_low_threshold','atr_medium_threshold','atr_high_threshold','atr_cap_low','atr_cap_medium','atr_cap_high','atr_cap_extreme'],
+    '因子权重': ['momentum_weight','quality_weight','trend_weight'],
+    '风控告警': ['alert_total_drawdown','alert_single_loss'],
+    '熔断保护': ['circuit_daily_loss','circuit_max_drawdown'],
+    '对冲': ['hedge_vix_trigger','hedge_ratio_max'],
+};
+
+let configData = {};
+async function loadConfig() {
+    const r = await fetch('/settings/api/all_config');
+    configData = await r.json();
+    const form = document.getElementById('configForm');
+    form.innerHTML = '';
+    Object.entries(CONFIG_GROUPS).forEach(([group, keys]) => {
+        let html = `<div style="background:#0d1117;border-radius:8px;padding:12px;border:1px solid #21262d;">
+            <h3 style="font-size:12px;color:#8b949e;text-transform:uppercase;margin-bottom:10px;">${group}</h3>`;
+        keys.forEach(k => {
+            const label = CONFIG_LABELS[k] || k;
+            const val = configData[k];
+            html += `<label style="display:block;margin-bottom:10px;font-size:12px;">
+                <span style="color:#8b949e;">${label}</span>
+                <input type="number" value="${val}" data-key="${k}" 
+                       style="width:100%;padding:6px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#c9d1d9;margin-top:4px;">
+            </label>`;
+        });
+        html += '</div>';
+        form.innerHTML += html;
+    });
+}
+
+async function saveConfig() {
+    const inputs = document.querySelectorAll('#configForm input[data-key]');
+    const updates = {};
+    inputs.forEach(inp => updates[inp.getAttribute('data-key')] = parseFloat(inp.value));
+    const r = await fetch('/settings/api/save_config', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(updates)
+    });
+    const d = await r.json();
+    document.getElementById('configMsg').textContent = d.status === 'ok' ? '✅ 已保存' : '❌ 失败';
+    setTimeout(() => document.getElementById('configMsg').textContent = ' ', 3000);
+}
+
+async function resetConfig() {
+    if (!confirm('确认恢复默认参数？')) return;
+    const r = await fetch('/settings/api/reset_config', {method: 'POST'});
+    document.getElementById('configMsg').textContent = '✅ 已重置';
+    setTimeout(() => location.reload(), 1500);
+}
+
+loadAll();
+loadConfig();
+</script>
+{% endblock %}

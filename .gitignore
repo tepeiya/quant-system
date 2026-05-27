@@ -1,0 +1,14 @@
+data_cache/
+config/users.json
+config/broker_keys.json
+config/circuit_breaker.json
+config/daemon.pid
+config/daemon_status.json
+signals/trade_log.json
+signals/portfolio.json
+signals/cached_portfolio.json
+logs/
+__pycache__/
+*.pyc
+*.tar.gz
+env_setup.sh

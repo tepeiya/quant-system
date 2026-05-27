@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}交易 - 量化系统{% endblock %}
+{% block content %}
+
+<!-- 绩效卡片 -->
+<div class="card-grid" id="perfCards">
+    <div class="card"><div class="label">总交易</div><div class="value" id="totalTrades">-</div></div>
+    <div class="card"><div class="label">胜率</div><div class="value" id="winRate">-</div></div>
+    <div class="card"><div class="label">盈亏比</div><div class="value" id="profitLoss">-</div></div>
+    <div class="card"><div class="label">总PnL</div><div class="value" id="totalPnl">-</div></div>
+    <div class="card"><div class="label">平均持仓</div><div class="value" id="avgHold">-</div></div>
+    <div class="card"><div class="label">预期月收益</div><div class="value" id="estReturn">-</div></div>
+</div>
+
+<div class="row-2">
+    <div class="panel">
+        <h2>🧬 因子贡献分解</h2>
+        <div id="factorContrib"></div>
+    </div>
+    <div class="panel">
+        <h2>📈 权益走势</h2>
+        <canvas id="equityChart" height="180"></canvas>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="flex-between mb-8">
+        <h2>📝 全部交易记录</h2>
+        <button class="btn" onclick="loadTrades()">🔄 刷新</button>
+    </div>
+    <div class="table-wrapper">
+    <table>
+        <thead><tr><th>时间</th><th>操作</th><th>股票</th><th>数量</th><th>价格</th><th>金额</th></tr></thead>
+        <tbody id="tradesBody"></tbody>
+    </table>
+    </div>
+</div>
+
+<script>
+async function loadTrades() {
+    // 绩效归因
+    try {
+        const ra = await fetch('/trades/api/attribution');
+        const perf = await ra.json();
+        const ts = perf.trade_stats || {};
+        const fc = perf.factor_contribution || {};
+
+        $('totalTrades').textContent = ts.total_trades || 0;
+        const wr = ts.win_rate || 0;
+        $('winRate').textContent = wr.toFixed(1) + '%';
+        $('winRate').className = 'value ' + (wr >= 50 ? 'positive' : 'negative');
+        $('profitLoss').textContent = (ts.profit_loss_ratio || 0).toFixed(2);
+        $('profitLoss').className = 'value ' + ((ts.profit_loss_ratio || 0) >= 1.5 ? 'positive' : 'neutral');
+        const pnl = ts.total_pnl || 0;
+        $('totalPnl').textContent = '$' + pnl.toFixed(0);
+        $('totalPnl').className = 'value ' + (pnl >= 0 ? 'positive' : 'negative');
+        $('avgHold').textContent = (ts.avg_hold_days || 0) + '天';
+        const est = fc.estimated_monthly_return || 0;
+        $('estReturn').textContent = (est * 100).toFixed(2) + '%';
+        $('estReturn').className = 'value ' + (est > 0 ? 'positive' : 'negative');
+
+        // 因子贡献
+        const factors = fc.factors || [];
+        const fcDiv = $('factorContrib');
+        if (factors.length > 0) {
+            const maxPct = Math.max(...factors.map(f => f.pct || 0), 1);
+            fcDiv.innerHTML = factors.map(f => {
+                const pct = f.pct || 0;
+                const barW = (pct / maxPct * 100).toFixed(0);
+                return '<div style="margin-bottom:8px;">' +
+                    '<div class="flex-between" style="font-size:12px;margin-bottom:2px;">' +
+                    '<span>' + f.name + '</span>' +
+                    '<span>权重' + f.weight + '% | IC' + (f.ic || 0).toFixed(4) + ' | <b>' + pct.toFixed(1) + '%</b></span>' +
+                    '</div>' +
+                    '<div style="height:8px;background:#21262d;border-radius:4px;overflow:hidden;">' +
+                    '<div style="height:100%;width:' + barW + '%;background:' +
+                    (f.key === 'momentum' ? '#58a6ff' : f.key === 'quality' ? '#3fb950' : f.key === 'trend' ? '#d29922' : '#8b949e') +
+                    ';border-radius:4px;"></div></div></div>';
+            }).join('');
+        } else {
+            fcDiv.innerHTML = '<div style="padding:20px;text-align:center;color:#8b949e;">暂无因子数据，先运行因子进化</div>';
+        }
+    } catch(e) {
+        console.log('Perf load error:', e);
+    }
+
+    // 交易明细
+    try {
+        const rt = await fetch('/trades/api/trade_log');
+        const td = await rt.json();
+        const trades = td.trades || [];
+        const tBody = $('tradesBody');
+        if (trades.length === 0) {
+            tBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8b949e;">暂无交易</td></tr>';
+        } else {
+            tBody.innerHTML = trades.slice().reverse().map(t => {
+                const sideClass = t.side?.toUpperCase() === 'BUY' ? 'badge buy' : 'badge sell';
+                return '<tr><td>' + (t.time || '').slice(0, 16) +
+                    '</td><td><span class="' + sideClass + '">' + (t.side?.toUpperCase() || '?') +
+                    '</span></td><td><b>' + t.symbol + '</b></td><td>' + t.qty +
+                    '</td><td>$' + (t.price || 0).toFixed(2) +
+                    '</td><td>' + formatCurrency(t.value) + '</td></tr>';
+            }).join('');
+        }
+    } catch(e) {}
+
+    // 权益曲线
+    try {
+        const rh = await fetch('/trades/api/portfolio_history');
+        const hist = await rh.json();
+        if (hist.length > 0 && window.Chart) {
+            const canvas = document.getElementById('equityChart');
+            const ctx = canvas.getContext('2d');
+            if (window.equityChart) window.equityChart.destroy();
+            window.equityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: hist.map(h => h.date),
+                    datasets: [{
+                        label: '总权益',
+                        data: hist.map(h => h.equity),
+                        borderColor: '#3fb950',
+                        backgroundColor: 'rgba(63,185,80,0.1)',
+                        fill: true, tension: 0.3, pointRadius: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { display: false } },
+                        y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', callback: v => '$' + v.toLocaleString() } }
+                    }
+                }
+            });
+        }
+    } catch(e) {}
+}
+
+loadTrades();
+</script>
+{% endblock %}

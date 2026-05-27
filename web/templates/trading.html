@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}手动交易 - M+{% endblock %}
+{% block content %}
+
+<div class="row-2">
+    <div class="panel" style="z-index:1;">
+        <h2>🔍 搜索股票</h2>
+        <div class="form-group">
+            <input type="text" id="searchInput" placeholder="输入股票代码，如 AAPL"
+                   oninput="searchStock(this.value)" style="width:100% !important;padding:10px !important;border:1px solid #30363d !important;border-radius:6px !important;background:#0d1117 !important;color:#c9d1d9 !important;font-size:14px !important;box-sizing:border-box !important;">
+        </div>
+        <div id="searchResults" style="margin-top:8px;"></div>
+    </div>
+    <div class="panel">
+        <h2>📝 下单</h2>
+        <div class="form-group">
+            <label style="font-size:12px;color:#8b949e;">股票代码</label>
+            <input type="text" id="orderSymbol" readonly style="width:100%;padding:10px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;">
+        </div>
+        <div class="form-group">
+            <label style="font-size:12px;color:#8b949e;">当前价</label>
+            <div id="orderPrice" style="font-size:18px;font-weight:600;color:#e6edf3;">-</div>
+        </div>
+        <div class="flex gap-8">
+            <div class="form-group" style="flex:1;">
+                <label style="font-size:12px;color:#8b949e;">数量</label>
+                <input type="number" id="orderQty" value="1" min="1"
+                       style="width:100%;padding:10px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;">
+            </div>
+            <div class="form-group" style="flex:1;">
+                <label style="font-size:12px;color:#8b949e;">方向</label>
+                <select id="orderSide"
+                        style="width:100%;padding:10px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;">
+                    <option value="buy">🟢 买入</option>
+                    <option value="sell">🔴 卖出</option>
+                </select>
+            </div>
+        </div>
+        <div id="orderSummary" style="font-size:13px;color:#8b949e;margin:8px 0;"></div>
+        <button class="btn primary" onclick="submitOrder()" id="orderBtn" disabled>下单</button>
+        <div id="orderResult" style="margin-top:8px;"></div>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>📋 账户信息</h2>
+    <div id="accountInfo" style="font-size:14px;color:#8b949e;">加载中...</div>
+</div>
+
+<script>
+let selectedStock = null;
+
+async function searchStock(keyword) {
+    const resultsDiv = document.getElementById('searchResults');
+    if (keyword.length < 1) {
+        resultsDiv.innerHTML = '';
+        return;
+    }
+    try {
+        const r = await fetch('/trading/api/search', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({keyword})
+        });
+        const stocks = await r.json();
+        resultsDiv.innerHTML = stocks.slice(0, 8).map(s => {
+            const cls = s.change >= 0 ? 'positive' : 'negative';
+            return `<div style="padding:8px;border-bottom:1px solid #21262d;cursor:pointer;"
+                        onclick="selectStock('${s.symbol}', ${s.price})">
+                <b>${s.symbol}</b> <span style="float:right;">$${s.price.toFixed(2)} <span class="${cls}">${s.change >= 0 ? '+' : ''}${s.change.toFixed(2)}%</span></span>
+            </div>`;
+        }).join('');
+        if (stocks.length === 0) resultsDiv.innerHTML = '<div style="color:#484f58;padding:8px;">未找到</div>';
+    } catch(e) {}
+}
+
+function selectStock(symbol, price) {
+    selectedStock = symbol;
+    document.getElementById('orderSymbol').value = symbol;
+    document.getElementById('orderPrice').textContent = '$' + price.toFixed(2);
+    document.getElementById('orderBtn').disabled = false;
+    document.getElementById('searchResults').innerHTML = '';
+    updateOrderSummary();
+}
+
+function updateOrderSummary() {
+    const qty = parseInt(document.getElementById('orderQty').value) || 0;
+    const priceEl = document.getElementById('orderPrice');
+    const price = parseFloat(priceEl.textContent.replace('$', '')) || 0;
+    const side = document.getElementById('orderSide').value;
+    if (selectedStock && qty > 0 && price > 0) {
+        document.getElementById('orderSummary').textContent =
+            `${side === 'buy' ? '买入' : '卖出'} ${selectedStock} x${qty} = $${(qty * price).toFixed(2)}`;
+    }
+}
+
+document.getElementById('orderQty').addEventListener('input', updateOrderSummary);
+document.getElementById('orderSide').addEventListener('change', updateOrderSummary);
+
+async function submitOrder() {
+    if (!selectedStock) return;
+    const qty = parseInt(document.getElementById('orderQty').value);
+    const side = document.getElementById('orderSide').value;
+    const btn = document.getElementById('orderBtn');
+    btn.textContent = '⏳ 提交中...';
+    btn.disabled = true;
+    try {
+        const r = await fetch('/trading/api/submit', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({symbol: selectedStock, side, qty})
+        });
+        const d = await r.json();
+        document.getElementById('orderResult').innerHTML =
+            `<div class="${d.status === 'ok' ? 'positive' : 'negative'}" style="margin-top:8px;">${d.message || JSON.stringify(d)}</div>`;
+    } catch(e) {
+        document.getElementById('orderResult').innerHTML = '<div class="negative">下单失败: ' + e + '</div>';
+    }
+    btn.textContent = '下单';
+    btn.disabled = false;
+}
+
+// 加载账户信息
+fetch('/trading/api/preview', {method: 'POST'}).then(r => r.json()).then(d => {
+    document.getElementById('accountInfo').innerHTML = `
+        <div class="flex gap-8">
+            <span>权益: <b style="color:#e6edf3;">$${(d.equity || 0).toFixed(2)}</b></span>
+            <span>现金: <b style="color:#e6edf3;">$${(d.cash || 0).toFixed(2)}</b></span>
+            <span>购买力: <b style="color:#e6edf3;">$${(d.buying_power || 0).toFixed(2)}</b></span>
+        </div>`;
+}).catch(() => {
+    document.getElementById('accountInfo').textContent = '❌ 无法获取账户信息';
+});
+</script>
+{% endblock %}

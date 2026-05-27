@@ -1,0 +1,103 @@
+{
+  "date": "2026-05-27",
+  "market": {
+    "spy": 745.64,
+    "rsi": 71.84189723320162,
+    "trend": "\ud83d\udfe2 \u591a\u5934",
+    "action": "\u6b63\u5e38\u4e70\u5165"
+  },
+  "top_scores": [
+    {
+      "ticker": "AMAT",
+      "score": 72.6,
+      "price": 432.16,
+      "mom": 166.4
+    },
+    {
+      "ticker": "SATS",
+      "score": 71.3,
+      "price": 124.2,
+      "mom": 487.5
+    },
+    {
+      "ticker": "CAT",
+      "score": 70.1,
+      "price": 879.89,
+      "mom": 156.9
+    },
+    {
+      "ticker": "AMCR",
+      "score": 67.1,
+      "price": 38.38,
+      "mom": 318.1
+    },
+    {
+      "ticker": "GEV",
+      "score": 66.7,
+      "price": 1049.23,
+      "mom": 142.4
+    },
+    {
+      "ticker": "AMD",
+      "score": 66.5,
+      "price": 467.51,
+      "mom": 317.2
+    },
+    {
+      "ticker": "FDX",
+      "score": 65.0,
+      "price": 394.2,
+      "mom": 81.8
+    },
+    {
+      "ticker": "APA",
+      "score": 64.9,
+      "price": 38.8,
+      "mom": 141.8
+    },
+    {
+      "ticker": "AKAM",
+      "score": 64.5,
+      "price": 147.23,
+      "mom": 92.7
+    },
+    {
+      "ticker": "ADI",
+      "score": 64.3,
+      "price": 397.07,
+      "mom": 81.4
+    }
+  ],
+  "buy_candidates": [
+    {
+      "ticker": "AMAT",
+      "score": 72.6,
+      "price": 432.16,
+      "mom": 166.4
+    },
+    {
+      "ticker": "SATS",
+      "score": 71.3,
+      "price": 124.2,
+      "mom": 487.5
+    },
+    {
+      "ticker": "CAT",
+      "score": 70.1,
+      "price": 879.89,
+      "mom": 156.9
+    },
+    {
+      "ticker": "AMCR",
+      "score": 67.1,
+      "price": 38.38,
+      "mom": 318.1
+    },
+    {
+      "ticker": "GEV",
+      "score": 66.7,
+      "price": 1049.23,
+      "mom": 142.4
+    }
+  ]
+}
