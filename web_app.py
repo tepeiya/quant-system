@@ -111,12 +111,12 @@ def index():
 
 @app.route("/login")
 def login_redirect():
-    return redirect("/auth/login")
+    return render_template("login.html")
 
 
 @app.route("/register")
 def register_redirect():
-    return redirect("/auth/register")
+    return render_template("register.html")
 
 
 # ====== 交易模式切换 ======
