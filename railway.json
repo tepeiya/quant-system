@@ -1,14 +1,12 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "DOCKERFILE",
-    "dockerfilePath": "Dockerfile",
-    "watchPatterns": ["Dockerfile", "web_app.py", "web/blueprints/*.py", "web/templates/*.html"]
+    "builder": "NIXPACKS"
   },
   "deploy": {
     "restartPolicyType": "ALWAYS",
     "numReplicas": 1,
     "healthcheckPath": "/login",
-    "healthcheckTimeout": 60
+    "healthcheckTimeout": 120
   }
 }

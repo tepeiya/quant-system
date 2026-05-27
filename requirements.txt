@@ -1,0 +1,8 @@
+flask
+gunicorn
+pandas
+numpy
+alpaca-py
+yfinance
+requests
+passlib
