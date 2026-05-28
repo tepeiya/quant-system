@@ -1,8 +1,28 @@
-flask
-gunicorn
-pandas
-numpy
-alpaca-py
-yfinance
-requests
-passlib
+# === 核心Web框架 ===
+flask>=3.0
+gunicorn>=21.2
+
+# === 数据处理 ===
+pandas>=2.0
+numpy>=1.26
+
+# === 数据源 ===
+alpaca-py>=0.43
+yfinance>=1.4
+requests>=2.31
+
+# === 安全 ===
+passlib>=1.7
+cryptography>=41.0
+
+# === 图表 ===
+matplotlib>=3.8
+
+# === 宏观 ===
+fredapi>=0.5
+
+# === IBKR（可选） ===
+# ib_insync>=0.9
+
+# === 构建 ===
+wheel>=0.41

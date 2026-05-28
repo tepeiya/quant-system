@@ -151,13 +151,11 @@ def api_trade_mode():
 register_blueprints()
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8765))
     print(f"\n{'='*50}")
     print(f"  🌐 量化系统 Web 面板")
     print(f"  {os.path.basename(__file__)}")
     print(f"{'='*50}")
-    print(f"  加载功能模块...")
-    # 不要重复调用 - register_blueprints() 已在外部调用
+    print(f"  启动地址: http://0.0.0.0:{port}")
     print(f"{'='*50}")
-    print(f"  启动地址: http://localhost:8765")
-    print(f"{'='*50}")
-    app.run(host="0.0.0.0", port=8765, debug=False, use_reloader=False)
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
