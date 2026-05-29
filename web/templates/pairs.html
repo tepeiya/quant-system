@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}配对交易 - M+{% endblock %}
+{% block content %}
+
+<div class="flex-between mb-16" style="flex-wrap:wrap;gap:8px;">
+    <div>
+        <h2 style="font-size:18px;font-weight:600;color:#e6edf3;">🔗 配对交易（统计套利）</h2>
+        <div style="font-size:12px;color:#8b949e;margin-top:2px;">找高度相关的股票对，价差偏离均值时反向操作</div>
+    </div>
+    <div class="flex gap-8">
+        <button class="btn primary" onclick="scanPairs()">🔍 扫描配对</button>
+        <button class="btn" onclick="refreshSignals()">🔄 刷新信号</button>
+    </div>
+</div>
+
+<!-- 概览卡片 -->
+<div class="card-grid mb-16" id="overviewCards" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+    <div class="card compact"><div class="label">可用配对</div><div class="value" id="totalPairs">-</div></div>
+    <div class="card compact"><div class="label">有信号</div><div class="value positive" id="activePairs">-</div></div>
+    <div class="card compact"><div class="label">最高相关系数</div><div class="value" id="maxCorr">-</div></div>
+    <div class="card compact"><div class="label">最大z-score</div><div class="value" id="maxZscore">-</div></div>
+</div>
+
+<!-- 配对列表 -->
+<div class="panel mb-16">
+    <h2>📊 配对扫描结果</h2>
+    <div class="table-wrapper">
+        <table>
+            <thead><tr><th>配对</th><th>相关系数</th><th>信号</th><th>z-score</th><th>说明</th></tr></thead>
+            <tbody id="pairsBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 价差热图 -->
+<div class="panel">
+    <h2>🔥 配对热图（z-score）</h2>
+    <div id="heatmapContainer" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    <div style="margin-top:8px;font-size:11px;color:#8b949e;">
+        🔴 红色 = 价差偏高（卖A买B） | 🟢 绿色 = 价差偏低（买A卖B） | 🟡 黄色 = 等待中
+    </div>
+</div>
+
+<!-- 详情弹窗 -->
+<div id="pairModal" class="modal-overlay" style="display:none;" onclick="this.style.display='none'">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2 id="modalTitle" style="font-size:18px;">-</h2>
+            <button class="modal-close" onclick="document.getElementById('pairModal').style.display='none'">✕</button>
+        </div>
+        <div id="modalBody"></div>
+    </div>
+</div>
+
+<style>
+.heatmap-cell {
+    border-radius: 6px;
+    padding: 12px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    min-width: 100px;
+}
+.heatmap-cell:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.heatmap-pair {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    pointer-events: none;
+}
+.heatmap-zscore {
+    font-size: 11px;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    pointer-events: none;
+    margin-top: 2px;
+}
+</style>
+
+<script>
+let allPairs = [];
+let allSignals = [];
+
+async function scanPairs() {
+    document.getElementById('pairsBody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8b949e;">扫描中...</td></tr>';
+    document.getElementById('heatmapContainer').innerHTML = '<div class="empty-state">扫描中...</div>';
+
+    const r = await fetch('/pairs/api/scan');
+    const d = await r.json();
+
+    if (d.error) {
+        document.getElementById('pairsBody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f85149;">' + d.error + '</td></tr>';
+        return;
+    }
+
+    allPairs = d.pairs || [];
+    allSignals = d.signals || [];
+    renderData();
+}
+
+async function refreshSignals() {
+    const r = await fetch('/pairs/api/signals');
+    const d = await r.json();
+    allSignals = d.signals || [];
+    renderData();
+}
+
+function renderData() {
+    // 概览
+    const activeCount = allSignals.filter(s => s.action === 'SELL_A_BUY_B' || s.action === 'BUY_A_SELL_B').length;
+    document.getElementById('totalPairs').textContent = allPairs.length;
+    document.getElementById('activePairs').textContent = activeCount;
+
+    let maxCorr = 0, maxZ = 0;
+    allPairs.forEach(p => { if (p.correlation > maxCorr) maxCorr = p.correlation; });
+    allSignals.forEach(s => { if (Math.abs(s.zscore) > maxZ) maxZ = Math.abs(s.zscore); });
+    document.getElementById('maxCorr').textContent = maxCorr.toFixed(4);
+    document.getElementById('maxZscore').textContent = maxZ.toFixed(2);
+
+    // 表格
+    const body = document.getElementById('pairsBody');
+    if (allPairs.length === 0) {
+        body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8b949e;">暂无数据，点击「扫描配对」开始</td></tr>';
+    } else {
+        // 合并配对和信号
+        const signalMap = {};
+        allSignals.forEach(s => { signalMap[s.pair] = s; });
+
+        body.innerHTML = allPairs.map(p => {
+            const sig = signalMap[p.pair] || {};
+            const action = sig.action || 'WAIT';
+            const z = sig.zscore || 0;
+            const actionLabel = action === 'SELL_A_BUY_B' ? '<span class="badge sell">卖A买B</span>' :
+                action === 'BUY_A_SELL_B' ? '<span class="badge buy">买A卖B</span>' :
+                action === 'EXIT' ? '<span class="badge hold">平仓</span>' :
+                action === 'HOLD' ? '<span class="badge hold">等待</span>' : '-';
+            const desc = sig.direction || '-';
+            const zClass = z > 1.5 ? 'negative' : (z < -1.5 ? 'positive' : 'neutral');
+
+            return '<tr onclick="showDetail(\'' + p.pair + '\')" style="cursor:pointer;">' +
+                '<td><b>' + p.pair + '</b></td>' +
+                '<td>' + p.correlation.toFixed(4) + '</td>' +
+                '<td>' + actionLabel + '</td>' +
+                '<td class="' + zClass + '">' + (z > 0 ? '+' : '') + z.toFixed(2) + '</td>' +
+                '<td style="font-size:12px;color:#8b949e;">' + desc + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    // 热图
+    const heatmap = document.getElementById('heatmapContainer');
+    if (allPairs.length === 0) {
+        heatmap.innerHTML = '<div class="empty-state">暂无配对数据</div>';
+        return;
+    }
+
+    const signalMap = {};
+    allSignals.forEach(s => { signalMap[s.pair] = s; });
+
+    heatmap.innerHTML = allPairs.map(p => {
+        const sig = signalMap[p.pair] || {};
+        const z = sig.zscore || 0;
+        const absZ = Math.abs(z);
+        let bg, color;
+        if (z > 1.5) { bg = 'rgba(248,81,73,0.6)'; color = '#f85149'; }
+        else if (z > 0.3) { bg = 'rgba(210,153,34,0.5)'; color = '#d29922'; }
+        else if (z < -1.5) { bg = 'rgba(63,185,80,0.6)'; color = '#3fb950'; }
+        else if (z < -0.3) { bg = 'rgba(210,153,34,0.5)'; color = '#d29922'; }
+        else { bg = 'rgba(210,153,34,0.4)'; color = '#d29922'; }
+
+        return '<div class="heatmap-cell" style="background:' + bg + ';" onclick="showDetail(\'' + p.pair + '\')">' +
+            '<div class="heatmap-pair">' + p.pair + '</div>' +
+            '<div class="heatmap-zscore" style="color:' + color + ';">z=' + (z > 0 ? '+' : '') + z.toFixed(2) + '</div>' +
+            '</div>';
+    }).join('');
+}
+
+async function showDetail(pairName) {
+    document.getElementById('pairModal').style.display = 'flex';
+    document.getElementById('modalTitle').textContent = pairName;
+
+    const pair = allPairs.find(p => p.pair === pairName) || {};
+    const sig = allSignals.find(s => s.pair === pairName) || {};
+
+    const actionStr = sig.action === 'SELL_A_BUY_B' ? '🔴 卖出A，买入B（价差偏高）' :
+        sig.action === 'BUY_A_SELL_B' ? '🟢 买入A，卖出B（价差偏低）' :
+        sig.action === 'EXIT' ? '⚪ 平仓（价差回归均值）' : '⏳ 等待信号';
+
+    document.getElementById('modalBody').innerHTML =
+        '<div class="card-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:12px;">' +
+        '<div class="card"><div class="label">相关系数</div><div class="value">' + pair.correlation.toFixed(4) + '</div></div>' +
+        '<div class="card"><div class="label">z-score</div><div class="value" style="color:' + (sig.zscore > 1.5 ? '#f85149' : (sig.zscore < -1.5 ? '#3fb950' : '#d29922')) + ';">' + (sig.zscore || 0).toFixed(2) + '</div></div>' +
+        '</div>' +
+        '<div class="card" style="margin-bottom:8px;">' +
+        '<div class="label">信号</div>' +
+        '<div style="font-size:14px;color:#e6edf3;margin-top:4px;">' + actionStr + '</div>' +
+        '</div>' +
+        '<div style="font-size:12px;color:#8b949e;margin-top:4px;">' +
+        '入场阈值: z-score &gt; 1.5（卖A买B）或 &lt; -1.5（买A卖B）<br>' +
+        '出场阈值: z-score 回归到 ±0.3 以内<br>' +
+        '止损阈值: z-score &gt; 3.0 或 &lt; -3.0' +
+        '</div>';
+}
+
+// 自动加载
+refreshSignals();
+</script>
+{% endblock %}
