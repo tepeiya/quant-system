@@ -2,36 +2,55 @@
 {% block title %}热图 - M+{% endblock %}
 {% block content %}
 
-<div class="flex-between mb-12">
-    <h2 style="font-size:16px;font-weight:600;">🔥 行业热图</h2>
-    <span style="font-size:12px;color:#8b949e;">色块大小=评分 | 颜色=周涨跌</span>
-</div>
-
-<div class="heatmap-controls flex gap-8 mb-12" style="flex-wrap:wrap;">
-    <button class="btn primary" onclick="loadHeatmap()">🔄 刷新</button>
-    <label style="font-size:12px;color:#8b949e;display:flex;align-items:center;gap:4px;">
-        <input type="checkbox" id="showLegend" checked onchange="toggleLegend()"> 图例
-    </label>
-</div>
-
-<div id="heatmapContainer"></div>
-
-<div id="legend" class="panel" style="margin-top:12px;">
-    <h2>📖 图例</h2>
-    <div class="flex gap-8" style="flex-wrap:wrap;margin-top:8px;">
-        <div class="flex gap-4" style="align-items:center;"><div style="width:16px;height:16px;border-radius:3px;background:#3fb950;"></div><span style="font-size:12px;">涨</span></div>
-        <div class="flex gap-4" style="align-items:center;"><div style="width:16px;height:16px;border-radius:3px;background:#d29922;"></div><span style="font-size:12px;">横盘</span></div>
-        <div class="flex gap-4" style="align-items:center;"><div style="width:16px;height:16px;border-radius:3px;background:#f85149;"></div><span style="font-size:12px;">跌</span></div>
-        <div class="flex gap-4" style="align-items:center;"><div style="width:16px;height:16px;border-radius:3px;background:#21262d;"></div><span style="font-size:12px;">无数据</span></div>
+<div class="flex-between mb-16" style="flex-wrap:wrap;gap:8px;">
+    <div>
+        <h2 style="font-size:18px;font-weight:600;color:#e6edf3;">🔥 行业热图</h2>
+        <div style="font-size:12px;color:#8b949e;margin-top:2px;">色块大小 = 综合评分 · 颜色 = 周涨跌幅</div>
     </div>
-    <div style="margin-top:8px;font-size:12px;color:#8b949e;">色块越大 = 评分越高，点击股票查看详情</div>
+    <div class="flex gap-8" style="flex-wrap:wrap;">
+        <select id="sortBy" class="btn" onchange="loadHeatmap()" style="padding:6px 10px;">
+            <option value="score">按评分排序</option>
+            <option value="change">按涨跌幅排序</option>
+            <option value="name">按名称排序</option>
+        </select>
+        <button class="btn primary" onclick="loadHeatmap()">🔄 刷新</button>
+    </div>
 </div>
 
-<!-- 股票详情弹窗 -->
+<!-- 概览卡片 -->
+<div class="card-grid mb-16" id="overviewCards" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr));">
+    <div class="card compact"><div class="label">行业数</div><div class="value" id="sectorCount">-</div></div>
+    <div class="card compact"><div class="label">股票数</div><div class="value" id="stockCount">-</div></div>
+    <div class="card compact"><div class="label">最高评分</div><div class="value positive" id="topScore">-</div></div>
+    <div class="card compact"><div class="label">最高周涨幅</div><div class="value positive" id="topGain">-</div></div>
+</div>
+
+<!-- 行业标签导航 -->
+<div class="flex gap-4 mb-16" id="sectorTabs" style="flex-wrap:wrap;overflow-x:auto;padding-bottom:4px;"></div>
+
+<!-- 热图主体 -->
+<div id="heatmapContainer">
+    <div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>
+</div>
+
+<!-- 图例 -->
+<div class="card mb-16" id="legendCard" style="padding:12px;">
+    <div class="flex gap-16" style="flex-wrap:wrap;align-items:center;">
+        <span style="font-size:12px;color:#8b949e;font-weight:500;">涨跌幅</span>
+        <div class="flex gap-4" style="align-items:center;"><div style="width:14px;height:14px;border-radius:3px;background:#f85149;"></div><span style="font-size:11px;color:#8b949e;">-5%</span></div>
+        <div class="flex gap-4" style="align-items:center;"><div style="width:14px;height:14px;border-radius:3px;background:#d29922;"></div><span style="font-size:11px;color:#8b949e;">0%</span></div>
+        <div class="flex gap-4" style="align-items:center;"><div style="width:14px;height:14px;border-radius:3px;background:#3fb950;"></div><span style="font-size:11px;color:#8b949e;">+5%</span></div>
+        <span style="font-size:12px;color:#8b949e;font-weight:500;margin-left:8px;">评分</span>
+        <div class="flex gap-4" style="align-items:center;"><div style="width:10px;height:10px;border-radius:2px;background:#3fb950;"></div><span style="font-size:11px;color:#8b949e;">高分</span></div>
+        <div class="flex gap-4" style="align-items:center;"><div style="width:7px;height:7px;border-radius:2px;background:#3fb950;"></div><span style="font-size:11px;color:#8b949e;">低分</span></div>
+    </div>
+</div>
+
+<!-- 详情弹窗 -->
 <div id="stockModal" class="modal-overlay" style="display:none;" onclick="this.style.display='none'">
     <div class="modal-content" onclick="event.stopPropagation()">
         <div class="modal-header">
-            <h2 id="modalTitle">-</h2>
+            <h2 id="modalTitle" style="font-size:18px;">-</h2>
             <button class="modal-close" onclick="document.getElementById('stockModal').style.display='none'">✕</button>
         </div>
         <div id="modalBody"></div>
@@ -39,9 +58,27 @@
 </div>
 
 <style>
+.sector-tab {
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid #30363d;
+    background: #161b22;
+    color: #8b949e;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.sector-tab:hover { border-color: #58a6ff; color: #58a6ff; }
+.sector-tab.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+
 .heatmap-sector {
     margin-bottom: 16px;
+    animation: fadeIn 0.3s ease;
 }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
 .heatmap-sector-title {
     font-size: 13px;
     font-weight: 600;
@@ -50,108 +87,205 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 0 2px;
 }
 .heatmap-sector-title .avg {
     font-size: 11px;
     color: #8b949e;
     font-weight: 400;
 }
+
 .heatmap-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 3px;
 }
+
 .heatmap-cell {
     border-radius: 4px;
-    padding: 6px 4px;
+    padding: 6px 3px;
     text-align: center;
     cursor: pointer;
-    transition: transform 0.1s, opacity 0.1s;
-    min-width: 50px;
-    flex: 0 0 auto;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    position: relative;
+    overflow: hidden;
 }
 .heatmap-cell:hover {
-    transform: scale(1.1);
-    opacity: 0.9;
-    z-index: 10;
+    transform: scale(1.15);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    z-index: 20;
 }
+.heatmap-cell::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.1);
+    pointer-events: none;
+}
+
 .heatmap-ticker {
     font-size: 10px;
     font-weight: 600;
-    color: #e6edf3;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
     pointer-events: none;
+    line-height: 1.3;
 }
 .heatmap-change {
     font-size: 9px;
     font-weight: 500;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
     pointer-events: none;
+    line-height: 1.2;
+}
+
+.hidden-sector { display: none; }
+
+@media (max-width: 600px) {
+    .heatmap-cell { min-width: 48px; }
+    .heatmap-ticker { font-size: 9px; }
+    .heatmap-change { font-size: 8px; }
 }
 </style>
 
 <script>
+let allSectors = [];
+let allStocks = [];
+
+function getColor(change) {
+    if (change === null || change === undefined || isNaN(change)) return '#21262d';
+    if (change > 3) return '#3fb950';
+    if (change > 1) return '#56d364';
+    if (change > -1) return '#d29922';
+    if (change > -3) return '#f85149';
+    return '#da3633';
+}
+
+function getTextColor(change) {
+    if (change === null || change === undefined || isNaN(change)) return '#8b949e';
+    if (change > 1) return '#3fb950';
+    if (change > -1) return '#d29922';
+    return '#f85149';
+}
+
+function getSize(score) {
+    return Math.max(44, Math.min(85, 44 + score * 0.45));
+}
+
 async function loadHeatmap() {
     const container = document.getElementById('heatmapContainer');
-    container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
-    
+    container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载行情数据...</p></div>';
+
     const r = await fetch('/heatmap/api/data');
     const d = await r.json();
-    const sectors = d.sectors || [];
-    
-    if (sectors.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无数据</p></div>';
+    allSectors = d.sectors || [];
+
+    if (allSectors.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无数据，请先补全股票缓存</p></div>';
         return;
     }
-    
+
+    // 统计
+    let totalStocks = 0, maxScore = 0, maxGain = -999, maxGainTicker = '';
+    allSectors.forEach(sec => {
+        sec.stocks.forEach(s => {
+            totalStocks++;
+            if (s.score > maxScore) maxScore = s.score;
+            if (s.weekly_change > maxGain) { maxGain = s.weekly_change; maxGainTicker = s.ticker; }
+        });
+    });
+
+    document.getElementById('sectorCount').textContent = allSectors.length;
+    document.getElementById('stockCount').textContent = totalStocks;
+    document.getElementById('topScore').textContent = maxScore.toFixed(0);
+    document.getElementById('topGain').textContent = (maxGain > 0 ? '+' : '') + maxGain.toFixed(1) + '%';
+
+    const sortBy = document.getElementById('sortBy').value;
+    if (sortBy === 'change') {
+        allSectors.forEach(sec => sec.stocks.sort((a,b) => (b.weekly_change||0) - (a.weekly_change||0)));
+    } else if (sortBy === 'name') {
+        allSectors.forEach(sec => sec.stocks.sort((a,b) => a.ticker.localeCompare(b.ticker)));
+    } else {
+        allSectors.forEach(sec => sec.stocks.sort((a,b) => b.score - a.score));
+    }
+
+    // 标签页
+    const tabsHtml = allSectors.map((sec, i) =>
+        '<span class="sector-tab' + (i === 0 ? ' active' : '') + '" onclick="filterSector(' + i + ', this)">' +
+        sec.name + ' <span style="opacity:0.6;">' + sec.count + '</span></span>'
+    ).join('');
+    document.getElementById('sectorTabs').innerHTML = tabsHtml;
+
+    // 热图
     let html = '';
-    for (const sec of sectors) {
+    allSectors.forEach((sec, si) => {
         const scoreColor = sec.avg_score >= 60 ? '#3fb950' : (sec.avg_score >= 40 ? '#d29922' : '#f85149');
-        html += '<div class="heatmap-sector">';
+        const vis = si === 0 ? '' : ' hidden-sector';
+        html += '<div class="heatmap-sector' + vis + '" data-sector="' + si + '">';
         html += '<div class="heatmap-sector-title">';
         html += '<span>' + sec.name + ' <span style="font-size:11px;color:#8b949e;font-weight:400;">(' + sec.count + '只)</span></span>';
         html += '<span class="avg" style="color:' + scoreColor + ';">均分 ' + sec.avg_score + '</span>';
-        html += '</div>';
-        html += '<div class="heatmap-grid">';
-        
-        for (const s of sec.stocks) {
-            const size = Math.max(50, Math.min(90, 50 + s.score * 0.5));
-            const change = s.weekly_change || 0;
-            const color = change > 1 ? '#3fb950' : (change > -1 ? '#d29922' : (change === 0 ? '#21262d' : '#f85149'));
-            const textColor = change > 1 ? '#3fb950' : (change > -1 ? '#d29922' : '#f85149');
-            const changeStr = (change > 0 ? '+' : '') + change.toFixed(1) + '%';
-            
-            html += '<div class="heatmap-cell" style="width:' + size + 'px;height:' + (size * 0.7) + 'px;background:' + color + ';"';
-            html += ' onclick="showStock(\'' + s.ticker + '\',' + s.price + ',' + s.score + ',' + s.momentum + ',' + (s.rsi || 0) + ',' + change + ')">';
+        html += '</div><div class="heatmap-grid">';
+
+        sec.stocks.forEach(s => {
+            const sz = getSize(s.score);
+            const chg = s.weekly_change || 0;
+            const bg = getColor(chg);
+            const tc = getTextColor(chg);
+            const chgStr = (chg > 0 ? '+' : '') + chg.toFixed(1) + '%';
+
+            html += '<div class="heatmap-cell" style="width:' + sz + 'px;height:' + Math.round(sz * 0.65) + 'px;background:' + bg + ';"';
+            html += ' onclick="showStock(\'' + s.ticker + '\')" title="' + s.ticker + ' ' + chgStr + '">';
             html += '<span class="heatmap-ticker">' + s.ticker + '</span>';
-            html += '<span class="heatmap-change" style="color:' + textColor + ';">' + changeStr + '</span>';
+            html += '<span class="heatmap-change" style="color:' + tc + ';">' + chgStr + '</span>';
             html += '</div>';
-        }
-        
+        });
+
         html += '</div></div>';
-    }
-    
+    });
+
     container.innerHTML = html;
 }
 
-function toggleLegend() {
-    const legend = document.getElementById('legend');
-    legend.style.display = document.getElementById('showLegend').checked ? 'block' : 'none';
+function filterSector(index, el) {
+    document.querySelectorAll('.sector-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.heatmap-sector').forEach(s => {
+        s.classList.toggle('hidden-sector', parseInt(s.dataset.sector) !== index);
+    });
 }
 
-function showStock(ticker, price, score, momentum, rsi, weeklyChange) {
-    document.getElementById('modalTitle').textContent = ticker;
-    const body = document.getElementById('modalBody');
-    const changeClass = weeklyChange > 0 ? 'positive' : (weeklyChange < 0 ? 'negative' : 'neutral');
-    body.innerHTML = '<div class="card-grid" style="grid-template-columns:repeat(2,1fr);">' +
-        '<div class="card"><div class="label">现价</div><div class="value">\$' + price.toFixed(2) + '</div></div>' +
-        '<div class="card"><div class="label">综合评分</div><div class="value">' + score.toFixed(0) + '</div></div>' +
-        '<div class="card"><div class="label">动量(12M)</div><div class="value">' + momentum.toFixed(1) + '%</div></div>' +
-        '<div class="card"><div class="label">周涨跌</div><div class="value ' + changeClass + '">' + (weeklyChange > 0 ? '+' : '') + weeklyChange.toFixed(2) + '%</div></div>' +
-        '</div>';
+async function showStock(ticker) {
     document.getElementById('stockModal').style.display = 'flex';
+    document.getElementById('modalTitle').textContent = ticker;
+    document.getElementById('modalBody').innerHTML = '<div class="empty-state"><div class="icon">⏳</div></div>';
+
+    // 找数据
+    for (const sec of allSectors) {
+        for (const s of sec.stocks) {
+            if (s.ticker === ticker) {
+                const chg = s.weekly_change || 0;
+                const chgClass = chg > 0 ? 'positive' : (chg < 0 ? 'negative' : 'neutral');
+                const chgStr = (chg > 0 ? '+' : '') + chg.toFixed(2) + '%';
+                document.getElementById('modalBody').innerHTML =
+                    '<div class="card-grid" style="grid-template-columns:repeat(2,1fr);">' +
+                    '<div class="card"><div class="label">行业</div><div class="value" style="font-size:14px;">' + sec.name + '</div></div>' +
+                    '<div class="card"><div class="label">现价</div><div class="value">\$' + s.price.toFixed(2) + '</div></div>' +
+                    '<div class="card"><div class="label">综合评分</div><div class="value" style="color:' + (s.score >= 60 ? '#3fb950' : '#d29922') + ';">' + s.score.toFixed(0) + '</div></div>' +
+                    '<div class="card"><div class="label">周涨跌幅</div><div class="value ' + chgClass + '">' + chgStr + '</div></div>' +
+                    '<div class="card"><div class="label">动量(12M)</div><div class="value">' + (s.momentum || 0).toFixed(1) + '%</div></div>' +
+                    '<div class="card"><div class="label">RSI</div><div class="value">' + (s.rsi || '-') + '</div></div>' +
+                    '</div>';
+                return;
+            }
+        }
+    }
+    document.getElementById('modalBody').innerHTML = '<div class="empty-state">无详细数据</div>';
 }
 
 loadHeatmap();
