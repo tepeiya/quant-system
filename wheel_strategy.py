@@ -71,6 +71,10 @@ def get_option_chain(symbol: str) -> dict:
     import pandas as pd
 
     try:
+        # 先用缓存
+        from data_prod import _fundamentals_cache
+        cached_fund = _fundamentals_cache.get(symbol, {})
+        
         import multiprocessing as _mp
         result_holder = {}
         def _fetch():

@@ -44,6 +44,17 @@ def compute_quality_scores(cache: dict[str, pd.DataFrame],
     """
     if pe_data is None:
         pe_data = _load_pe()
+        # 如果缓存为空，尝试从data_prod的基本面缓存自动加载
+        if not pe_data:
+            try:
+                from data_prod import _fundamentals_cache
+                for t, v in _fundamentals_cache.items():
+                    if v and v.get("pe"):
+                        pe_data[t] = {"pe": v["pe"]}
+                if pe_data:
+                    save_pe_cache(pe_data)
+            except:
+                pass
 
     scores = {}
     breakdown = {}

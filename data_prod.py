@@ -389,27 +389,53 @@ def _fetch_alpaca_batch(tickers: list[str], result: dict, start: str, end: str) 
 
 
 def fetch_fundamentals(tickers: list[str]) -> dict:
-    """从yfinance获取基本面（ROE/利润率/负债率）
-    用于价值因子提升PE估算精度
+    """从yfinance获取基本面（PE/ROE/利润率/负债率）
+    用于质量因子提升PE估算精度和财报日历
     """
     import yfinance as yf
     result = {}
-    need = [t for t in tickers]
+    need = [t for t in tickers if t not in _fundamentals_cache]
     if not need:
-        return result
+        # 用缓存
+        return {t: _fundamentals_cache[t] for t in tickers if t in _fundamentals_cache}
     logger.info(f"获取基本面: {len(need)}只...")
     for t in need:
         try:
             info = yf.Ticker(t).info
             result[t] = {
+                "pe": info.get("trailingPE") or info.get("forwardPE"),
                 "roe": info.get("returnOnEquity"),
                 "profit_margin": info.get("profitMargins"),
                 "debt_to_equity": info.get("debtToEquity"),
-                "pe": info.get("trailingPE") or info.get("forwardPE"),
+                "market_cap": info.get("marketCap"),
+                "dividend_yield": info.get("dividendYield"),
+                "earnings_date": info.get("earningsDate"),
+                "sector": info.get("sector"),
+                "industry": info.get("industry"),
             }
+            _fundamentals_cache[t] = result[t]
         except:
             result[t] = {}
+    # 缓存到磁盘
+    try:
+        import pickle as _pkl
+        with open(os.path.join(CACHE_DIR, "fundamentals.pkl"), "wb") as f:
+            _pkl.dump(_fundamentals_cache, f)
+    except:
+        pass
     return result
+
+
+# 基本面缓存
+_fundamentals_cache = {}
+_fundamentals_cache_file = os.path.join(CACHE_DIR, "fundamentals.pkl")
+if os.path.exists(_fundamentals_cache_file):
+    try:
+        import pickle as _pkl
+        with open(_fundamentals_cache_file, "rb") as f:
+            _fundamentals_cache = _pkl.load(f)
+    except:
+        pass
 
 
 def validate(data: dict[str, pd.DataFrame]) -> dict:
