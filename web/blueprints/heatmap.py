@@ -26,47 +26,42 @@ SECTOR_MAP = {
 
 
 def _get_data():
-    """获取热图数据（实时从 Tiingo/Alpaca 拉取）"""
-    from data_prod import load_price_cache
-    from quality_factor import compute_quality_scores
+    """获取热图数据（实时从数据源拉取）"""
+    from data_prod import _fetch_tiingo, compute_indicators as _ci
     
-    cache = load_price_cache()
-    
-    # 从缓存获取已有数据
     sectors = []
     for sector_name, tickers in SECTOR_MAP.items():
         stocks = []
         for t in tickers:
-            df = cache.get(t)
-            if df is None:
-                continue
-            row = df.iloc[-1]
-            price = row["Close"]
-            mom = row.get("Momentum_12M", np.nan)
-            rsi = row.get("RSI", np.nan)
-            
-            if len(df) >= 5:
-                week_ago = df["Close"].iloc[-5]
-                week_change = (price / week_ago - 1) * 100
-            else:
+            try:
+                df = _fetch_tiingo(t, "2025-01-01", "2026-05-31")
+                if df is None or len(df) < 50:
+                    continue
+                df = _ci(df)
+                row = df.iloc[-1]
+                price = row["Close"]
+                mom = row.get("Momentum_12M", np.nan)
+                rsi = row.get("RSI", np.nan)
                 week_change = 0
-
-            stocks.append({
-                "ticker": t,
-                "price": round(float(price), 2),
-                "momentum": round(float(mom * 100), 1) if not np.isnan(mom) else 0,
-                "rsi": round(float(rsi), 0) if not np.isnan(rsi) else None,
-                "weekly_change": round(float(week_change), 2),
-                "score": 0,
-            })
-        
+                if len(df) >= 5:
+                    week_ago = df["Close"].iloc[-5]
+                    week_change = (price / week_ago - 1) * 100
+                stocks.append({
+                    "ticker": t,
+                    "price": round(float(price), 2),
+                    "momentum": round(float(mom * 100), 1) if not np.isnan(mom) else 0,
+                    "rsi": round(float(rsi), 0) if not np.isnan(rsi) else None,
+                    "weekly_change": round(float(week_change), 2),
+                    "score": 0,
+                })
+            except:
+                continue
         if stocks:
             sectors.append({
                 "name": sector_name,
-                "stocks": stocks[:15],
+                "stocks": stocks[:20],
                 "count": len(stocks),
             })
-    
     return {"sectors": sectors}
 
 
