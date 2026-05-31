@@ -34,6 +34,7 @@ def page():
 def api_list():
     """返回所有券商列表"""
     cfg = _load_cfg()
+    default = get_default_broker()
     result = []
     for bid, bc in cfg.items():
         key_set = True
@@ -50,6 +51,7 @@ def api_list():
             "paper": bc.get("paper", False),
             "enabled": bc.get("enabled", False),
             "ready": bc.get("enabled", False) and key_set and secret_set,
+            "default": bid == default,
         })
     return jsonify(result)
 
@@ -72,7 +74,37 @@ def api_toggle():
 def api_keys():
     """返回所有券商的Key配置"""
     from broker_keys import get_broker_keys_status
-    return jsonify(get_broker_keys_status())
+    keys_status = get_broker_keys_status()
+    # 标记默认券商
+    default = get_default_broker()
+    return jsonify({"keys": keys_status, "default": default})
+
+
+def get_default_broker():
+    """获取默认券商ID"""
+    df = "config/default_broker.txt"
+    if os.path.exists(df):
+        with open(df) as f:
+            return f.read().strip()
+    return "alpaca_paper"
+
+
+def set_default_broker(broker_id):
+    df = "config/default_broker.txt"
+    os.makedirs("config", exist_ok=True)
+    with open(df, "w") as f:
+        f.write(broker_id)
+
+
+@bp.route("/api/set_default", methods=["POST"])
+def api_set_default():
+    """设置默认券商"""
+    data = request.json or {}
+    broker_id = data.get("broker_id", "")
+    if broker_id:
+        set_default_broker(broker_id)
+        return jsonify({"status": "ok"})
+    return jsonify({"status": "error", "message": "参数错误"})
 
 
 @bp.route("/api/save_key", methods=["POST"])

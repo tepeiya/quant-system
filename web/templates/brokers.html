@@ -27,12 +27,24 @@ async function loadBrokers() {
                 <span style="font-size:12px;${b.ready ? 'color:#3fb950;' : b.enabled ? 'color:#d29922;' : 'color:#484f58;'}">
                     ${b.ready ? '✅ 就绪' : b.enabled ? '⚠️ 未配置' : '⏸️ 未启用'}
                 </span>
+                <button class="btn" onclick="setDefaultBroker('${b.id}')" style="padding:4px 10px;font-size:11px;${b.default ? 'background:#1f6feb;color:#fff;' : ''}">${b.default ? '⭐ 默认' : '设为默认'}</button>
                 <button class="btn" onclick="toggleBroker('${b.id}', ${b.enabled})" style="padding:5px 12px;font-size:12px;">
                     ${b.enabled ? '⏹️ 停用' : '▶️ 启用'}
                 </button>
             </div>
         </div>
     `).join('');
+}
+
+async function setDefaultBroker(id) {
+    try {
+        const r = await fetch('/brokers/api/set_default', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({broker_id: id})
+        });
+        const d = await r.json();
+        if (d.status === 'ok') loadBrokers();
+    } catch(e) {}
 }
 
 async function toggleBroker(id, enabled) {
