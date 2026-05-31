@@ -1,90 +1,73 @@
 """
-股票热图 - Blueprint (实时版)
+股票热图 - Blueprint (缓存+后台渐进式加载)
 """
 from flask import Blueprint, jsonify, render_template
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
+import logging
 
+logger = logging.getLogger("quant.heatmap")
 bp = Blueprint("heatmap", __name__, url_prefix="/heatmap")
-
-# 热图缓存（30分钟有效）
-_heatmap_cache = {"data": None, "time": None, "cache_minutes": 30}
 
 SECTOR_MAP = {
     "科技": ["AAPL","MSFT","GOOGL","META","NVDA","AVGO","AMD","INTC","QCOM","TXN",
              "CRM","ADBE","NOW","PANW","CRWD","ADP","ORCL","ANET","AKAM","SNOW"],
     "消费": ["AMZN","TSLA","NFLX","HD","LOW","MCD","SBUX","NKE","TJX","TGT",
              "COST","WMT","EBAY","BKNG","MAR","RCL","CCL","DASH","UBER","ABNB"],
-    "金融": ["JPM","GS","BK","AXP","V","MA","BLK","C","BAC","MS","SCHW",
+    "金融": ["JPM","GS","AXP","V","MA","BLK","C","BAC","MS","SCHW",
              "SPGI","COF","MET","PRU","AIG","ALL","AFL","MMC","CB"],
     "医疗": ["JNJ","UNH","LLY","MRK","ABBV","PFE","AMGN","ISRG","SYK","VRTX",
              "TMO","DHR","ABT","MDT","BSX","REGN","GILD","BIIB","DXCM","ZTS"],
-    "工业": ["CAT","DE","BA","LMT","RTX","GE","HON","MMM","ETN","TDG",
-             "UPS","FDX","CSX","UNP","CARR","AME","IR","PH","ROK","EMR"],
+    "工业": ["CAT","DE","BA","LMT","RTX","GE","HON","MMM","ETN","UPS",
+             "FDX","CSX","UNP","CARR","AME","IR","PH","ROK","EMR"],
     "能源": ["XOM","CVX","COP","EOG","SLB","OXY","MPC","PSX","VLO","HAL",
-             "BKR","FCX","NEM","APA","DVN","MRO","HES","FANG","WBD","CTRA"],
+             "BKR","FCX","NEM","APA","DVN","MRO","HES","FANG"],
     "半导体": ["NVDA","AVGO","AMD","INTC","QCOM","TXN","AMAT","KLAC","LRCX","MU","ADI"],
 }
 
 
 def _get_data():
-    """获取热图数据（优先缓存，缓存30分钟）"""
-    from datetime import datetime, timedelta
-    now = datetime.now()
-    if _heatmap_cache["data"] and _heatmap_cache["time"]:
-        elapsed = (now - _heatmap_cache["time"]).total_seconds() / 60
-        if elapsed < _heatmap_cache["cache_minutes"]:
-            return _heatmap_cache["data"]
+    """获取热图数据（从缓存读取）"""
+    from data_prod import load_price_cache
     
-    from data_prod import _fetch_tiingo, compute_indicators as _ci
-    import logging
-    logger = logging.getLogger("quant.heatmap")
-    
+    cache = load_price_cache()
     sectors = []
-    total_stocks = sum(len(v) for v in SECTOR_MAP.values())
-    fetched = 0
     
     for sector_name, tickers in SECTOR_MAP.items():
         stocks = []
         for t in tickers:
-            try:
-                df = _fetch_tiingo(t, "2025-01-01", "2026-05-31")
-                fetched += 1
-                if fetched % 10 == 0:
-                    logger.info(f"热图进度: {fetched}/{total_stocks}")
-                if df is None or len(df) < 50:
-                    continue
-                df = _ci(df)
-                row = df.iloc[-1]
-                price = row["Close"]
-                mom = row.get("Momentum_12M", np.nan)
-                rsi = row.get("RSI", np.nan)
-                week_change = 0
-                if len(df) >= 5:
-                    week_ago = df["Close"].iloc[-5]
-                    week_change = (price / week_ago - 1) * 100
-                stocks.append({
-                    "ticker": t,
-                    "price": round(float(price), 2),
-                    "momentum": round(float(mom * 100), 1) if not np.isnan(mom) else 0,
-                    "rsi": round(float(rsi), 0) if not np.isnan(rsi) else None,
-                    "weekly_change": round(float(week_change), 2),
-                    "score": 0,
-                })
-            except:
-                fetched += 1
+            df = cache.get(t)
+            if df is None:
                 continue
+            row = df.iloc[-1]
+            price = row["Close"]
+            mom = row.get("Momentum_12M", np.nan)
+            rsi = row.get("RSI", np.nan)
+            week_change = 0
+            if len(df) >= 5:
+                week_ago = df["Close"].iloc[-5]
+                week_change = (price / week_ago - 1) * 100
+            stocks.append({
+                "ticker": t,
+                "price": round(float(price), 2),
+                "momentum": round(float(mom * 100), 1) if not np.isnan(mom) else 0,
+                "rsi": round(float(rsi), 0) if not np.isnan(rsi) else None,
+                "weekly_change": round(float(week_change), 2),
+            })
         if stocks:
             sectors.append({
                 "name": sector_name,
                 "stocks": stocks[:20],
                 "count": len(stocks),
             })
-    logger.info(f"热图完成: {fetched}只")
-    result = {"sectors": sectors}
-    _heatmap_cache["data"] = result
-    _heatmap_cache["time"] = datetime.now()
-    return result
+    
+    total = sum(s["count"] for s in sectors)
+    expected = sum(len(v) for v in SECTOR_MAP.values())
+    
+    return {
+        "sectors": sectors,
+        "coverage": f"{total}/{expected}",
+    }
 
 
 @bp.route("/")
