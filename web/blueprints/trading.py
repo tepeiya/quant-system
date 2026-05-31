@@ -3,7 +3,7 @@
 """
 from flask import Blueprint, jsonify, render_template, request, session
 import numpy as np
-from security import log_audit
+from security import log_audit, csrf_protect
 
 bp = Blueprint("trading", __name__, url_prefix="/trading")
 
@@ -41,7 +41,6 @@ def api_preview():
 @bp.route("/api/submit", methods=["POST"])
 @csrf_protect
 def api_submit():
-    from security import csrf_protect
     data = request.json or {}
     symbol = data.get("symbol", "").upper().strip()
     side = data.get("side", "buy").lower()
