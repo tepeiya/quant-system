@@ -13,6 +13,34 @@
 </div>
 
 <script>
+// === 配置标签 ===
+const CONFIG_LABELS = {
+    stop_loss_pct: '止损 (%)', trailing_stop_activate_pct: '移动止损启动 (%)',
+    trailing_stop_distance_pct: '移动止损距离 (%)',
+    stop_loss_atr_multiple: 'ATR止损倍数', trailing_stop_atr_multiple: 'ATR跟踪止损倍数',
+    rsi_exit: 'RSI退出阈值', rsi_entry: '买入RSI上限',
+    market_overheat_rsi: '大盘过热RSI', market_extreme_rsi: '大盘极端RSI',
+    market_reduce_ratio: '过热减仓比例', max_positions: '最大持仓数',
+    score_threshold: '评分阈值', mom_rank_top_pct: '动量排名门槛',
+    max_position_pct: '单票上限', max_sector_pct: '行业上限',
+    semi_single_limit: '半导体单票上限', semi_total_limit: '半导体总上限',
+    buy_cash_ratio: '买入现金比例',
+    atr_low_threshold: '低波ATR阈值%', atr_medium_threshold: '中波ATR阈值%',
+    atr_high_threshold: '高波ATR阈值%',
+    atr_cap_low: '低波仓位上限', atr_cap_medium: '中波仓位上限',
+    atr_cap_high: '高波仓位上限', atr_cap_extreme: '极高波仓位上限',
+    min_hold_days: '最短持有天数', churn_keep_score: '换手保留分',
+    alert_total_drawdown: '总回撤告警 (%)', alert_single_loss: '单票亏损告警 (%)',
+    circuit_daily_loss: '单日熔断%', circuit_consecutive_loss: '连续亏损熔断%',
+    circuit_max_drawdown: '最大回撤熔断%', circuit_cooldown_hours: '熔断冷却小时',
+};
+
+const CONFIG_GROUPS = {
+    '策略参数': ['stop_loss_pct','stop_loss_atr_multiple','trailing_stop_activate_pct','trailing_stop_atr_multiple','rsi_exit','rsi_entry','score_threshold','mom_rank_top_pct','max_positions'],
+    '仓位控制': ['max_position_pct','max_sector_pct','semi_single_limit','semi_total_limit','buy_cash_ratio','atr_low_threshold','atr_medium_threshold','atr_high_threshold','atr_cap_low','atr_cap_medium','atr_cap_high','atr_cap_extreme'],
+    '风控告警': ['alert_total_drawdown','alert_single_loss','circuit_daily_loss','circuit_consecutive_loss','circuit_max_drawdown','circuit_cooldown_hours'],
+};
+
 async function loadConfig() {
     const r = await fetch('/settings/api/all_config');
     configData = await r.json();
@@ -46,17 +74,6 @@ async function saveConfig() {
     const d = await r.json();
     document.getElementById('configMsg').textContent = d.status === 'ok' ? '✅ 已保存' : '❌ 失败';
     setTimeout(() => document.getElementById('configMsg').textContent = ' ', 3000);
-}
-
-async function toggleBroker(brokerId, currentEnabled) {
-    try {
-        await fetch('/settings/api/switch_broker', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({broker_id: brokerId, enabled: !currentEnabled})
-        });
-        loadBrokers();
-    } catch(e) {}
 }
 
 async function resetConfig() {
