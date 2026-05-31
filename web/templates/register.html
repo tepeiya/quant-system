@@ -51,7 +51,7 @@
             btn.textContent = '注册中...';
             btn.disabled = true;
             try {
-                const r = await fetch('/register', {
+                const r = await fetch('/auth/register', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({username, password, confirm})
                 });

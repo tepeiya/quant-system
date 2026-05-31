@@ -42,7 +42,7 @@
             btn.textContent = '登录中...';
             btn.disabled = true;
             try {
-                const r = await fetch('/login', {
+                const r = await fetch('/auth/login', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({username, password})
                 });
