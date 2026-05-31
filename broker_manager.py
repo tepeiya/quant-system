@@ -96,20 +96,23 @@ def save_config(config: dict):
 
 
 def list_brokers() -> list[dict]:
-    """列出所有配置的券商"""
+    """列出所有券商（包括未启用的）"""
     config = load_config()
     brokers = []
     for bid, bc in config.items():
-        if not bc.get("enabled", False):
-            continue
-        key_set = bool(os.environ.get(bc.get("env_key_id", "")))
-        secret_set = bool(os.environ.get(bc.get("env_secret", "")))
+        try:
+            key_set = bool(os.environ.get(bc.get("env_key_id", "")))
+            secret_set = bool(os.environ.get(bc.get("env_secret", "")))
+        except:
+            key_set = False
+            secret_set = False
         brokers.append({
             "id": bid,
             "name": bc.get("name", bid),
             "type": bc.get("type", "unknown"),
-            "ready": key_set and secret_set,
             "paper": bc.get("paper", False),
+            "enabled": bc.get("enabled", False),
+            "ready": bc.get("enabled", False) and key_set and secret_set,
         })
     return brokers
 
