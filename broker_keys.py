@@ -28,6 +28,20 @@ BROKER_KEY_MAP = {
             {"key": "ALPACA_LIVE_SECRET", "label": "Secret Key", "secret": True},
         ]
     },
+    "ibkr": {
+        "name": "盈透证券",
+        "fields": [
+            {"key": "IBKR_ACCOUNT_ID", "label": "IBKR 账户 ID", "secret": False},
+            {"key": "IBKR_TOKEN", "label": "IBKR API Token", "secret": True},
+        ]
+    },
+    "ibkr_paper": {
+        "name": "盈透证券 (模拟)",
+        "fields": [
+            {"key": "IBKR_ACCOUNT_ID", "label": "IBKR 账户 ID", "secret": False},
+            {"key": "IBKR_TOKEN", "label": "IBKR API Token", "secret": True},
+        ]
+    },
 }
 
 
