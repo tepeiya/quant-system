@@ -63,12 +63,19 @@ async function loadPage() {
 
 async function toggleBroker(brokerId, currentEnabled) {
     try {
-        await fetch('/settings/api/switch_broker', {
+        const r = await fetch('/settings/api/switch_broker', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({broker_id: brokerId, enabled: !currentEnabled})
         });
-        loadPage();
-    } catch(e) {}
+        const d = await r.json();
+        if (d.status === 'ok') {
+            loadPage();
+        } else {
+            alert('操作失败: ' + (d.message || '未知错误'));
+        }
+    } catch(e) {
+        alert('请求失败: ' + e.message);
+    }
 }
 
 async function saveBrokerKey(key) {
