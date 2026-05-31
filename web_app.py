@@ -38,7 +38,16 @@ app = Flask(__name__,
 
 # Session密钥
 import secrets
-app.secret_key = secrets.token_urlsafe(32)
+# 从文件读取持久化 secret_key，重启后不丢失
+_secret_key_file = "config/secret_key.txt"
+if os.path.exists(_secret_key_file):
+    with open(_secret_key_file) as f:
+        app.secret_key = f.read().strip()
+else:
+    app.secret_key = secrets.token_urlsafe(32)
+    os.makedirs("config", exist_ok=True)
+    with open(_secret_key_file, "w") as f:
+        f.write(app.secret_key)
 
 # ====== 安全加固 ======
 from security import apply_security_fixes, log_audit
