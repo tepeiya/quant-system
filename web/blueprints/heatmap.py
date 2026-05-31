@@ -3,10 +3,12 @@
 """
 from flask import Blueprint, jsonify, render_template
 import numpy as np
-import pandas as pd
 from datetime import datetime
 
 bp = Blueprint("heatmap", __name__, url_prefix="/heatmap")
+
+# 热图缓存（30分钟有效）
+_heatmap_cache = {"data": None, "time": None, "cache_minutes": 30}
 
 SECTOR_MAP = {
     "科技": ["AAPL","MSFT","GOOGL","META","NVDA","AVGO","AMD","INTC","QCOM","TXN",
@@ -26,7 +28,14 @@ SECTOR_MAP = {
 
 
 def _get_data():
-    """获取热图数据（实时从数据源拉取）"""
+    """获取热图数据（优先缓存，缓存30分钟）"""
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    if _heatmap_cache["data"] and _heatmap_cache["time"]:
+        elapsed = (now - _heatmap_cache["time"]).total_seconds() / 60
+        if elapsed < _heatmap_cache["cache_minutes"]:
+            return _heatmap_cache["data"]
+    
     from data_prod import _fetch_tiingo, compute_indicators as _ci
     import logging
     logger = logging.getLogger("quant.heatmap")
@@ -72,7 +81,10 @@ def _get_data():
                 "count": len(stocks),
             })
     logger.info(f"热图完成: {fetched}只")
-    return {"sectors": sectors}
+    result = {"sectors": sectors}
+    _heatmap_cache["data"] = result
+    _heatmap_cache["time"] = datetime.now()
+    return result
 
 
 @bp.route("/")
