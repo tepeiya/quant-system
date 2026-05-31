@@ -177,19 +177,34 @@ function getSize(score) {
     return Math.max(44, Math.min(85, 44 + score * 0.45));
 }
 
+let _heatmapCache = null;
+let _heatmapCacheTime = 0;
+
 async function loadHeatmap() {
+    // 30分钟内使用缓存
+    if (_heatmapCache && (Date.now() - _heatmapCacheTime) < 30 * 60 * 1000) {
+        allSectors = _heatmapCache;
+        renderSectors();
+        return;
+    }
     const container = document.getElementById('heatmapContainer');
     container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载行情数据...</p></div>';
 
     const r = await fetch('/heatmap/api/data');
     const d = await r.json();
     allSectors = d.sectors || [];
+    _heatmapCache = allSectors;
+    _heatmapCacheTime = Date.now();
 
     if (allSectors.length === 0) {
         container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无数据，请先补全股票缓存</p></div>';
         return;
     }
 
+}
+
+function renderSectors() {
+    const container = document.getElementById('heatmapContainer');
     // 统计
     let totalStocks = 0, maxScore = 0, maxGain = -999, maxGainTicker = '';
     allSectors.forEach(sec => {
@@ -288,6 +303,6 @@ async function showStock(ticker) {
     document.getElementById('modalBody').innerHTML = '<div class="empty-state">无详细数据</div>';
 }
 
-loadHeatmap();
+loadHeatmap();  // 首次加载
 </script>
 {% endblock %}
