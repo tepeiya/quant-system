@@ -42,8 +42,10 @@ async function loadAll() {
             bDiv.innerHTML = brokers.map(b => `
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid #21262d;">
                     <div><b>${b.name}</b><br><span style="font-size:11px;color:#8b949e;">${b.type} ${b.paper ? '📄' : '🔴'}</span></div>
-                    <div><span class="${b.ready ? 'positive' : 'negative'}">${b.ready ? '✅ 就绪' : '❌ 未配置'}</span></div>
-                    <div><button class="btn" onclick="showIBKRConfig('${b.id}')">🔧</button></div>
+                    <div><span class="${b.ready ? 'positive' : 'negative'}">${b.ready ? '✅ 就绪' : b.enabled ? '❌ 未配置' : '⏸️ 未启用'}</span></div>
+                    <div>
+                        <button class="btn" onclick="toggleBroker('${b.id}', ${b.enabled})" style="font-size:11px;padding:4px 8px;">${b.enabled ? '⏹️ 停用' : '▶️ 启用'}</button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -192,6 +194,17 @@ async function saveConfig() {
     const d = await r.json();
     document.getElementById('configMsg').textContent = d.status === 'ok' ? '✅ 已保存' : '❌ 失败';
     setTimeout(() => document.getElementById('configMsg').textContent = ' ', 3000);
+}
+
+async function toggleBroker(brokerId, currentEnabled) {
+    try {
+        await fetch('/settings/api/switch_broker', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({broker_id: brokerId, enabled: !currentEnabled})
+        });
+        loadBrokers();
+    } catch(e) {}
 }
 
 async function resetConfig() {

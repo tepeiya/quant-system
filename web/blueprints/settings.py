@@ -137,10 +137,22 @@ def api_delete_broker():
 
 @bp.route("/api/switch_broker", methods=["POST"])
 def api_switch_broker():
-    """切换券商"""
-    from broker_manager import BrokerManager
+    """启用/禁用或切换券商"""
+    from broker_manager import BrokerManager, load_config, save_config
     data = __import__("flask").request.json or {}
     broker_id = data.get("broker_id", "")
+    enabled = data.get("enabled")
+    
+    if enabled is not None:
+        # 启用/禁用
+        cfg = load_config()
+        if broker_id in cfg:
+            cfg[broker_id]["enabled"] = enabled
+            save_config(cfg)
+            return jsonify({"status": "ok", "message": f"{'启用' if enabled else '禁用'} {broker_id}"})
+        return jsonify({"status": "error", "message": f"未知券商 {broker_id}"})
+    
+    # 切换（旧逻辑）
     try:
         bm = BrokerManager()
         bm.use(broker_id)
