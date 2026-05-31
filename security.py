@@ -245,7 +245,8 @@ def apply_security_fixes(app):
         path = request.path
         public = ["/login", "/register", "/static/", "/auth/login", "/auth/register", 
                   "/auth/logout", "/api/trade_mode", "/api/csrf_token",
-                  "/dashboard/", "/heatmap/", "/wheel/", "/trading/"]
+                  "/dashboard/", "/heatmap/", "/wheel/", "/trading/", "/brokers/",
+                  "/settings/api/"]
         if any(path.startswith(p) for p in public):
             return
         if "user" in session and check_session_expiry():
