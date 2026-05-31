@@ -4,6 +4,7 @@ services:
     ports:
       - "8765:8765"
     environment:
+      - PORT=8765
       - ALPACA_API_KEY_ID=${ALPACA_API_KEY_ID}
       - ALPACA_SECRET_KEY=${ALPACA_SECRET_KEY}
       - TIINGO_API_KEY=${TIINGO_API_KEY}
