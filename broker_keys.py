@@ -42,6 +42,13 @@ BROKER_KEY_MAP = {
             {"key": "IBKR_TOKEN", "label": "IBKR API Token", "secret": True},
         ]
     },
+    "longbridge": {
+        "name": "长桥证券",
+        "fields": [
+            {"key": "LONGBRIDGE_APP_KEY", "label": "APP Key", "secret": False},
+            {"key": "LONGBRIDGE_APP_SECRET", "label": "APP Secret", "secret": True},
+        ]
+    },
 }
 
 
