@@ -28,13 +28,21 @@ SECTOR_MAP = {
 def _get_data():
     """获取热图数据（实时从数据源拉取）"""
     from data_prod import _fetch_tiingo, compute_indicators as _ci
+    import logging
+    logger = logging.getLogger("quant.heatmap")
     
     sectors = []
+    total_stocks = sum(len(v) for v in SECTOR_MAP.values())
+    fetched = 0
+    
     for sector_name, tickers in SECTOR_MAP.items():
         stocks = []
         for t in tickers:
             try:
                 df = _fetch_tiingo(t, "2025-01-01", "2026-05-31")
+                fetched += 1
+                if fetched % 10 == 0:
+                    logger.info(f"热图进度: {fetched}/{total_stocks}")
                 if df is None or len(df) < 50:
                     continue
                 df = _ci(df)
@@ -55,6 +63,7 @@ def _get_data():
                     "score": 0,
                 })
             except:
+                fetched += 1
                 continue
         if stocks:
             sectors.append({
@@ -62,6 +71,7 @@ def _get_data():
                 "stocks": stocks[:20],
                 "count": len(stocks),
             })
+    logger.info(f"热图完成: {fetched}只")
     return {"sectors": sectors}
 
 
