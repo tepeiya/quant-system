@@ -99,7 +99,7 @@ def check_login():
     
     public_paths = ["/login", "/register", "/static/", "/logout",
                     "/auth/login", "/auth/register", "/auth/logout",
-                    "/api/trade_mode"]
+                    "/api/trade_mode", "/brokers/", "/settings/api/"]
     if any(path.startswith(p) for p in public_paths):
         return None
     
