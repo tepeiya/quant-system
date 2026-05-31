@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}券商管理 - M+{% endblock %}
+{% block content %}
+
+<div class="panel">
+    <h2>🔌 券商管理</h2>
+    <div id="brokerList"></div>
+</div>
+
+<div class="panel">
+    <h2>🔐 券商密钥</h2>
+    <div id="brokerKeys"></div>
+</div>
+
+<script>
+async function loadPage() {
+    // 券商列表
+    try {
+        const rb = await fetch('/settings/api/brokers');
+        const brokers = await rb.json();
+        const bDiv = document.getElementById('brokerList');
+        bDiv.innerHTML = brokers.map(b => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 8px;border-bottom:1px solid #21262d;">
+                <div>
+                    <b>${b.name}</b>
+                    <br><span style="font-size:11px;color:#8b949e;">${b.type} ${b.paper ? '📄' : '🔴'}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span class="${b.ready ? 'positive' : 'negative'}">${b.ready ? '✅ 就绪' : b.enabled ? '⚠️ 未配置' : '⏸️ 未启用'}</span>
+                    <button class="btn" onclick="toggleBroker('${b.id}', ${b.enabled})" style="font-size:11px;padding:4px 10px;">${b.enabled ? '⏹️ 停用' : '▶️ 启用'}</button>
+                </div>
+            </div>
+        `).join('');
+    } catch(e) {}
+
+    // 密钥
+    try {
+        const rk = await fetch('/settings/api/broker_keys');
+        const kd = await rk.json();
+        const kDiv = document.getElementById('brokerKeys');
+        if (kd.length === 0) {
+            kDiv.innerHTML = '<div style="color:#8b949e;padding:12px;">暂无券商密钥配置</div>';
+        } else {
+            kDiv.innerHTML = kd.map(b => `
+                <div style="background:#0d1117;border-radius:8px;padding:14px;margin-bottom:10px;border:1px solid #21262d;">
+                    <div style="font-size:14px;font-weight:500;margin-bottom:10px;">${b.name} ${b.all_set ? '✅' : '⚠️ 未配置完整'}</div>
+                    ${b.fields.map(f => `
+                        <div style="margin-bottom:8px;">
+                            <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px;">${f.label}</label>
+                            <div style="display:flex;gap:6px;">
+                                <input type="password" id="bk_${f.key}" 
+                                       style="flex:1;padding:7px 10px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;font-size:13px;"
+                                       placeholder="${f.set ? '已设置' : '请输入 ${f.label}'}">
+                                <button class="btn" onclick="saveBrokerKey('${f.key}')" style="padding:7px 14px;">保存</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+        }
+    } catch(e) {}
+}
+
+async function toggleBroker(brokerId, currentEnabled) {
+    try {
+        await fetch('/settings/api/switch_broker', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({broker_id: brokerId, enabled: !currentEnabled})
+        });
+        loadPage();
+    } catch(e) {}
+}
+
+async function saveBrokerKey(key) {
+    const val = document.getElementById('bk_' + key).value.trim();
+    if (!val) return;
+    try {
+        const r = await fetch('/settings/api/save_broker_key', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({key, value: val})
+        });
+        const d = await r.json();
+        alert(d.message || '已保存');
+        loadPage();
+    } catch(e) { alert('保存失败'); }
+}
+
+loadPage();
+</script>
+{% endblock %}

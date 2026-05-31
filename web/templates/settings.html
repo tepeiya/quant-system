@@ -2,22 +2,6 @@
 {% block title %}设置 - M+{% endblock %}
 {% block content %}
 
-<div class="row-2">
-    <div class="panel">
-        <h2>🔌 券商管理</h2>
-        <div id="brokerList"></div>
-    </div>
-    <div class="panel">
-        <h2>🔑 环境变量</h2>
-        <div id="envVarList"></div>
-    </div>
-</div>
-
-<div class="panel">
-    <h2>🔐 券商密钥</h2>
-    <div id="brokerKeys"></div>
-</div>
-
 <div class="panel">
     <h2>🧩 策略参数</h2>
     <div id="configForm" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;"></div>
@@ -29,11 +13,10 @@
 </div>
 
 <script>
-// ===== 加载所有 =====
-async function loadAll() {
-    // 券商管理
+// ===== 策略参数 =====
+async function loadConfig() {
     try {
-        const rb = await fetch('/settings/api/brokers');
+        const r = await fetch('/settings/api/all_config');
         const brokers = await rb.json();
         const bDiv = document.getElementById('brokerList');
         if (brokers.length === 0) {
