@@ -29,7 +29,8 @@ def api_report():
 
     p = load_portfolio() or {}
     equity = float(p.get("equity", 0) or 0)
+    cash = float(p.get("cash", 0) or 0)
 
-    rep = allocation_report(market, equity)
+    rep = allocation_report(market, equity, cash)
     rep["market"] = market
     return jsonify(rep)

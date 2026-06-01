@@ -48,6 +48,8 @@ async function loadAlloc(){
     barRow('趋势主策略', w.trend, 0) +
     barRow('配对交易', w.pairs, 0) +
     barRow('轮式策略', w.wheel, 0) +
+    barRow('防守轮动', w.defense, 0) +
+    barRow('现金停泊(SGOV)', w.cash_park, 0) +
     barRow('现金储备', w.cash, 0);
 
   const c = d.capital || {};
@@ -55,7 +57,14 @@ async function loadAlloc(){
     barRow('趋势主策略', w.trend, c.trend) +
     barRow('配对交易', w.pairs, c.pairs) +
     barRow('轮式策略', w.wheel, c.wheel) +
+    barRow('防守轮动', w.defense, c.defense) +
+    barRow('现金停泊(SGOV)', w.cash_park, c.cash_park) +
     barRow('现金储备', w.cash, c.cash);
+
+  if (d.notes && d.notes.length) {
+    const tips = d.notes.map(x => `<li>${x}</li>`).join('');
+    document.getElementById('capital').innerHTML += `<div style="margin-top:12px;color:#8b949e;font-size:12px;"><b>说明</b><ul style="margin:6px 0 0 18px;">${tips}</ul></div>`;
+  }
 }
 
 loadAlloc();
