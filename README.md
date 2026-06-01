@@ -111,14 +111,44 @@ quant-system/
 └── Dockerfile               # Docker部署
 ```
 
-## 🔐 安全
+## 🧪 回测与健康检查
 
-- 密码 bcrypt 加密
-- API Key AES-256 加密存储
-- 登录限速（5次/分钟）
-- CSRF 保护
-- Session 24小时过期
-- 操作审计日志
+### 一键健康检查
+
+```bash
+./check.sh
+```
+
+### 快速回测报告（自动对比 SPY）
+
+```bash
+python3 backtest_report.py
+```
+
+输出：
+- `signals/backtest_report.json`
+- 总收益 / 年化 / 最大回撤 / 夏普 / SPY / Alpha
+
+## 🧩 多策略分配引擎
+
+新增页面：`/allocator/`
+
+自动根据市场状态分配资金到：
+- 趋势主策略
+- 配对交易
+- 轮式策略
+- 防守轮动（XLU/XLP/IEF/TLT）
+- 现金停泊（SGOV）
+
+配置文件：`config/strategy_allocator.json`
+
+## 🔧 最新稳定性升级
+
+- 统一公共白名单来源：`security_policy.py`
+- 统一 API 响应工具：`api_response.py`
+- 全局健康灯 + 健康详情面板 + 一键复制诊断
+- Dashboard 强缓存兜底（实时失败不影响页面返回）
+- 券商管理独立模块：`/brokers/`（启用/停用/默认券商/API密钥）
 
 ## 📄 许可证
 
