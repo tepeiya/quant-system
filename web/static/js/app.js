@@ -1,5 +1,22 @@
 /* ===== JS 工具 ===== */
 
+// 统一Toast提示
+function showToast(message, type = 'info', duration = 2600) {
+    let box = document.getElementById('global-toast');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'global-toast';
+        box.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:99999;max-width:80%;padding:10px 14px;border-radius:10px;color:#fff;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.25);display:none;';
+        document.body.appendChild(box);
+    }
+    const color = type === 'error' ? '#d1242f' : (type === 'success' ? '#238636' : '#1f6feb');
+    box.style.background = color;
+    box.textContent = message;
+    box.style.display = 'block';
+    clearTimeout(window.__toastTimer);
+    window.__toastTimer = setTimeout(() => box.style.display = 'none', duration);
+}
+
 // 通用API请求封装
 async function apiFetch(url, options = {}) {
     const res = await fetch(url, options);
@@ -8,13 +25,16 @@ async function apiFetch(url, options = {}) {
 
     if (!res.ok) {
         const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
-        throw new Error(msg);
+        const trace = data && data.trace_id ? ` [trace:${data.trace_id}]` : '';
+        throw new Error(msg + trace);
     }
     if (data && data.status === 'error') {
-        throw new Error(data.message || '请求失败');
+        const trace = data.trace_id ? ` [trace:${data.trace_id}]` : '';
+        throw new Error((data.message || '请求失败') + trace);
     }
     return data;
 }
+
 
 
 // SPA 页面加载

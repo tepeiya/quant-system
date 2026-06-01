@@ -14,90 +14,96 @@
 
 <script>
 async function loadBrokers() {
-    const r = await apiFetch('/brokers/api/list');
-    const brokers = await r.json();
-    const div = document.getElementById('brokerList');
-    div.innerHTML = brokers.map(b => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 10px;border-bottom:1px solid #21262d;">
-            <div>
-                <b>${b.name}</b>
-                <span style="font-size:11px;color:#8b949e;margin-left:6px;">${b.type} ${b.paper ? '📄' : ''}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px;">
-                <span style="font-size:12px;${b.ready ? 'color:#3fb950;' : b.enabled ? 'color:#d29922;' : 'color:#484f58;'}">
-                    ${b.ready ? '✅ 就绪' : b.enabled ? '⚠️ 未配置' : '⏸️ 未启用'}
-                </span>
-                <button class="btn" onclick="setDefaultBroker('${b.id}')" style="padding:4px 10px;font-size:11px;${b.default ? 'background:#1f6feb;color:#fff;' : ''}">${b.default ? '⭐ 默认' : '设为默认'}</button>
-                <button class="btn" onclick="toggleBroker('${b.id}', ${b.enabled})" style="padding:5px 12px;font-size:12px;">
-                    ${b.enabled ? '⏹️ 停用' : '▶️ 启用'}
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
-
-async function setDefaultBroker(id) {
     try {
-        const r = await apiFetch('/brokers/api/set_default', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({broker_id: id})
-        });
-        const d = await r.json();
-        if (d.status === 'ok') loadBrokers();
-    } catch(e) {}
-}
-
-async function toggleBroker(id, enabled) {
-    try {
-        const r = await apiFetch('/brokers/api/toggle', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({broker_id: id, enabled: !enabled})
-        });
-        const d = await r.json();
-        if (d.status === 'ok') loadBrokers();
-        else alert('失败: ' + d.message);
+        const d = await apiFetch('/brokers/api/list');
+        const brokers = d.data || d || [];
+        const div = document.getElementById('brokerList');
+        div.innerHTML = brokers.map(b => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid #21262d;">
+                <div>
+                    <b>${b.name}</b>
+                    <div style="font-size:11px;color:#8b949e;">${b.type} ${b.paper ? '📄' : '🔴'}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:12px;${b.ready ? 'color:#3fb950;' : b.enabled ? 'color:#d29922;' : 'color:#484f58;'}">
+                        ${b.ready ? '✅ 就绪' : b.enabled ? '⚠️ 未配置' : '⏸️ 未启用'}
+                    </span>
+                    <button class="btn" onclick="setDefaultBroker('${b.id}')" style="padding:4px 10px;font-size:11px;${b.default ? 'background:#1f6feb;color:#fff;' : ''}">${b.default ? '⭐ 默认' : '设为默认'}</button>
+                    <button class="btn" onclick="toggleBroker('${b.id}', ${b.enabled})" style="padding:5px 12px;font-size:12px;">
+                        ${b.enabled ? '⏹️ 停用' : '▶️ 启用'}
+                    </button>
+                </div>
+            </div>
+        `).join('');
     } catch(e) {
-        alert('请求失败: ' + e.message);
+        showToast('加载券商失败: ' + e.message, 'error');
     }
 }
 
 async function loadKeys() {
-    const r = await apiFetch('/brokers/api/keys');
-    const keys = await r.json();
-    const div = document.getElementById('keyList');
-    if (keys.length === 0) {
-        div.innerHTML = '<div style="color:#8b949e;padding:12px;">暂无配置</div>';
-        return;
-    }
-    div.innerHTML = keys.map(b => `
-        <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:14px;margin-bottom:10px;">
-            <div style="font-size:14px;font-weight:500;margin-bottom:10px;">${b.name} ${b.all_set ? '✅' : '⚠️ 未配置'}</div>
-            ${b.fields.map(f => `
-                <div style="margin-bottom:8px;">
-                    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:4px;">${f.label}</label>
-                    <div style="display:flex;gap:6px;">
-                        <input type="password" id="key_${f.key}" style="flex:1;padding:7px 10px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;font-size:13px;" placeholder="${f.set ? '已设置' : '请输入'}">
-                        <button class="btn" onclick="saveKey('${f.key}')" style="padding:7px 14px;">保存</button>
+    try {
+        const d = await apiFetch('/brokers/api/keys');
+        const list = d.data?.keys || d.keys || [];
+        const keyDiv = document.getElementById('keyList');
+        keyDiv.innerHTML = list.map(item => `
+            <div style="padding:10px;border-bottom:1px solid #21262d;">
+                <div style="font-weight:600;margin-bottom:8px;">${item.name}</div>
+                ${(item.fields || []).map(f => `
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+                        <div style="min-width:180px;font-size:12px;color:#8b949e;">${f.label}</div>
+                        <input id="k_${f.key}" type="${f.secret ? 'password' : 'text'}" placeholder="${f.set ? '已设置（留空不改）' : '请输入'}" style="flex:1;padding:6px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;">
+                        <button class="btn" onclick="saveBrokerKey('${f.key}')" style="padding:4px 10px;">保存</button>
                     </div>
-                </div>
-            `).join('')}
-        </div>
-    `).join('');
+                `).join('')}
+            </div>
+        `).join('');
+    } catch(e) {
+        showToast('加载密钥失败: ' + e.message, 'error');
+    }
 }
 
-async function saveKey(key) {
-    const value = document.getElementById('key_' + key).value.trim();
-    if (!value) return;
+async function toggleBroker(id, enabled) {
     try {
-        const r = await apiFetch('/brokers/api/save_key', {
+        await apiFetch('/brokers/api/toggle', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({key, value})
+            body: JSON.stringify({broker_id: id, enabled: !enabled})
         });
-        const d = await r.json();
-        if (d.status === 'ok') { loadKeys(); loadBrokers(); }
-        else alert('失败: ' + d.message);
-    } catch(e) { alert('保存失败'); }
+        showToast('已更新券商状态', 'success');
+        loadBrokers();
+        loadKeys();
+    } catch(e) {
+        showToast('切换失败: ' + e.message, 'error');
+    }
+}
+
+async function setDefaultBroker(id) {
+    try {
+        await apiFetch('/brokers/api/set_default', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({broker_id: id})
+        });
+        showToast('默认券商已更新', 'success');
+        loadBrokers();
+    } catch(e) {
+        showToast('设置默认失败: ' + e.message, 'error');
+    }
+}
+
+async function saveBrokerKey(key) {
+    const v = document.getElementById('k_' + key).value.trim();
+    if (!v) return showToast('请输入值', 'error');
+    try {
+        await apiFetch('/brokers/api/save_key', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({key, value: v})
+        });
+        showToast('已保存', 'success');
+        document.getElementById('k_' + key).value = '';
+        loadBrokers();
+        loadKeys();
+    } catch(e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
 }
 
 loadBrokers();
