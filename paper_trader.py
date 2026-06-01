@@ -232,21 +232,35 @@ def rebalance(auto: bool = False):
     except:
         pass
 
-    # 3. 目标持仓（过滤今日已交易）
-    target_symbols = [c["ticker"] for c in candidates[:8] if c["ticker"] not in today_traded]
-    if not target_symbols:
-        print("\n无买入候选")
-        return
-
     # 4. 预先获取价格
     prices = {}
-    for sym in target_symbols:
+    for sym in [c["ticker"] for c in candidates if c["ticker"] not in today_traded]:
         for c in candidates:
             if c["ticker"] == sym:
                 prices[sym] = c.get("price", 0)
                 break
         if sym not in prices:
             prices[sym] = 0
+
+    # 价格过滤（避免高价股买不起导致空仓）
+    from system_config import load as _load_cfg
+    cfgv = _load_cfg()
+    max_share_price = float(cfgv.get("max_share_price", 300))
+    primary = [c["ticker"] for c in candidates[:8] if c["ticker"] not in today_traded and prices.get(c["ticker"], 0) > 0 and prices.get(c["ticker"], 0) <= max_share_price]
+    # 候补池（Top9-15）用于填满仓位
+    backup = [c["ticker"] for c in candidates[8:15] if c["ticker"] not in today_traded and prices.get(c["ticker"], 0) > 0 and prices.get(c["ticker"], 0) <= max_share_price]
+
+    target_symbols = primary[:8]
+    # 补位：最多补到8只
+    for s in backup:
+        if len(target_symbols) >= 8:
+            break
+        if s not in target_symbols:
+            target_symbols.append(s)
+
+    if not target_symbols:
+        print("\n无可买入候选（可能都超出价格上限）")
+        return
     
     # 5. 计算等权目标仓位
     acct = client.get_account()

@@ -25,6 +25,7 @@ const CONFIG_LABELS = {
     max_position_pct: '单票上限', max_sector_pct: '行业上限',
     semi_single_limit: '半导体单票上限', semi_total_limit: '半导体总上限',
     buy_cash_ratio: '买入现金比例',
+    max_share_price: '单股价格上限($)',
     atr_low_threshold: '低波ATR阈值%', atr_medium_threshold: '中波ATR阈值%',
     atr_high_threshold: '高波ATR阈值%',
     atr_cap_low: '低波仓位上限', atr_cap_medium: '中波仓位上限',
@@ -37,7 +38,7 @@ const CONFIG_LABELS = {
 
 const CONFIG_GROUPS = {
     '策略参数': ['stop_loss_pct','stop_loss_atr_multiple','trailing_stop_activate_pct','trailing_stop_atr_multiple','rsi_exit','rsi_entry','score_threshold','mom_rank_top_pct','max_positions'],
-    '仓位控制': ['max_position_pct','max_sector_pct','semi_single_limit','semi_total_limit','buy_cash_ratio','atr_low_threshold','atr_medium_threshold','atr_high_threshold','atr_cap_low','atr_cap_medium','atr_cap_high','atr_cap_extreme'],
+    '仓位控制': ['max_position_pct','max_sector_pct','semi_single_limit','semi_total_limit','buy_cash_ratio','max_share_price','atr_low_threshold','atr_medium_threshold','atr_high_threshold','atr_cap_low','atr_cap_medium','atr_cap_high','atr_cap_extreme'],
     '风控告警': ['alert_total_drawdown','alert_single_loss','circuit_daily_loss','circuit_consecutive_loss','circuit_max_drawdown','circuit_cooldown_hours'],
 };
 

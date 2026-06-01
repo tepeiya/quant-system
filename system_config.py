@@ -47,7 +47,8 @@ DEFAULT_CONFIG = {
     "atr_cap_medium": 0.12,
     "atr_cap_high": 0.08,
     "atr_cap_extreme": 0.06,
-    "buy_cash_ratio": 0.90,      # 买入占用现金比例
+    "buy_cash_ratio": 0.95,      # 买入占用现金比例
+    "max_share_price": 300,      # 单股价格上限（超过则走候补池）
 
     # ===== 因子权重 =====
     "momentum_weight": 45,
