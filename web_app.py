@@ -153,6 +153,71 @@ def api_trade_mode():
     return jsonify({"mode": mode, "message": f"已切换到{'纸交易' if mode == 'paper' else '实盘'}"})
 
 
+@app.route("/api/health/full")
+def api_health_full():
+    """全链路健康检查"""
+    from datetime import datetime
+    report = {
+        "time": str(datetime.now()),
+        "status": "ok",
+        "checks": {}
+    }
+    
+    # 1) 登录系统
+    try:
+        report["checks"]["auth"] = {"ok": True, "user": session.get("user")}
+    except Exception as e:
+        report["checks"]["auth"] = {"ok": False, "error": str(e)}
+        report["status"] = "degraded"
+
+    # 2) 券商配置
+    try:
+        from broker_manager import list_brokers
+        brokers = list_brokers()
+        report["checks"]["brokers"] = {
+            "ok": True,
+            "count": len(brokers),
+            "enabled": [b["id"] for b in brokers if b.get("enabled")],
+            "ready": [b["id"] for b in brokers if b.get("ready")],
+        }
+    except Exception as e:
+        report["checks"]["brokers"] = {"ok": False, "error": str(e)}
+        report["status"] = "degraded"
+
+    # 3) 数据缓存
+    try:
+        from data_prod import load_price_cache
+        cache = load_price_cache()
+        report["checks"]["data_cache"] = {"ok": True, "stocks": len(cache)}
+        if len(cache) < 50:
+            report["status"] = "degraded"
+    except Exception as e:
+        report["checks"]["data_cache"] = {"ok": False, "error": str(e)}
+        report["status"] = "degraded"
+
+    # 4) 信号文件
+    try:
+        import glob
+        files = sorted(glob.glob("signals/signal_*.json"))
+        report["checks"]["signals"] = {"ok": bool(files), "count": len(files), "latest": files[-1] if files else None}
+        if not files:
+            report["status"] = "degraded"
+    except Exception as e:
+        report["checks"]["signals"] = {"ok": False, "error": str(e)}
+        report["status"] = "degraded"
+
+    # 5) 热图接口
+    try:
+        from web.blueprints.heatmap import _get_data
+        d = _get_data()
+        report["checks"]["heatmap"] = {"ok": True, "sectors": len(d.get("sectors", []))}
+    except Exception as e:
+        report["checks"]["heatmap"] = {"ok": False, "error": str(e)}
+        report["status"] = "degraded"
+
+    return jsonify(report)
+
+
 # ====== 启动 ======
 # 自动注册所有blueprint
 register_blueprints()
