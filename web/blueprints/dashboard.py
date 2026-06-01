@@ -73,23 +73,50 @@ def page():
 def api_data():
     from flask import session
     username = session.get("user")
-    
-    portfolio = {}
-    try:
-        # 尝试用用户专属的key同步
-        p = sync_from_alpaca(username=username)
-        if p:
-            portfolio = p
-        else:
-            portfolio = load_cached_portfolio()
-    except:
-        portfolio = load_cached_portfolio()
 
-    macro = {}
+    # 默认兜底（永不返回空）
+    portfolio = {
+        "equity": 0,
+        "cash": 0,
+        "position_count": 0,
+        "positions": {}
+    }
+
+    macro = {
+        "total_score": 0,
+        "verdict": "⚪",
+        "bond": {"score": 0},
+        "dollar": {"score": 0},
+        "gold": {"score": 0},
+        "inflation": {"score": 0}
+    }
+
+    # 1) 先尝试读缓存
+    try:
+        cached = load_cached_portfolio()
+        if cached and cached.get("equity") is not None:
+            portfolio = cached
+    except:
+        pass
+
+    # 2) 再尝试实时同步（失败不影响）
+    try:
+        p = sync_from_alpaca(username=username)
+        if p and p.get("equity") is not None:
+            portfolio = p
+            try:
+                with open(CACHED_PORTFOLIO_FILE, "w") as f:
+                    json.dump(portfolio, f, ensure_ascii=False, indent=2)
+            except:
+                pass
+    except Exception as e:
+        logger.warning(f"dashboard实时同步失败，使用缓存: {str(e)[:80]}")
+
+    # 3) 宏观失败也兜底
     try:
         macro = macro_summary()
-    except:
-        macro = {"total_score": 0, "verdict": "⚪", "bond": {"score": 0}, "dollar": {"score": 0}, "gold": {"score": 0}, "inflation": {"score": 0}}
+    except Exception as e:
+        logger.warning(f"dashboard宏观失败，使用默认: {str(e)[:80]}")
 
     payload = _fix({
         "portfolio": portfolio,
@@ -107,7 +134,8 @@ def api_equity_history():
     if os.path.exists(reports_dir):
         for f in sorted(glob.glob(f"{reports_dir}/report_*.txt")):
             date = os.path.basename(f).replace("report_", "").replace(".txt", "")
-            content = open(f).read()
+            with open(f) as fh:
+                content = fh.read()
             for line in content.split("\n"):
                 if "权益:" in line:
                     try:
