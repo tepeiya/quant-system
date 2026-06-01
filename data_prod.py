@@ -403,33 +403,48 @@ def _fetch_alpaca_batch(tickers: list[str], result: dict, start: str, end: str) 
 
 
 def fetch_fundamentals(tickers: list[str]) -> dict:
-    """从yfinance获取基本面（PE/ROE/利润率/负债率）
-    用于质量因子提升PE估算精度和财报日历
-    """
+    """获取基本面（优先 Finnhub，失败回退 yfinance）"""
     import yfinance as yf
     result = {}
     need = [t for t in tickers if t not in _fundamentals_cache]
     if not need:
-        # 用缓存
         return {t: _fundamentals_cache[t] for t in tickers if t in _fundamentals_cache}
+
     logger.info(f"获取基本面: {len(need)}只...")
+
+    # 优先 Finnhub
+    try:
+        from fundamentals_finnhub import _finnhub_get
+    except:
+        _finnhub_get = None
+
     for t in need:
-        try:
-            info = yf.Ticker(t).info
-            result[t] = {
-                "pe": info.get("trailingPE") or info.get("forwardPE"),
-                "roe": info.get("returnOnEquity"),
-                "profit_margin": info.get("profitMargins"),
-                "debt_to_equity": info.get("debtToEquity"),
-                "market_cap": info.get("marketCap"),
-                "dividend_yield": info.get("dividendYield"),
-                "earnings_date": info.get("earningsDate"),
-                "sector": info.get("sector"),
-                "industry": info.get("industry"),
-            }
-            _fundamentals_cache[t] = result[t]
-        except:
-            result[t] = {}
+        rec = None
+        if _finnhub_get:
+            rec = _finnhub_get(t)
+
+        # 回退 yfinance
+        if not rec:
+            try:
+                info = yf.Ticker(t).info
+                rec = {
+                    "pe": info.get("trailingPE") or info.get("forwardPE"),
+                    "roe": info.get("returnOnEquity"),
+                    "profit_margin": info.get("profitMargins"),
+                    "debt_to_equity": info.get("debtToEquity"),
+                    "market_cap": info.get("marketCap"),
+                    "dividend_yield": info.get("dividendYield"),
+                    "earnings_date": info.get("earningsDate"),
+                    "sector": info.get("sector"),
+                    "industry": info.get("industry"),
+                    "source": "yfinance",
+                }
+            except:
+                rec = {}
+
+        result[t] = rec
+        _fundamentals_cache[t] = rec
+
     # 缓存到磁盘
     try:
         import pickle as _pkl
@@ -437,6 +452,7 @@ def fetch_fundamentals(tickers: list[str]) -> dict:
             _pkl.dump(_fundamentals_cache, f)
     except:
         pass
+
     return result
 
 
