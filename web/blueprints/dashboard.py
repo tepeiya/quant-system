@@ -9,6 +9,7 @@ logger = logging.getLogger("quant.dashboard")
 
 from broker_manager import BrokerManager
 from portfolio_tracker import sync_from_alpaca
+from api_response import ok, err
 
 
 def get_broker():
@@ -90,10 +91,11 @@ def api_data():
     except:
         macro = {"total_score": 0, "verdict": "⚪", "bond": {"score": 0}, "dollar": {"score": 0}, "gold": {"score": 0}, "inflation": {"score": 0}}
 
-    return jsonify(_fix({
+    payload = _fix({
         "portfolio": portfolio,
         "macro": macro,
-    }))
+    })
+    return jsonify(payload)
 
 
 @bp.route("/api/equity_history")

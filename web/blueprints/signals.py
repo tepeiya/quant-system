@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, render_template
 import numpy as np
 
 from daily_signal import generate_signals
+from api_response import ok, err
 
 bp = Blueprint("signals", __name__, url_prefix="/signals")
 
@@ -49,7 +50,7 @@ def api_today():
         with open(files[-1]) as f:
             return jsonify(_fix(json.load(f)))
     
-    return jsonify({"error": "无信号数据，请先生成"})
+    return err("无信号数据，请先生成", 404)
 
 
 @bp.route("/api/execute", methods=["POST"])
@@ -58,6 +59,6 @@ def api_execute():
     from paper_trader import rebalance
     try:
         rebalance(auto=True)
-        return jsonify({"status": "ok", "message": "调仓完成"})
+        return ok(message="调仓完成")
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+        return err(str(e))
