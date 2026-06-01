@@ -50,7 +50,7 @@ else:
         f.write(app.secret_key)
 
 # ====== 安全加固 ======
-from security import apply_security_fixes, log_audit
+from security_policy import PUBLIC_PATHS
 apply_security_fixes(app)
 
 
@@ -97,9 +97,7 @@ def check_login():
     from flask import request, redirect, url_for
     path = request.path
     
-    public_paths = ["/login", "/register", "/static/", "/logout",
-                    "/auth/login", "/auth/register", "/auth/logout",
-                    "/api/trade_mode", "/brokers/"]
+    public_paths = PUBLIC_PATHS
     if any(path.startswith(p) for p in public_paths):
         return None
     

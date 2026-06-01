@@ -14,6 +14,7 @@ import os
 import json
 import time
 import hashlib
+from security_policy import PUBLIC_PATHS
 import logging
 from datetime import datetime, timedelta
 from functools import wraps
@@ -243,10 +244,9 @@ def apply_security_fixes(app):
     def session_expiry_check():
         from flask import session, request, redirect, jsonify
         path = request.path
-        public = ["/login", "/register", "/static/", "/auth/login", "/auth/register", 
-                  "/auth/logout", "/api/trade_mode", "/api/csrf_token",
-                  "/dashboard/", "/heatmap/", "/wheel/", "/trading/", "/brokers/",
-                  "/settings/api/"]
+        public = PUBLIC_PATHS + [
+                  "/dashboard/", "/heatmap/", "/wheel/", "/trading/", "/settings/api/"
+                 ]
         if any(path.startswith(p) for p in public):
             return
         if "user" in session and check_session_expiry():

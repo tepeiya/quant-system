@@ -1,5 +1,22 @@
 /* ===== JS 工具 ===== */
 
+// 通用API请求封装
+async function apiFetch(url, options = {}) {
+    const res = await fetch(url, options);
+    let data = null;
+    try { data = await res.json(); } catch (_) {}
+
+    if (!res.ok) {
+        const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
+        throw new Error(msg);
+    }
+    if (data && data.status === 'error') {
+        throw new Error(data.message || '请求失败');
+    }
+    return data;
+}
+
+
 // SPA 页面加载
 async function loadPage(url, targetId = 'mainContent') {
     try {
