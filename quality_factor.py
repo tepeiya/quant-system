@@ -109,6 +109,9 @@ def compute_quality_scores(cache: dict[str, pd.DataFrame],
         # 5. PE估值 (0-15)
         f_pe = _get_pe_score(ticker, pe_data)
 
+        # 5.1 财务质量增强 (0-8): ROE/利润率/负债率
+        f_fund = _get_fund_quality_score(ticker, pe_data)
+
         # 6. 低波因子 (0-10): 低波动率 = 防御价值
         if len(atr) > 50:
             recent_atr_mean = np.nanmean(atr)
@@ -125,7 +128,7 @@ def compute_quality_scores(cache: dict[str, pd.DataFrame],
         else:
             f_lowvol = 5.0
 
-        value_total = f_pe + f_lowvol
+        value_total = f_pe + f_lowvol + f_fund
 
         # ============ 趋势确认 (0-20分) ============
 
@@ -167,7 +170,9 @@ def compute_quality_scores(cache: dict[str, pd.DataFrame],
         trend_total = f_resilience + f_trend
 
         # ============ 综合 (0-100) ============
-        total = round(quality_total + value_total + trend_total, 1)
+        # 当前子因子总上限: 55 + (15+10+8) + 20 = 108
+        raw_total = quality_total + value_total + trend_total
+        total = round(raw_total / 108 * 100, 1)
 
         scores[ticker] = total
         breakdown[ticker] = {
@@ -176,6 +181,7 @@ def compute_quality_scores(cache: dict[str, pd.DataFrame],
             "drawdown_control": f_dd,
             "earnings_quality": f_earnings,
             "pe_value": f_pe,
+            "fund_quality": f_fund,
             "low_vol": f_lowvol,
             "resilience": f_resilience,
             "trend_strength": f_trend,
@@ -240,6 +246,46 @@ def _get_pe_score(ticker: str, pe_cache: dict) -> float:
         return 4
     else:
         return 0
+
+
+def _get_fund_quality_score(ticker: str, pe_cache: dict) -> float:
+    """财务质量评分(0-8): ROE/利润率/负债率"""
+    data = pe_cache.get(ticker, {}) if isinstance(pe_cache, dict) else {}
+    if not isinstance(data, dict):
+        return 0.0
+
+    roe = data.get("roe")
+    pm = data.get("profit_margin")
+    dte = data.get("debt_to_equity")
+
+    score = 0.0
+    try:
+        if roe is not None:
+            r = float(roe)
+            if r >= 0.20: score += 3
+            elif r >= 0.12: score += 2
+            elif r >= 0.06: score += 1
+    except:
+        pass
+
+    try:
+        if pm is not None:
+            p = float(pm)
+            if p >= 0.20: score += 3
+            elif p >= 0.10: score += 2
+            elif p >= 0.03: score += 1
+    except:
+        pass
+
+    try:
+        if dte is not None:
+            d = float(dte)
+            if d <= 40: score += 2
+            elif d <= 100: score += 1
+    except:
+        pass
+
+    return round(min(8.0, score), 2)
 
 
 def add_ema_indicators(df: pd.DataFrame) -> pd.DataFrame:
