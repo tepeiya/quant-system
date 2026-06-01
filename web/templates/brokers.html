@@ -14,7 +14,7 @@
 
 <script>
 async function loadBrokers() {
-    const r = await fetch('/brokers/api/list');
+    const r = await apiFetch('/brokers/api/list');
     const brokers = await r.json();
     const div = document.getElementById('brokerList');
     div.innerHTML = brokers.map(b => `
@@ -38,7 +38,7 @@ async function loadBrokers() {
 
 async function setDefaultBroker(id) {
     try {
-        const r = await fetch('/brokers/api/set_default', {
+        const r = await apiFetch('/brokers/api/set_default', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({broker_id: id})
         });
@@ -49,7 +49,7 @@ async function setDefaultBroker(id) {
 
 async function toggleBroker(id, enabled) {
     try {
-        const r = await fetch('/brokers/api/toggle', {
+        const r = await apiFetch('/brokers/api/toggle', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({broker_id: id, enabled: !enabled})
@@ -63,7 +63,7 @@ async function toggleBroker(id, enabled) {
 }
 
 async function loadKeys() {
-    const r = await fetch('/brokers/api/keys');
+    const r = await apiFetch('/brokers/api/keys');
     const keys = await r.json();
     const div = document.getElementById('keyList');
     if (keys.length === 0) {
@@ -90,7 +90,7 @@ async function saveKey(key) {
     const value = document.getElementById('key_' + key).value.trim();
     if (!value) return;
     try {
-        const r = await fetch('/brokers/api/save_key', {
+        const r = await apiFetch('/brokers/api/save_key', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({key, value})
         });

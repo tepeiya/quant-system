@@ -42,7 +42,7 @@ const CONFIG_GROUPS = {
 };
 
 async function loadConfig() {
-    const r = await fetch('/settings/api/all_config');
+    const r = await apiFetch('/settings/api/all_config');
     configData = await r.json();
     const form = document.getElementById('configForm');
     form.innerHTML = '';
@@ -67,7 +67,7 @@ async function saveConfig() {
     const inputs = document.querySelectorAll('#configForm input[data-key]');
     const updates = {};
     inputs.forEach(inp => updates[inp.getAttribute('data-key')] = parseFloat(inp.value));
-    const r = await fetch('/settings/api/save_config', {
+    const r = await apiFetch('/settings/api/save_config', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(updates)
     });
@@ -78,7 +78,7 @@ async function saveConfig() {
 
 async function resetConfig() {
     if (!confirm('确认恢复默认参数？')) return;
-    const r = await fetch('/settings/api/reset_config', {method: 'POST'});
+    const r = await apiFetch('/settings/api/reset_config', {method: 'POST'});
     document.getElementById('configMsg').textContent = '✅ 已重置';
     setTimeout(() => location.reload(), 1500);
 }

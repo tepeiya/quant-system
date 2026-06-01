@@ -89,7 +89,7 @@ async function scanPairs() {
     document.getElementById('pairsBody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8b949e;">扫描中...</td></tr>';
     document.getElementById('heatmapContainer').innerHTML = '<div class="empty-state">扫描中...</div>';
 
-    const r = await fetch('/pairs/api/scan');
+    const r = await apiFetch('/pairs/api/scan');
     const d = await r.json();
 
     if (d.error) {
@@ -103,7 +103,7 @@ async function scanPairs() {
 }
 
 async function refreshSignals() {
-    const r = await fetch('/pairs/api/signals');
+    const r = await apiFetch('/pairs/api/signals');
     const d = await r.json();
     allSignals = d.signals || [];
     renderData();

@@ -72,7 +72,7 @@
 let currentWeights = {};
 
 async function loadWeights() {
-    const r = await fetch('/factors/api/weights');
+    const r = await apiFetch('/factors/api/weights');
     const w = await r.json();
     currentWeights = w;
     $('momSlider').value = w.momentum || 45;
@@ -106,7 +106,7 @@ async function saveWeights() {
         lowvol: parseInt($('lvSlider').value),
     };
     try {
-        const r = await fetch('/factors/api/update_weights', {
+        const r = await apiFetch('/factors/api/update_weights', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({weights})
@@ -124,7 +124,7 @@ async function runEvolution() {
     btn.disabled = true;
     $('weightResult').innerHTML = '⏳ 正在计算因子IC并优化权重...';
     try {
-        const r = await fetch('/factors/api/evolve', { method: 'POST' });
+        const r = await apiFetch('/factors/api/evolve', { method: 'POST' });
         const d = await r.json();
         if (d.status === 'ok') {
             $('weightResult').innerHTML = '✅ ' + d.message;
@@ -142,7 +142,7 @@ async function runEvolution() {
 }
 
 async function loadIC() {
-    const r = await fetch('/factors/api/ic_history');
+    const r = await apiFetch('/factors/api/ic_history');
     const icData = await r.json();
 
     $('icNote').textContent = icData.length + ' 个月数据';
@@ -196,7 +196,7 @@ async function loadIC() {
 }
 
 async function loadEvolution() {
-    const r = await fetch('/factors/api/evolution_history');
+    const r = await apiFetch('/factors/api/evolution_history');
     const data = await r.json();
     const history = data.history || [];
     $('evolutionCount').textContent = '共 ' + history.length + ' 次进化';

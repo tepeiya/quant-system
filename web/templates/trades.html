@@ -40,7 +40,7 @@
 async function loadTrades() {
     // 绩效归因
     try {
-        const ra = await fetch('/trades/api/attribution');
+        const ra = await apiFetch('/trades/api/attribution');
         const perf = await ra.json();
         const ts = perf.trade_stats || {};
         const fc = perf.factor_contribution || {};
@@ -86,7 +86,7 @@ async function loadTrades() {
 
     // 交易明细
     try {
-        const rt = await fetch('/trades/api/trade_log');
+        const rt = await apiFetch('/trades/api/trade_log');
         const td = await rt.json();
         const trades = td.trades || [];
         const tBody = $('tradesBody');
@@ -106,7 +106,7 @@ async function loadTrades() {
 
     // 权益曲线
     try {
-        const rh = await fetch('/trades/api/portfolio_history');
+        const rh = await apiFetch('/trades/api/portfolio_history');
         const hist = await rh.json();
         if (hist.length > 0 && window.Chart) {
             const canvas = document.getElementById('equityChart');

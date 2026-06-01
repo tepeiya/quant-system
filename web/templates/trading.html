@@ -57,7 +57,7 @@ async function searchStock(keyword) {
         return;
     }
     try {
-        const r = await fetch('/trading/api/search', {
+        const r = await apiFetch('/trading/api/search', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({keyword})
@@ -105,7 +105,7 @@ async function submitOrder() {
     btn.textContent = '⏳ 提交中...';
     btn.disabled = true;
     try {
-        const r = await fetch('/trading/api/submit', {
+        const r = await apiFetch('/trading/api/submit', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({symbol: selectedStock, side, qty})

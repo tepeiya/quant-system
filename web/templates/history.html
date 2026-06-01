@@ -44,7 +44,7 @@
 
 <script>
 async function refreshHistory() {
-    const r = await fetch('/history/api/list');
+    const r = await apiFetch('/history/api/list');
     const d = await r.json();
     const signals = d.signals || [];
 
@@ -73,7 +73,7 @@ async function showDetail(date) {
     $('detailModal').style.display = 'flex';
     $('detailBody').innerHTML = '<p style="color:#8b949e;">加载中...</p>';
 
-    const r = await fetch(`/history/api/detail?date=${date}`);
+    const r = await apiFetch(`/history/api/detail?date=${date}`);
     const d = await r.json();
 
     let html = '';

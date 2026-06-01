@@ -71,7 +71,7 @@
 
 <script>
 async function refreshPlan() {
-    const r = await fetch('/wheel/api/plan');
+    const r = await apiFetch('/wheel/api/plan');
     const d = await r.json();
     
     if (d.error) {
@@ -120,7 +120,7 @@ async function updateConfig() {
     $('dteVal').textContent = cfg.put_dte;
     
     try {
-        const r = await fetch('/wheel/api/config', {
+        const r = await apiFetch('/wheel/api/config', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(cfg),

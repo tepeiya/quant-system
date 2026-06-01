@@ -26,6 +26,18 @@
     </div>
 
     <script>
+        async function apiFetch(url, options = {}) {
+            const res = await fetch(url, options);
+            let data = null;
+            try { data = await res.json(); } catch (_) {}
+            if (!res.ok) {
+                const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
+                throw new Error(msg);
+            }
+            if (data && data.status === 'error') throw new Error(data.message || '请求失败');
+            return data;
+        }
+
         async function doLogin() {
             const btn = document.getElementById('loginBtn');
             const errorBox = document.getElementById('errorBox');
@@ -42,7 +54,7 @@
             btn.textContent = '登录中...';
             btn.disabled = true;
             try {
-                const r = await fetch('/auth/login', {
+                const r = await apiFetch('/auth/login', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({username, password})
                 });

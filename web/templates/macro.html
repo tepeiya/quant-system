@@ -40,7 +40,7 @@ function scoreEmoji(v) {
 }
 
 async function loadMacro() {
-    const r = await fetch('/macro/api/data');
+    const r = await apiFetch('/macro/api/data');
     const d = await r.json();
 
     $('totalScore').textContent = (d.total_score || 0).toFixed(2);

@@ -190,7 +190,7 @@ async function loadHeatmap() {
     const container = document.getElementById('heatmapContainer');
     container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载行情数据...</p></div>';
 
-    const r = await fetch('/heatmap/api/data');
+    const r = await apiFetch('/heatmap/api/data');
     const d = await r.json();
     allSectors = d.sectors || [];
     _heatmapCache = allSectors;
