@@ -2,6 +2,7 @@
 设置 - Blueprint
 """
 from flask import Blueprint, jsonify, render_template
+from api_response import ok, err
 import numpy as np
 
 bp = Blueprint("settings", __name__, url_prefix="/settings")
@@ -149,16 +150,16 @@ def api_switch_broker():
         if broker_id in cfg:
             cfg[broker_id]["enabled"] = enabled
             save_config(cfg)
-            return jsonify({"status": "ok", "message": f"{'启用' if enabled else '禁用'} {broker_id}"})
-        return jsonify({"status": "error", "message": f"未知券商 {broker_id}"})
+            return ok(message=f"{'启用' if enabled else '禁用'} {broker_id}")
+        return err(f"未知券商 {broker_id}", 404)
     
     # 切换（旧逻辑）
     try:
         bm = BrokerManager()
         bm.use(broker_id)
-        return jsonify({"status": "ok", "message": f"已切换到 {broker_id}"})
+        return ok(message=f"已切换到 {broker_id}")
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+        return err(str(e))
 
 @bp.route("/api/all_config")
 def api_all_config():

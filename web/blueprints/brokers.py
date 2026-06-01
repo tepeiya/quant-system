@@ -2,8 +2,8 @@
 券商管理 - 独立页面 + 独立API
 所有功能不依赖 settings 蓝图
 """
-from flask import Blueprint, jsonify, render_template, request, session
-import numpy as np
+from flask import Blueprint, jsonify, render_template, request
+from api_response import ok, err
 import os, json, logging
 
 logger = logging.getLogger("quant.brokers")
@@ -53,7 +53,7 @@ def api_list():
             "ready": bc.get("enabled", False) and key_set and secret_set,
             "default": bid == default,
         })
-    return jsonify(result)
+    return ok(result)
 
 
 @bp.route("/api/toggle", methods=["POST"])
@@ -66,8 +66,8 @@ def api_toggle():
     if broker_id in cfg:
         cfg[broker_id]["enabled"] = enabled
         _save_cfg(cfg)
-        return jsonify({"status": "ok", "message": f"{'启用' if enabled else '禁用'} {broker_id}"})
-    return jsonify({"status": "error", "message": "券商不存在"})
+        return ok(message=f"{'启用' if enabled else '禁用'} {broker_id}")
+    return err("券商不存在", 404)
 
 
 @bp.route("/api/keys")
@@ -77,7 +77,7 @@ def api_keys():
     keys_status = get_broker_keys_status()
     # 标记默认券商
     default = get_default_broker()
-    return jsonify({"keys": keys_status, "default": default})
+    return ok({"keys": keys_status, "default": default})
 
 
 def get_default_broker():
@@ -98,13 +98,13 @@ def set_default_broker(broker_id):
 
 @bp.route("/api/set_default", methods=["POST"])
 def api_set_default():
-    """设置默认券商"""
+    """设置默认券商（同时取消其他券商默认）"""
     data = request.json or {}
     broker_id = data.get("broker_id", "")
     if broker_id:
         set_default_broker(broker_id)
-        return jsonify({"status": "ok"})
-    return jsonify({"status": "error", "message": "参数错误"})
+        return ok(message="默认券商已更新")
+    return err("参数错误")
 
 
 @bp.route("/api/save_key", methods=["POST"])
@@ -116,5 +116,5 @@ def api_save_key():
     value = data.get("value", "")
     if key and value:
         set_key(key, value)
-        return jsonify({"status": "ok", "message": "已保存"})
-    return jsonify({"status": "error", "message": "参数不完整"})
+        return ok(message="已保存")
+    return err("参数不完整")

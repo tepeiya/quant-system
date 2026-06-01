@@ -4,6 +4,7 @@
 from flask import Blueprint, jsonify, render_template, request, session
 import numpy as np
 from security import log_audit, csrf_protect
+from api_response import ok, err
 
 bp = Blueprint("trading", __name__, url_prefix="/trading")
 
@@ -46,16 +47,16 @@ def api_submit():
     side = data.get("side", "buy").lower()
     qty = int(data.get("qty", 0))
     if not symbol or qty <= 0:
-        return jsonify({"status": "error", "message": "参数错误"})
+        return err("参数错误")
     try:
         from broker_manager import BrokerManager
         bm = BrokerManager(username=session.get("user"))
         broker = bm.get_current()
         result = broker.submit_order(symbol, qty, side, "market")
         log_audit("ORDER", session.get("user", "?"), f"{side.upper()} {symbol} x{qty}")
-        return jsonify(_fix(result))
+        return ok(result, "下单请求已发送")
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+        return err(str(e))
 
 
 @bp.route("/api/search", methods=["POST"])
