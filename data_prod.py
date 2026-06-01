@@ -110,7 +110,7 @@ def save_price_cache(data: dict):
 
 
 def _fetch_tiingo(ticker: str, start: str, end: str) -> pd.DataFrame | None:
-    """通过Tiingo API获取单只股票日线数据"""
+    """通过Tiingo API获取单只股票日线数据（带429重试）"""
     api_key = os.environ.get("TIINGO_API_KEY")
     if not api_key:
         return None
@@ -124,47 +124,53 @@ def _fetch_tiingo(ticker: str, start: str, end: str) -> pd.DataFrame | None:
     }
     headers = {"Authorization": f"Token {api_key}"}
 
-    try:
-        r = requests.get(url, params=params, headers=headers, timeout=15)
-        if r.status_code != 200:
-            logger.warning(f"Tiingo {ticker}: HTTP {r.status_code}")
-            return None
+    for attempt in range(3):
+        try:
+            r = requests.get(url, params=params, headers=headers, timeout=15)
+            if r.status_code == 429:
+                wait = 2 ** attempt
+                logger.warning(f"Tiingo {ticker}: 429限流，{wait}s后重试")
+                time.sleep(wait)
+                continue
+            if r.status_code != 200:
+                logger.warning(f"Tiingo {ticker}: HTTP {r.status_code}")
+                return None
 
-        data = r.json()
-        if not data or len(data) < 200:
-            logger.warning(f"Tiingo {ticker}: 数据不足({len(data) if data else 0}行)")
-            return None
+            data = r.json()
+            if not data or len(data) < 200:
+                logger.warning(f"Tiingo {ticker}: 数据不足({len(data) if data else 0}行)")
+                return None
 
-        df = pd.DataFrame(data)
-        df["Date"] = pd.to_datetime(df["date"])
-        df.set_index("Date", inplace=True)
-        df.sort_index(inplace=True)
+            df = pd.DataFrame(data)
+            df["Date"] = pd.to_datetime(df["date"])
+            df.set_index("Date", inplace=True)
+            df.sort_index(inplace=True)
 
-        # 统一列名 -> yfinance格式
-        df.rename(columns={
-            "adjClose": "Close",
-            "adjHigh": "High",
-            "adjLow": "Low",
-            "adjOpen": "Open",
-            "adjVolume": "Volume",
-        }, inplace=True)
+            df.rename(columns={
+                "adjClose": "Close",
+                "adjHigh": "High",
+                "adjLow": "Low",
+                "adjOpen": "Open",
+                "adjVolume": "Volume",
+            }, inplace=True)
 
-        # 只保留标准列
-        keep = ["Close", "High", "Low", "Open", "Volume"]
-        for col in keep:
-            if col not in df.columns:
-                df[col] = 0.0
+            keep = ["Close", "High", "Low", "Open", "Volume"]
+            for col in keep:
+                if col not in df.columns:
+                    df[col] = 0.0
 
-        df = df[keep]
-        df["Close"] = df["Close"].astype(float)
-        return df
+            df = df[keep]
+            df["Close"] = df["Close"].astype(float)
+            return df
 
-    except requests.Timeout:
-        logger.warning(f"Tiingo {ticker}: 超时")
-        return None
-    except Exception as e:
-        logger.warning(f"Tiingo {ticker}: 异常 {str(e)[:60]}")
-        return None
+        except requests.Timeout:
+            logger.warning(f"Tiingo {ticker}: 超时")
+            continue
+        except Exception as e:
+            logger.warning(f"Tiingo {ticker}: 异常 {str(e)[:60]}")
+            continue
+
+    return None
 
 
 def fetch_prices(tickers: list[str],
@@ -269,6 +275,14 @@ def fetch_prices(tickers: list[str],
         # 每5只之间随机延迟
         if (i + 1) % 5 == 0:
             time.sleep(random.uniform(1, 2))
+
+    # 3.5 对仍缺失的票尝试Alpaca批量补齐（自动）
+    unresolved = [t for t in missing if t not in result or result[t] is None or len(result[t]) < 200]
+    if unresolved:
+        alpaca_ok = _fetch_alpaca_batch(unresolved, result, start, end)
+        if alpaca_ok > 0:
+            success += alpaca_ok
+            logger.info(f"Alpaca补齐: {alpaca_ok}/{len(unresolved)}")
 
     # 4. 保存缓存
     if missing:
