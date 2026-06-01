@@ -17,8 +17,9 @@
             <div class="user-info" id="loginUser">
                 <span class="user-dot"></span>
                 <span>加载中...</span>
-                <span id="healthDot" style="margin-left:auto;font-size:11px;color:#8b949e;">⚪ 检查中</span>
+                <span id="healthDot" onclick="toggleHealthPanel()" style="margin-left:auto;font-size:11px;color:#8b949e;cursor:pointer;">⚪ 检查中</span>
             </div>
+            <div id="healthPanel" style="display:none;margin-top:8px;padding:8px;border:1px solid #30363d;border-radius:8px;background:#0f1115;font-size:11px;line-height:1.5;color:#c9d1d9;"></div>
             <ul class="nav-list">
                 <li><a href="/dashboard" class="nav-item active" data-page="dashboard"><span class="nav-icon">📈</span> <span>大盘</span></a></li>
                 <li><a href="/positions" class="nav-item" data-page="positions"><span class="nav-icon">📋</span> <span>持仓</span></a></li>

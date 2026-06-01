@@ -87,12 +87,35 @@ apiFetch('/auth/api/current_user').then(d => {
     }
 }).catch(() => {});
 
+let _healthDetail = null;
+
+function toggleHealthPanel() {
+    const panel = document.getElementById('healthPanel');
+    if (!panel) return;
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (_healthDetail) renderHealthPanel(_healthDetail);
+}
+
+function renderHealthPanel(data) {
+    const panel = document.getElementById('healthPanel');
+    if (!panel) return;
+    const checks = data.checks || {};
+    const rows = Object.keys(checks).map(k => {
+        const v = checks[k] || {};
+        const icon = v.ok === false ? '🔴' : '🟢';
+        const extra = v.error ? (' - ' + v.error) : (v.count ? (' - ' + v.count) : '');
+        return `<div>${icon} <b>${k}</b>${extra}</div>`;
+    }).join('');
+    panel.innerHTML = `<div style="margin-bottom:6px;"><b>系统健康详情</b></div>${rows || '暂无数据'}`;
+}
+
 // 系统健康检查指示灯
 async function updateHealthDot() {
     const dot = document.getElementById('healthDot');
     if (!dot) return;
     try {
         const d = await apiFetch('/api/health/full');
+        _healthDetail = d;
         const st = d.status || 'degraded';
         if (st === 'ok') {
             dot.textContent = '🟢 正常';
@@ -104,6 +127,11 @@ async function updateHealthDot() {
             const checks = d.checks || {};
             const bad = Object.keys(checks).filter(k => checks[k] && checks[k].ok === false);
             dot.title = bad.length ? ('异常: ' + bad.join(', ')) : '部分模块降级';
+        }
+        // 如果面板已展开，刷新详情
+        const panel = document.getElementById('healthPanel');
+        if (panel && panel.style.display !== 'none') {
+            renderHealthPanel(d);
         }
     } catch (e) {
         dot.textContent = '🔴 故障';
