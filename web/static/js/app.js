@@ -79,12 +79,41 @@ function formatPct(v) { return (v >= 0 ? '+' : '') + (v || 0).toFixed(2) + '%'; 
 function pnlClass(v) { return v >= 0 ? 'positive' : 'negative'; }
 
 // 加载登录用户
-fetch('/auth/api/current_user').then(r => r.json()).then(d => {
-    if (d.username) {
+apiFetch('/auth/api/current_user').then(d => {
+    const user = d.data || d;
+    if (user && user.username) {
         const el = document.getElementById('loginUser');
-        if (el) el.innerHTML = '<span class="user-dot"></span><span>' + d.username + '</span>' + (d.role === 'admin' ? ' <span style="font-size:10px;color:#d29922;">🔑</span>' : '');
+        if (el) el.innerHTML = '<span class="user-dot"></span><span>' + user.username + '</span>' + (user.role === 'admin' ? ' <span style="font-size:10px;color:#d29922;">🔑</span>' : '') + '<span id="healthDot" style="margin-left:auto;font-size:11px;color:#8b949e;">⚪ 检查中</span>';
     }
-});
+}).catch(() => {});
+
+// 系统健康检查指示灯
+async function updateHealthDot() {
+    const dot = document.getElementById('healthDot');
+    if (!dot) return;
+    try {
+        const d = await apiFetch('/api/health/full');
+        const st = d.status || 'degraded';
+        if (st === 'ok') {
+            dot.textContent = '🟢 正常';
+            dot.style.color = '#3fb950';
+            dot.title = '系统运行正常';
+        } else {
+            dot.textContent = '🟡 注意';
+            dot.style.color = '#d29922';
+            const checks = d.checks || {};
+            const bad = Object.keys(checks).filter(k => checks[k] && checks[k].ok === false);
+            dot.title = bad.length ? ('异常: ' + bad.join(', ')) : '部分模块降级';
+        }
+    } catch (e) {
+        dot.textContent = '🔴 故障';
+        dot.style.color = '#f85149';
+        dot.title = e.message || '健康检查失败';
+    }
+}
+
+setInterval(updateHealthDot, 30000);
+updateHealthDot();
 
 // ===== 响应式：侧边栏管理 =====
 function openSidebar() {
