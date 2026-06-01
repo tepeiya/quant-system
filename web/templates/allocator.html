@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}策略分配 - 量化系统{% endblock %}
+{% block content %}
+<div class="panel">
+  <div class="flex-between mb-8">
+    <h2>🧩 多策略资金分配引擎</h2>
+    <button class="btn" onclick="loadAlloc()">🔄 刷新</button>
+  </div>
+  <div id="summary" class="card-grid"></div>
+</div>
+
+<div class="panel">
+  <h2>📊 策略权重</h2>
+  <div id="weights"></div>
+</div>
+
+<div class="panel">
+  <h2>💰 资金分配（美元）</h2>
+  <div id="capital"></div>
+</div>
+
+<script>
+function barRow(name, pct, amount){
+  const p = Math.max(0, Math.min(100, Number(pct||0)));
+  return `
+    <div style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:#8b949e;margin-bottom:4px;">
+        <span>${name}</span><span>${p.toFixed(1)}% | $${(amount||0).toFixed(0)}</span>
+      </div>
+      <div style="height:10px;background:#161b22;border-radius:99px;overflow:hidden;border:1px solid #30363d;">
+        <div style="height:100%;width:${p}%;background:linear-gradient(90deg,#1f6feb,#3fb950);"></div>
+      </div>
+    </div>`;
+}
+
+async function loadAlloc(){
+  const r = await fetch('/allocator/api/report');
+  const d = await r.json();
+
+  document.getElementById('summary').innerHTML = `
+    <div class="stat-card"><div class="stat-label">市场状态</div><div class="stat-value">${(d.market||{}).trend||'?'}</div></div>
+    <div class="stat-card"><div class="stat-label">建议</div><div class="stat-value">${(d.market||{}).action||'?'}</div></div>
+    <div class="stat-card"><div class="stat-label">总权益</div><div class="stat-value">$${(d.total_equity||0).toFixed(0)}</div></div>
+    <div class="stat-card"><div class="stat-label">可用资金</div><div class="stat-value">$${(d.deployable_equity||0).toFixed(0)}</div></div>`;
+
+  const w = d.weights || {};
+  document.getElementById('weights').innerHTML =
+    barRow('趋势主策略', w.trend, 0) +
+    barRow('配对交易', w.pairs, 0) +
+    barRow('轮式策略', w.wheel, 0) +
+    barRow('现金储备', w.cash, 0);
+
+  const c = d.capital || {};
+  document.getElementById('capital').innerHTML =
+    barRow('趋势主策略', w.trend, c.trend) +
+    barRow('配对交易', w.pairs, c.pairs) +
+    barRow('轮式策略', w.wheel, c.wheel) +
+    barRow('现金储备', w.cash, c.cash);
+}
+
+loadAlloc();
+</script>
+{% endblock %}
