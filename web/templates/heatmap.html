@@ -14,6 +14,7 @@
             <option value="name">按名称排序</option>
         </select>
         <button class="btn primary" onclick="loadHeatmap()">🔄 刷新</button>
+        <button class="btn" onclick="runWarmup()">🔥 预热数据</button>
     </div>
 </div>
 
@@ -301,6 +302,18 @@ async function showStock(ticker) {
         }
     }
     document.getElementById('modalBody').innerHTML = '<div class="empty-state">无详细数据</div>';
+}
+
+async function runWarmup() {
+    try {
+        showToast('开始预热数据...', 'info');
+        const d = await apiFetch('/api/warmup', {method:'POST'});
+        showToast(`预热完成: 本轮${d.data.fetched}只，剩余${d.data.remaining}只`, 'success', 5000);
+        _heatmapCache = null;
+        loadHeatmap();
+    } catch (e) {
+        showToast('预热失败: ' + e.message, 'error', 6000);
+    }
 }
 
 loadHeatmap();  // 首次加载

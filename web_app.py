@@ -50,6 +50,7 @@ else:
         f.write(app.secret_key)
 
 # ====== 安全加固 ======
+from security import apply_security_fixes, log_audit
 from security_policy import PUBLIC_PATHS
 apply_security_fixes(app)
 
@@ -151,6 +152,17 @@ def api_trade_mode():
         return jsonify({"error": "无效模式"}), 400
     _set_trade_mode(mode)
     return jsonify({"mode": mode, "message": f"已切换到{'纸交易' if mode == 'paper' else '实盘'}"})
+
+
+@app.route("/api/warmup", methods=["POST"])
+def api_warmup():
+    """手动触发数据预热一轮"""
+    try:
+        from warmup_data import warmup
+        r = warmup(batch_size=80)
+        return jsonify({"status": "ok", "message": "预热完成", "data": r})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 
 @app.route("/api/health/full")
