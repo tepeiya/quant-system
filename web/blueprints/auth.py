@@ -19,6 +19,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, render_template, session, redirect, url_for
 from passlib.hash import bcrypt
 from security import login_rate_limit, csrf_protect, encrypt_key, decrypt_key, log_audit, is_registration_allowed
+from api_response import ok, err
 
 logger = logging.getLogger("quant.auth")
 
@@ -120,16 +121,16 @@ def login():
     password = data.get("password", "")
 
     if not username or not password:
-        return jsonify({"status": "error", "message": "用户名和密码不能为空"})
+        return err("用户名和密码不能为空")
 
     users = load_users()
     user = users.get(username)
 
     if not user:
-        return jsonify({"status": "error", "message": "用户不存在"})
+        return err("用户不存在")
 
     if not bcrypt.verify(password, user["password"]):
-        return jsonify({"status": "error", "message": "密码错误"})
+        return err("密码错误")
 
     session["user"] = username
     session["role"] = user.get("role", "user")
@@ -146,6 +147,7 @@ def login():
         "message": "登录成功",
         "username": username,
         "role": user.get("role", "user"),
+        "data": {"username": username, "role": user.get("role", "user")}
     })
 
 
@@ -164,16 +166,16 @@ def register():
     
     # 注册白名单检查
     if not is_registration_allowed(username):
-        return jsonify({"status": "error", "message": "注册未开放，请联系管理员"})
+        return err("注册未开放，请联系管理员")
     
     if len(password) < 6:
-        return jsonify({"status": "error", "message": "密码至少6个字符"})
+        return err("密码至少6个字符")
     if password != confirm:
-        return jsonify({"status": "error", "message": "两次密码不一致"})
+        return err("两次密码不一致")
 
     users = load_users()
     if username in users:
-        return jsonify({"status": "error", "message": "用户已存在"})
+        return err("用户已存在")
 
     hashed = bcrypt.hash(password)
     users[username] = {
@@ -194,7 +196,13 @@ def register():
 
     log_audit("REGISTER", username, "新用户注册")
     logger.info(f"新用户注册: {username}")
-    return jsonify({"status": "ok", "message": "注册成功", "username": username})
+    return jsonify({
+        "status": "ok",
+        "message": "注册成功",
+        "username": username,
+        "role": "user",
+        "data": {"username": username, "role": "user"}
+    })
 
 
 @bp.route("/logout")
@@ -205,7 +213,9 @@ def logout():
 
 @bp.route("/api/current_user")
 def api_current_user():
-    return jsonify({
+    if "user" not in session:
+        return err("未登录", 401)
+    return ok({
         "username": session.get("user"),
         "role": session.get("role"),
     })
