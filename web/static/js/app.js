@@ -96,6 +96,12 @@ function toggleHealthPanel() {
     if (_healthDetail) renderHealthPanel(_healthDetail);
 }
 
+function copyHealthDiag() {
+    if (!_healthDetail) return;
+    const txt = JSON.stringify(_healthDetail, null, 2);
+    navigator.clipboard.writeText(txt).then(() => showToast('已复制诊断信息', 'success')).catch(()=>showToast('复制失败', 'error'));
+}
+
 function renderHealthPanel(data) {
     const panel = document.getElementById('healthPanel');
     if (!panel) return;
@@ -106,7 +112,14 @@ function renderHealthPanel(data) {
         const extra = v.error ? (' - ' + v.error) : (v.count ? (' - ' + v.count) : '');
         return `<div>${icon} <b>${k}</b>${extra}</div>`;
     }).join('');
-    panel.innerHTML = `<div style="margin-bottom:6px;"><b>系统健康详情</b></div>${rows || '暂无数据'}`;
+    panel.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <b>系统健康详情</b>
+        <button onclick="copyHealthDiag()" style="font-size:10px;padding:2px 6px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;">复制诊断</button>
+      </div>
+      <div style="margin-bottom:6px;color:#8b949e;">trace_id: ${data.trace_id || '-'} ${data.last_error_time ? ('| 最近错误: ' + data.last_error_time) : ''}</div>
+      ${rows || '暂无数据'}
+    `;
 }
 
 // 系统健康检查指示灯

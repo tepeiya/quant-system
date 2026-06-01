@@ -160,7 +160,9 @@ def api_health_full():
     report = {
         "time": str(datetime.now()),
         "status": "ok",
-        "checks": {}
+        "checks": {},
+        "trace_id": __import__('uuid').uuid4().hex[:12],
+        "last_error_time": None
     }
     
     # 1) 登录系统
@@ -169,6 +171,7 @@ def api_health_full():
     except Exception as e:
         report["checks"]["auth"] = {"ok": False, "error": str(e)}
         report["status"] = "degraded"
+        report["last_error_time"] = str(datetime.now())
 
     # 2) 券商配置
     try:
