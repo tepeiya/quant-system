@@ -25,6 +25,15 @@ def _fix(obj):
     return obj
 
 
+@bp.route("/api/orders")
+def api_orders():
+    try:
+        from order_manager import _load
+        return ok(_load())
+    except Exception as e:
+        return err(str(e))
+
+
 @bp.route("/")
 def page():
     return render_template("trading.html")
@@ -50,11 +59,17 @@ def api_submit():
         return err("参数错误")
     try:
         from broker_manager import BrokerManager
+        from order_manager import new_intent, mark, STATUS_SUBMITTED, STATUS_REJECTED
         bm = BrokerManager(username=session.get("user"))
         broker = bm.get_current()
+        intent = new_intent(symbol, side.upper(), qty, getattr(bm, '_current_id', 'broker'))
         result = broker.submit_order(symbol, qty, side, "market")
+        if isinstance(result, dict) and result.get('error'):
+            mark(intent['intent_id'], STATUS_REJECTED, last_error=result.get('error'))
+            return err(result.get('error'))
+        mark(intent['intent_id'], STATUS_SUBMITTED, broker_order=result)
         log_audit("ORDER", session.get("user", "?"), f"{side.upper()} {symbol} x{qty}")
-        return ok(result, "下单请求已发送")
+        return ok({"intent_id": intent['intent_id'], "broker_order": result}, "下单请求已发送")
     except Exception as e:
         return err(str(e))
 
