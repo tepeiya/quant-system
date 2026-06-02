@@ -52,5 +52,37 @@ def mark(intent_id, status, **kwargs):
     _save(rows)
 
 
-def can_retry(intent, max_retry=3):
-    return intent.get('retry_count', 0) < max_retry and intent.get('status') in [STATUS_NEW, STATUS_SUBMITTED, STATUS_PARTIAL, STATUS_REJECTED]
+def retry_failed(submit_func, max_retry=3):
+    """对失败/新建订单做简单重试，submit_func(intent)->result"""
+    rows = _load()
+    for r in rows:
+        if not can_retry(r, max_retry=max_retry):
+            continue
+        if r.get('status') not in [STATUS_NEW, STATUS_REJECTED]:
+            continue
+        try:
+            result = submit_func(r)
+            if isinstance(result, dict) and result.get('error'):
+                r['retry_count'] = r.get('retry_count', 0) + 1
+                r['last_error'] = result.get('error')
+                r['status'] = STATUS_REJECTED
+            else:
+                r['status'] = STATUS_SUBMITTED
+                r['broker_order'] = result
+                r['retry_count'] = r.get('retry_count', 0)
+            r['updated_at'] = str(datetime.now())
+        except Exception as e:
+            r['retry_count'] = r.get('retry_count', 0) + 1
+            r['last_error'] = str(e)
+            r['status'] = STATUS_REJECTED
+            r['updated_at'] = str(datetime.now())
+    _save(rows)
+    return rows
+
+
+def mark_filled(intent_id, filled_qty=None, avg_price=None):
+    mark(intent_id, STATUS_FILLED, filled_qty=filled_qty, avg_fill_price=avg_price)
+
+
+def mark_partial(intent_id, filled_qty=None, avg_price=None):
+    mark(intent_id, STATUS_PARTIAL, filled_qty=filled_qty, avg_fill_price=avg_price)

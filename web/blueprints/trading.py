@@ -25,11 +25,57 @@ def _fix(obj):
     return obj
 
 
+@bp.route("/api/orders/retry", methods=["POST"])
+def api_orders_retry():
+    try:
+        from order_manager import retry_failed
+        from broker_manager import BrokerManager
+        bm = BrokerManager(username=session.get("user"))
+        broker = bm.get_current()
+
+        def _submit(intent):
+            return broker.submit_order(intent['symbol'], int(intent['qty']), intent['side'].lower(), "market")
+
+        rows = retry_failed(_submit)
+        return ok(rows, "重试完成")
+    except Exception as e:
+        return err(str(e))
+
+
 @bp.route("/api/orders")
 def api_orders():
     try:
         from order_manager import _load
         return ok(_load())
+    except Exception as e:
+        return err(str(e))
+
+
+@bp.route("/api/orders/sync", methods=["POST"])
+def api_orders_sync():
+    try:
+        from order_manager import _load, mark_filled, mark_partial
+        from broker_manager import BrokerManager
+        bm = BrokerManager(username=session.get("user"))
+        broker = bm.get_current()
+        if not hasattr(broker, 'get_orders'):
+            return err('当前券商不支持订单同步')
+        broker_orders = broker.get_orders(limit=50, status='all')
+        local = _load()
+        by_id = {str(o.get('order_id')): o for o in broker_orders if o.get('order_id') is not None}
+        updated = 0
+        for row in local:
+            bo = by_id.get(str((row.get('broker_order') or {}).get('order_id')))
+            if not bo:
+                continue
+            status = str(bo.get('status','')).lower()
+            filled = bo.get('filled_qty') or bo.get('filled')
+            avg = bo.get('avg_fill_price')
+            if status in ['filled']:
+                mark_filled(row['intent_id'], filled, avg); updated += 1
+            elif status in ['partially_filled','partial','new'] and filled:
+                mark_partial(row['intent_id'], filled, avg); updated += 1
+        return ok({'updated': updated}, '同步完成')
     except Exception as e:
         return err(str(e))
 
