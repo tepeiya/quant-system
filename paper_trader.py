@@ -29,13 +29,27 @@ TRADE_LOG = "signals/trade_log.json"
 
 
 def get_alpaca():
-    from alpaca.trading.client import TradingClient
-    key = os.environ.get("ALPACA_API_KEY_ID", "")
-    secret = os.environ.get("ALPACA_SECRET_KEY", "")
-    if not key or not secret:
-        logger.error("请设置 ALPACA_API_KEY_ID 和 ALPACA_SECRET_KEY")
+    """获取默认券商客户端。
+    当前自动执行器优先支持 Alpaca；若默认券商为 IBKR/其他，提示改用 Web 下单或 broker_manager。
+    """
+    from broker_manager import get_default_broker_id, load_config
+    default_id = get_default_broker_id()
+    cfg = load_config().get(default_id, {})
+
+    if cfg.get("type") != "alpaca":
+        logger.error(f"当前默认券商是 {default_id}，paper_trader 暂只支持 Alpaca 自动执行。请先将默认券商切回 Alpaca，或使用 Web 下单。")
         sys.exit(1)
-    return TradingClient(key, secret, paper=True)
+
+    from alpaca.trading.client import TradingClient
+    key_name = cfg.get("env_key_id", "ALPACA_API_KEY_ID")
+    sec_name = cfg.get("env_secret", "ALPACA_SECRET_KEY")
+    key = os.environ.get(key_name, "")
+    secret = os.environ.get(sec_name, "")
+    if not key or not secret:
+        logger.error(f"请设置 {key_name} 和 {sec_name}")
+        sys.exit(1)
+    paper = cfg.get("paper", True)
+    return TradingClient(key, secret, paper=paper)
 
 
 def periodic_rebalance(auto: bool = False):

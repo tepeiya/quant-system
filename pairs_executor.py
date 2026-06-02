@@ -27,10 +27,17 @@ PER_PAIR_PCT = 0.20    # 单配对资金占比
 
 
 def get_alpaca():
+    """获取默认券商客户端（当前配对执行器优先支持 Alpaca）"""
+    from broker_manager import get_default_broker_id, load_config
+    default_id = get_default_broker_id()
+    cfg = load_config().get(default_id, {})
+    if cfg.get("type") != "alpaca":
+        raise RuntimeError(f"当前默认券商是 {default_id}，pairs_executor 暂仅支持 Alpaca 自动执行")
+
     from alpaca.trading.client import TradingClient
-    KEY = os.environ.get("ALPACA_API_KEY_ID", "")
-    SECRET = os.environ.get("ALPACA_SECRET_KEY", "")
-    return TradingClient(KEY, SECRET, paper=True)
+    key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+    secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+    return TradingClient(key, secret, paper=cfg.get("paper", True))
 
 
 def get_positions():

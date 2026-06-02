@@ -518,6 +518,17 @@ BROKER_CLASSES = {
 }
 
 
+def get_default_broker_id() -> str:
+    path = "config/default_broker.txt"
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                return f.read().strip()
+        except:
+            pass
+    return "alpaca_paper"
+
+
 class BrokerManager:
     """券商管理器 — 支持多用户账户隔离"""
     
@@ -573,11 +584,17 @@ class BrokerManager:
     
     def get_current(self) -> BrokerInterface:
         if self._current is None:
-            # 默认使用第一个可用的
             available = self.list_available()
             if not available:
                 raise RuntimeError("没有可用的券商")
-            self.use(available[0]["id"])
+
+            # 优先使用默认券商（若已启用）
+            default_id = get_default_broker_id()
+            ids = [b["id"] for b in available]
+            if default_id in ids:
+                self.use(default_id)
+            else:
+                self.use(available[0]["id"])
         return self._current
     
     def enable(self, broker_id: str, enabled: bool = True):
