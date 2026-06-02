@@ -10,6 +10,15 @@ def page():
     return render_template("allocator.html")
 
 
+@bp.route("/api/execute", methods=["POST"])
+def api_execute():
+    from multi_strategy_runner import run_all
+    try:
+        return jsonify(run_all(auto=True))
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+
 @bp.route("/api/report")
 def api_report():
     from strategy_allocator import allocation_report

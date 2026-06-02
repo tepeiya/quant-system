@@ -4,7 +4,10 @@
 <div class="panel">
   <div class="flex-between mb-8">
     <h2>🧩 多策略资金分配引擎</h2>
-    <button class="btn" onclick="loadAlloc()">🔄 刷新</button>
+    <div class="flex gap-8">
+      <button class="btn" onclick="loadAlloc()">🔄 刷新</button>
+      <button class="btn primary" onclick="runStrategies()">⚡ 执行分配</button>
+    </div>
   </div>
   <div id="summary" class="card-grid"></div>
 </div>
@@ -19,6 +22,11 @@
   <div id="capital"></div>
 </div>
 
+<div class="panel">
+  <h2>📝 执行结果</h2>
+  <div id="execResult" style="font-size:12px;color:#8b949e;">尚未执行</div>
+</div>
+
 <script>
 function barRow(name, pct, amount){
   const p = Math.max(0, Math.min(100, Number(pct||0)));
@@ -31,6 +39,21 @@ function barRow(name, pct, amount){
         <div style="height:100%;width:${p}%;background:linear-gradient(90deg,#1f6feb,#3fb950);"></div>
       </div>
     </div>`;
+}
+
+async function runStrategies(){
+  try {
+    const r = await apiFetch('/allocator/api/execute', {method:'POST'});
+    const steps = r.steps || [];
+    document.getElementById('execResult').innerHTML = steps.map(s => {
+      const color = s.status === 'executed' ? '#3fb950' : (s.status === 'error' ? '#f85149' : '#d29922');
+      return `<div style="padding:6px 0;border-bottom:1px solid #21262d;"><b>${s.name}</b> <span style="color:${color}">${s.status}</span> ${s.capital ? '| $'+Number(s.capital).toFixed(0) : ''} ${s.error ? '| '+s.error : ''}</div>`;
+    }).join('');
+    showToast('多策略执行已完成', 'success');
+  } catch(e) {
+    document.getElementById('execResult').textContent = '执行失败: ' + e.message;
+    showToast('执行失败: ' + e.message, 'error');
+  }
 }
 
 async function loadAlloc(){
