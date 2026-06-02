@@ -17,6 +17,8 @@
 
 import logging
 from datetime import datetime, timedelta
+import os
+import requests
 
 logger = logging.getLogger("quant.earnings")
 
@@ -77,17 +79,43 @@ class EarningsFilter:
 
         return [est.strftime("%Y-%m-%d"), est2.strftime("%Y-%m-%d")]
 
+    def _get_finnhub_earnings(self, ticker: str, days_ahead: int = 30) -> list[str]:
+        """从 Finnhub 获取未来财报日期"""
+        api_key = os.environ.get("FINNHUB_API_KEY", "")
+        if not api_key:
+            return []
+        now = datetime.now().date()
+        end = now + timedelta(days=days_ahead)
+        try:
+            url = "https://finnhub.io/api/v1/calendar/earnings"
+            params = {"symbol": ticker, "from": str(now), "to": str(end), "token": api_key}
+            r = requests.get(url, params=params, timeout=10)
+            if r.status_code != 200:
+                return []
+            data = r.json()
+            rows = data.get("earningsCalendar") or []
+            out = []
+            for row in rows:
+                d = row.get("date")
+                if d:
+                    out.append(d)
+            return out
+        except Exception:
+            return []
+
     def get_upcoming_earnings(self, tickers: list[str],
                               days_ahead: int = 7) -> list[dict]:
         """
         检查哪些股票在未来 days_ahead 天内发财报。
+        优先 Finnhub，失败回退到估算。
         返回：受影响的股票列表
         """
         now = datetime.now()
         affected = []
 
         for t in tickers:
-            dates = self.estimate_earnings(t)
+            finnhub_dates = self._get_finnhub_earnings(t, days_ahead=days_ahead + 7)
+            dates = finnhub_dates if finnhub_dates else self.estimate_earnings(t)
             for d in dates:
                 report_date = datetime.strptime(d, "%Y-%m-%d")
                 if now <= report_date <= now + timedelta(days=days_ahead):
@@ -96,7 +124,8 @@ class EarningsFilter:
                         "ticker": t,
                         "report_date": d,
                         "days_to_report": days_to,
-                        "suggested_action": "减仓50%",
+                        "suggested_action": f"减仓{int(self.reduce_ratio*100)}%",
+                        "source": "finnhub" if finnhub_dates else "estimate",
                     })
                     break
 

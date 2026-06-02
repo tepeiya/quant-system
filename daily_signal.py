@@ -270,9 +270,22 @@ def generate_signals(use_cached_quality=True):
               f"{s['mom']:>+6.1f}% {s['quality']:>6.1f} {s['rsi'] or '':>4}")
 
     # 买入候选
+    cand = []
     if not bearish and not extreme:
         held = set()
         cand = [s for s in scores if s["ticker"] not in held][:5]
+        # 财报过滤（优先Finnhub）
+        try:
+            from earnings_filter import EarningsFilter
+            ef = EarningsFilter()
+            before = len(cand)
+            cand = ef.filter_buys(cand)
+            filtered_n = before - len(cand)
+            if filtered_n > 0:
+                print(f"\n📅 财报过滤: 排除了 {filtered_n} 只临近财报股票")
+        except Exception as e:
+            logger.warning(f"财报过滤失败: {str(e)[:80]}")
+
         print(f"\n🟢 买入候选 Top 5")
         print(f"  {'股票':>6} {'评分':>6} {'价格':>8} {'动量%':>7} {'质量分':>6}")
         for s in cand:
@@ -286,7 +299,7 @@ def generate_signals(use_cached_quality=True):
         "date": dt_str,
         "market": {"spy": float(spy_price), "rsi": float(rsi), "trend": ml, "action": ma},
         "top_scores": scores[:10],
-        "buy_candidates": [s for s in scores if s["ticker"] not in set()][:5],
+        "buy_candidates": cand,
     }
     op = f"{OUTPUT_DIR}/signal_{dt_str}.json"
     with open(op, "w") as f:
