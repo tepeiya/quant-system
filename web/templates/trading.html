@@ -47,6 +47,17 @@
     <div id="accountInfo" style="font-size:14px;color:#8b949e;">加载中...</div>
 </div>
 
+<div class="panel">
+    <div class="flex gap-8" style="align-items:center;justify-content:space-between;">
+        <h2>📦 订单状态</h2>
+        <div class="flex gap-8">
+            <button class="btn" onclick="syncOrders()">🔄 同步成交</button>
+            <button class="btn" onclick="retryOrders()">♻️ 重试失败单</button>
+        </div>
+    </div>
+    <div id="ordersInfo" style="font-size:13px;color:#8b949e;">加载中...</div>
+</div>
+
 <script>
 let selectedStock = null;
 
@@ -62,7 +73,7 @@ async function searchStock(keyword) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({keyword})
         });
-        const stocks = await r.json();
+        const stocks = Array.isArray(r.data) ? r.data : (Array.isArray(r) ? r : []);
         resultsDiv.innerHTML = stocks.slice(0, 8).map(s => {
             const cls = s.change >= 0 ? 'positive' : 'negative';
             return `<div style="padding:8px;border-bottom:1px solid #21262d;cursor:pointer;"
@@ -105,14 +116,14 @@ async function submitOrder() {
     btn.textContent = '⏳ 提交中...';
     btn.disabled = true;
     try {
-        const r = await apiFetch('/trading/api/submit', {
+        const d = await apiFetch('/trading/api/submit', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({symbol: selectedStock, side, qty})
         });
-        const d = await r.json();
         document.getElementById('orderResult').innerHTML =
-            `<div class="${d.status === 'ok' ? 'positive' : 'negative'}" style="margin-top:8px;">${d.message || JSON.stringify(d)}</div>`;
+            `<div class="positive" style="margin-top:8px;">${d.message || '已提交'}${d.data && d.data.intent_id ? '（意图ID: ' + d.data.intent_id + '）' : ''}</div>`;
+        loadOrders();
     } catch(e) {
         document.getElementById('orderResult').innerHTML = '<div class="negative">下单失败: ' + e + '</div>';
     }
@@ -120,16 +131,55 @@ async function submitOrder() {
     btn.disabled = false;
 }
 
+async function loadOrders() {
+    try {
+        const d = await apiFetch('/trading/api/orders');
+        const orders = d.data || [];
+        if (!orders.length) {
+            document.getElementById('ordersInfo').innerHTML = '暂无订单';
+            return;
+        }
+        document.getElementById('ordersInfo').innerHTML = orders.slice().reverse().slice(0,10).map(o => {
+            const color = o.status === 'FILLED' ? '#3fb950' : (o.status === 'REJECTED' ? '#f85149' : '#d29922');
+            return `<div style="padding:8px 0;border-bottom:1px solid #21262d;display:flex;justify-content:space-between;gap:8px;">
+                <div><b>${o.symbol}</b> ${o.side} x${o.qty}<br><span style="font-size:11px;color:#8b949e;">${o.intent_id}</span></div>
+                <div style="text-align:right;"><span style="color:${color};">${o.status}</span><br><span style="font-size:11px;color:#8b949e;">重试:${o.retry_count||0}</span></div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        document.getElementById('ordersInfo').innerHTML = '加载订单失败: ' + e.message;
+    }
+}
+
+async function syncOrders() {
+    try {
+        const d = await apiFetch('/trading/api/orders/sync', {method:'POST'});
+        showToast(d.message || '同步完成', 'success');
+        loadOrders();
+    } catch(e) { showToast('同步失败: ' + e.message, 'error'); }
+}
+
+async function retryOrders() {
+    try {
+        const d = await apiFetch('/trading/api/orders/retry', {method:'POST'});
+        showToast(d.message || '重试完成', 'success');
+        loadOrders();
+    } catch(e) { showToast('重试失败: ' + e.message, 'error'); }
+}
+
 // 加载账户信息
-fetch('/trading/api/preview', {method: 'POST'}).then(r => r.json()).then(d => {
+apiFetch('/trading/api/preview', {method: 'POST'}).then(d => {
+    const a = d.data || d;
     document.getElementById('accountInfo').innerHTML = `
         <div class="flex gap-8">
-            <span>权益: <b style="color:#e6edf3;">$${(d.equity || 0).toFixed(2)}</b></span>
-            <span>现金: <b style="color:#e6edf3;">$${(d.cash || 0).toFixed(2)}</b></span>
-            <span>购买力: <b style="color:#e6edf3;">$${(d.buying_power || 0).toFixed(2)}</b></span>
+            <span>权益: <b style="color:#e6edf3;">$${(a.equity || 0).toFixed(2)}</b></span>
+            <span>现金: <b style="color:#e6edf3;">$${(a.cash || 0).toFixed(2)}</b></span>
+            <span>购买力: <b style="color:#e6edf3;">$${(a.buying_power || 0).toFixed(2)}</b></span>
         </div>`;
-}).catch(() => {
-    document.getElementById('accountInfo').textContent = '❌ 无法获取账户信息';
+}).catch((e) => {
+    document.getElementById('accountInfo').textContent = '❌ 无法获取账户信息: ' + e.message;
 });
+
+loadOrders();
 </script>
 {% endblock %}
