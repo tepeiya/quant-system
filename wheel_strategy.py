@@ -66,63 +66,43 @@ def save_positions(positions: list):
 # ===== 核心逻辑 =====
 
 def get_option_chain(symbol: str) -> dict:
-    """获取期权链数据（通过yfinance）"""
+    """获取期权链数据（优先真实期权链，失败返回错误）"""
     import yfinance as yf
-    import pandas as pd
 
     try:
-        # 先用缓存
-        from data_prod import _fundamentals_cache
-        cached_fund = _fundamentals_cache.get(symbol, {})
-        
-        import multiprocessing as _mp
-        result_holder = {}
-        def _fetch():
-            import yfinance as yf
-            result_holder['ticker'] = yf.Ticker(symbol)
-        t = _mp.Process(target=_fetch)
-        t.start()
-        t.join(timeout=8)
-        if 'ticker' not in result_holder:
-            t.terminate()
-            return {"error": "超时"}
-        ticker = result_holder['ticker']
+        ticker = yf.Ticker(symbol)
         expirations = ticker.options
         if not expirations:
             return {"error": "无期权数据"}
-        
-        # 找最近>30天的到期日
+
         target_dte = load_config().get("put_dte", 35)
         now = datetime.now()
         best_expiry = None
-        
+
         for exp in expirations:
             exp_date = datetime.strptime(exp, "%Y-%m-%d")
             dte = (exp_date - now).days
-            if dte >= target_dte - 7 and dte <= target_dte + 7:
+            if target_dte - 10 <= dte <= target_dte + 10:
                 best_expiry = exp
                 break
-        
         if not best_expiry:
-            best_expiry = expirations[0] if expirations else None
-        
-        if not best_expiry:
-            return {"error": "无可用的到期日"}
-        
-        # 获取看跌和看涨
-        puts = ticker.option_chain(best_expiry).puts
-        calls = ticker.option_chain(best_expiry).calls
-        
-        current_price = None
-        if len(puts) > 0 and "underlyingPrice" in puts.columns:
-            current_price = float(puts["underlyingPrice"].iloc[0])
-        
+            best_expiry = expirations[0]
+
+        oc = ticker.option_chain(best_expiry)
+        puts = oc.puts
+        calls = oc.calls
+
+        # 现价从历史中取
+        hist = ticker.history(period="5d")
+        current_price = float(hist["Close"].iloc[-1]) if hist is not None and len(hist) > 0 else 0.0
+
         return {
             "symbol": symbol,
             "expiry": best_expiry,
             "current_price": current_price,
             "puts": puts.to_dict("records") if puts is not None else [],
             "calls": calls.to_dict("records") if calls is not None else [],
+            "source": "yfinance_real",
         }
     except Exception as e:
         logger.error(f"期权链获取失败 {symbol}: {e}")
@@ -286,37 +266,53 @@ def analyze_wheel_candidates() -> list:
     for c in candidates:
         if c.get("score", 0) < score_threshold:
             continue
-        
-        # 用简化模型估算期权价格（不依赖实时期权链）
+
         price = c.get("price", 0)
         if price <= 0:
             continue
-        
-        put_strike = round(price * 0.90, 2)  # 虚值10%
-        put_premium_per_share = round(price * 0.025, 2)  # 估算权利金2.5%
-        collateral = put_strike * 100
-        monthly_return = put_premium_per_share * 100 / collateral * 100 if collateral > 0 else 0
-        
-        call_strike = round(price * 1.10, 2)  # 虚值10%  
-        call_premium_per_share = round(price * 0.02, 2)  # 估算权利金2%
-        
-        results.append({
-            "ticker": c["ticker"],
-            "score": c["score"],
-            "price": price,
-            "put": {
+
+        chain = get_option_chain(c["ticker"])
+        put_best = None
+        call_best = None
+
+        if not chain.get("error"):
+            put_info = find_best_put(chain)
+            call_info = find_best_call(chain)
+            put_best = put_info.get("best") if not put_info.get("error") else None
+            call_best = call_info.get("best") if not call_info.get("error") else None
+
+        # 如果真实链失败，回退估算
+        if not put_best:
+            put_strike = round(price * 0.90, 2)
+            put_premium_per_share = round(price * 0.025, 2)
+            collateral = put_strike * 100
+            monthly_return = put_premium_per_share * 100 / collateral * 100 if collateral > 0 else 0
+            put_best = {
                 "strike": put_strike,
                 "premium_received": round(put_premium_per_share * 100, 2),
                 "collateral_required": collateral,
                 "monthly_return_pct": round(monthly_return, 2),
                 "break_even": round(put_strike - put_premium_per_share, 2),
                 "premium": round(put_premium_per_share * 100, 2),
-            },
-            "call": {
+                "source": "model",
+            }
+        if not call_best:
+            call_strike = round(price * 1.10, 2)
+            call_premium_per_share = round(price * 0.02, 2)
+            call_best = {
                 "strike": call_strike,
                 "premium_received": round(call_premium_per_share * 100, 2),
                 "monthly_return_pct": round(call_premium_per_share / max(price, 1) * 100, 2),
-            },
+                "source": "model",
+            }
+
+        results.append({
+            "ticker": c["ticker"],
+            "score": c["score"],
+            "price": price,
+            "put": put_best,
+            "call": call_best,
+            "option_source": chain.get("source", "model") if not chain.get("error") else "model",
         })
         
         if len(results) >= 5:
