@@ -63,11 +63,10 @@
             btn.textContent = '注册中...';
             btn.disabled = true;
             try {
-                const r = await apiFetch('/auth/register', {
+                const d = await apiFetch('/auth/register', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({username, password, confirm})
                 });
-                const d = await r.json();
                 if (d.status === 'ok') {
                     successBox.textContent = '注册成功，跳转中...';
                     successBox.style.display = 'block';

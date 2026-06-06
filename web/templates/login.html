@@ -54,11 +54,10 @@
             btn.textContent = '登录中...';
             btn.disabled = true;
             try {
-                const r = await apiFetch('/auth/login', {
+                const d = await apiFetch('/auth/login', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({username, password})
                 });
-                const d = await r.json();
                 if (d.status === 'ok') window.location.href = '/dashboard/';
                 else { errorBox.textContent = d.message; errorBox.style.display = 'block'; }
             } catch(e) {
