@@ -30,7 +30,7 @@ import numpy as np
 logger = logging.getLogger("quant.final")
 
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
-os.makedirs(f"{OUT_DIR}/results", exist_ok=True)
+os.makedirs(OUT_DIR, exist_ok=True)
 
 
 def main():
@@ -42,14 +42,24 @@ def main():
     logger.info(f"缓存: {len(cache)}只")
 
     logger.info("获取SPY...")
-    spy = yf.download("SPY", start="2018-01-01", end="2026-05-17",
-                      progress=False, auto_adjust=True)
-    if isinstance(spy.columns, pd.MultiIndex):
-        spy.columns = spy.columns.get_level_values(0)
+    try:
+        spy_t = yf.Ticker("SPY")
+        spy = spy_t.history(start="2018-01-01", end="2026-05-17", auto_adjust=True)
+    except Exception:
+        logger.warning("SPY下载失败，将跳过回测")
+
+    if spy is None or len(spy) < 200:
+        logger.error("没有有效的SPY数据，无法进行回测")
+        return
+
     spy = compute_indicators(spy)
     logger.info(f"SPY: {len(spy)}行")
 
     tickers = sorted(cache.keys())
+    if len(tickers) < 10:
+        logger.error("缓存数据不足，需要至少10只股票")
+        return
+    logger.info(f"使用缓存中的 {len(tickers)} 只股票")
 
     # 2. 质量分
     logger.info("计算质量因子...")
@@ -113,14 +123,14 @@ def main():
         ax2.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        path = f"{OUT_DIR}/results/final_report.png"
+        path = os.path.join(OUT_DIR, "final_report.png")
         fig.savefig(path, dpi=150, bbox_inches="tight")
         plt.close()
         logger.info(f"图表: {path}")
 
         # 保存详细数据
-        eq_all.to_csv(f"{OUT_DIR}/results/equity_all500.csv")
-        eq_top.to_csv(f"{OUT_DIR}/results/equity_top200.csv")
+        eq_all.to_csv(os.path.join(OUT_DIR, "equity_all500.csv"))
+        eq_top.to_csv(os.path.join(OUT_DIR, "equity_top200.csv"))
         logger.info("详细数据已保存")
 
 

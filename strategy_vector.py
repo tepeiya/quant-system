@@ -27,6 +27,18 @@ from system_config import load as load_config
 
 logger = logging.getLogger("quant.vector")
 
+# 半导体行业股票（用于子行业集中度控制）
+SEMI = {
+    "AMD", "INTC", "NVDA", "AVGO", "QCOM", "TXN", "ASML", "AMAT",
+    "KLAC", "LRCX", "MU", "MRVL", "NXPI", "MCHP", "STM", "ADI",
+    "ON", "SWKS", "QRVO", "TER", "WOLF", "ENTG", "UCTT", "COHU",
+    "ACMR", "AMKR", "RMBS", "ALGM", "DIOD", "MTSI", "POWI",
+    "SMTC", "GSIT", "CEVA", "SIMO",
+}
+HIGH_VOL_SEMI = {"AMD", "NVDA", "MRVL", "MCHP", "ON", "WOLF", "STM"}
+
+logger = logging.getLogger("quant.vector")
+
 # 缓存配置
 _config = {}
 
@@ -90,8 +102,10 @@ class VectorStrategy:
         返回：{total_return, annual_return, max_drawdown, sharpe,
               equity_curve, drawdown_curve}
         """
-        # 1. 构建日期
+        # 1. 构建日期（统一转为无时区，和 yfinance 数据匹配）
         dates = pd.bdate_range(start, end, freq="W")
+        if hasattr(spy.index, 'tz') and spy.index.tz is not None:
+            dates = dates.tz_localize(None)
         T = len(dates)
 
         # 2. 构建价格矩阵 (T x N) — 向量化
@@ -113,9 +127,11 @@ class VectorStrategy:
             if j is None:
                 continue
             # 找出dates中每行在df中的最近索引
-            df_dates = df.index.values
+            df_index = df.index
+            if hasattr(df_index, 'tz') and df_index.tz is not None:
+                df_index = df_index.tz_localize(None)
             for i, d in enumerate(dates):
-                idx = df.index.get_indexer([d], method="nearest")
+                idx = df_index.get_indexer([d], method="nearest")
                 if idx[0] < 0 or idx[0] >= len(df):
                     continue
                 row = df.iloc[idx[0]]
@@ -130,9 +146,13 @@ class VectorStrategy:
 
         # 3. 大盘信号——4态择时（多头/震荡/高波/空头）
         logger.info("计算大盘信号...")
+        # 统一 SPY index 无时区
+        spy_index_clean = spy.index
+        if hasattr(spy_index_clean, 'tz') and spy_index_clean.tz is not None:
+            spy_index_clean = spy_index_clean.tz_localize(None)
         spy_idx = []
         for d in dates:
-            idx = spy.index.get_indexer([d], method="nearest")
+            idx = spy_index_clean.get_indexer([d], method="nearest")
             spy_idx.append(idx[0] if idx[0] >= 0 else 0)
 
         spy_rows = spy.iloc[spy_idx]
