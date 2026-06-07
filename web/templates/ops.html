@@ -155,20 +155,31 @@ async function runTask(taskId) {
     try {
         const btn = document.getElementById('run_' + taskId);
         if (btn) { btn.disabled = true; btn.textContent = '⏳ 启动中...'; }
-        const d = await apiFetch('/ops/api/' + taskId, {method:'POST'});
-        showToast(d.message || '任务已启动', 'success');
+        await apiFetch('/ops/api/' + taskId, {method:'POST'});
+        showToast('任务已启动', 'success');
     } catch(e) {
         showToast('启动失败: ' + e.message, 'error');
     }
-    // 启动/停止守护进程后，硬编码强制刷新
-    if (taskId === 'daemon_start') {
-        document.getElementById('run_daemon_start').disabled = true;
-        document.getElementById('run_daemon_stop').disabled = false;
-    } else if (taskId === 'daemon_stop') {
-        document.getElementById('run_daemon_start').disabled = false;
-        document.getElementById('run_daemon_stop').disabled = true;
+    // 等后端更新，最多重试5次
+    for (let i = 0; i < 5; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        try {
+            const st = await apiFetch('/ops/api/status');
+            const daemon = st.daemon || {};
+            const s = document.getElementById('run_daemon_start');
+            const p = document.getElementById('run_daemon_stop');
+            if (s) s.disabled = daemon.running;
+            if (p) p.disabled = !daemon.running;
+            // 状态正确就不再轮询
+            if ((taskId === 'daemon_start' && daemon.running) ||
+                (taskId === 'daemon_stop' && !daemon.running)) {
+                loadStatus();
+                return;
+            }
+        } catch(e) {}
     }
-    setTimeout(loadStatus, 2000);
+    // 5秒后刷新一次界面保证显示同步
+    loadStatus();
 }
 
 async function showLog(taskId) {
