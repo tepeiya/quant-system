@@ -155,12 +155,19 @@ async function runTask(taskId) {
     try {
         const btn = document.getElementById('run_' + taskId);
         if (btn) { btn.disabled = true; btn.textContent = '⏳ 启动中...'; }
-        await apiFetch('/ops/api/' + taskId, {method:'POST'});
-        showToast('任务已启动', 'success');
+        const d = await apiFetch('/ops/api/' + taskId, {method:'POST'});
+        showToast(d.message || '任务已启动', 'success');
     } catch(e) {
         showToast('启动失败: ' + e.message, 'error');
     }
-    // 等后端状态更新后再刷新
+    // 启动/停止守护进程后，硬编码强制刷新
+    if (taskId === 'daemon_start') {
+        document.getElementById('run_daemon_start').disabled = true;
+        document.getElementById('run_daemon_stop').disabled = false;
+    } else if (taskId === 'daemon_stop') {
+        document.getElementById('run_daemon_start').disabled = false;
+        document.getElementById('run_daemon_stop').disabled = true;
+    }
     setTimeout(loadStatus, 2000);
 }
 
