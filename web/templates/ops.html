@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}运维中心{% endblock %}
+{% block content %}
+
+<style>
+.task-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    transition: border-color .2s;
+    margin-bottom: 12px;
+}
+.task-card:hover { border-color: #58a6ff; }
+.task-info { flex: 1; }
+.task-info h3 { margin: 0 0 4px; font-size: 15px; color: #e6edf3; }
+.task-info p { margin: 0; font-size: 12px; color: #8b949e; }
+.task-status { font-size: 11px; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
+.status-idle { color: #8b949e; background: #21262d; }
+.status-ok { color: #3fb950; background: rgba(63,185,80,.15); }
+.status-error { color: #f85149; background: rgba(248,81,73,.15); }
+.status-running { color: #d29922; background: rgba(210,153,34,.15); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+.btn-task { padding: 8px 20px; font-size: 13px; border-radius: 8px; border: none; cursor: pointer; white-space: nowrap; }
+.btn-run { background: #238636; color: #fff; }
+.btn-run:hover { background: #2ea043; }
+.btn-run:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+.btn-log { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
+.btn-log:hover { background: #30363d; }
+
+#logPanel {
+    display: none;
+    margin-top: 16px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 16px;
+}
+#logPanel pre {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #c9d1d9;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+</style>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <h2 style="margin:0;">🛠️ 运维中心</h2>
+    <div style="display:flex;align-items:center;gap:8px;">
+        <span id="runningBadge" class="task-status status-idle">⏸️ 空闲</span>
+        <span style="font-size:11px;color:#484f58;">每30秒自动刷新</span>
+    </div>
+</div>
+
+<div id="taskList">
+    <!-- 由 JS 动态渲染 -->
+</div>
+
+<div id="logPanel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <strong id="logTitle" style="font-size:13px;color:#e6edf3;">日志</strong>
+        <button class="btn-task btn-log" onclick="closeLog()">✕ 关闭</button>
+    </div>
+    <pre id="logContent">加载中...</pre>
+</div>
+
+<script>
+const TASKS = [
+    {id:'data_warmup',    name:'📥 数据预热',     desc:'下载 S&P 500 全部503只股票的历史数据缓存（首次需10-30分钟）'},
+    {id:'run_backtest',   name:'📊 运行回测',     desc:'执行 Multi-Factor Momentum+ 完整回测并生成图表'},
+    {id:'run_signal',     name:'🏆 生成信号',     desc:'基于最新数据生成今日选股信号和评分排名'},
+    {id:'evolve_factors', name:'🧬 因子进化',     desc:'IC追踪 + 滑动窗口优化，自动调整因子权重'},
+    {id:'run_weekly',     name:'📋 生成周报',     desc:'输出本周绩效总结、持仓分析和收益归因'},
+    {id:'export_report',  name:'📄 导出回测报告', desc:'生成带 SPY 对比的回测报告 JSON'},
+];
+
+async function loadStatus() {
+    try {
+        const d = await apiFetch('/ops/api/status');
+        const running = d.running;
+        const current = d.current || '';
+        const last = d.last || {};
+
+        const badge = document.getElementById('runningBadge');
+        if (running) {
+            badge.className = 'task-status status-running';
+            badge.textContent = '🔄 ' + current;
+        } else {
+            const anyOk = Object.values(last).some(v => v.status === 'ok');
+            const anyErr = Object.values(last).some(v => v.status === 'error');
+            if (anyErr) { badge.className = 'task-status status-error'; badge.textContent = '⚠️ 有任务失败'; }
+            else if (anyOk) { badge.className = 'task-status status-ok'; badge.textContent = '✅ 就绪'; }
+            else { badge.className = 'task-status status-idle'; badge.textContent = '⏸️ 空闲'; }
+        }
+
+        const list = document.getElementById('taskList');
+        list.innerHTML = TASKS.map(t => {
+            const st = last[t.id] || {};
+            const isRunning = running && current === t.id;
+            let statusText = '等待运行';
+            let statusClass = 'status-idle';
+            if (isRunning) { statusText = '🔄 运行中...'; statusClass = 'status-running'; }
+            else if (st.status === 'ok') { statusText = '✅ ' + (st.time || '').slice(5,16); statusClass = 'status-ok'; }
+            else if (st.status === 'error') { statusText = '❌ ' + (st.error || '').slice(0,30); statusClass = 'status-error'; }
+
+            return `<div class="task-card">
+                <div class="task-info">
+                    <h3>${t.name}</h3>
+                    <p>${t.desc}</p>
+                </div>
+                <span class="task-status ${statusClass}">${statusText}</span>
+                <div style="display:flex;gap:6px;">
+                    <button class="btn-task btn-run" onclick="runTask('${t.id}')" ${running ? 'disabled' : ''}>
+                        ${isRunning ? '⏳' : '▶️'} 运行
+                    </button>
+                    <button class="btn-task btn-log" onclick="showLog('${t.id}')">📋 日志</button>
+                </div>
+            </div>`;
+        }).join('');
+    } catch(e) {}
+}
+
+async function runTask(taskId) {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '⏳ 启动中...';
+    try {
+        await apiFetch('/ops/api/' + taskId, {method:'POST'});
+        showToast('任务已启动', 'success');
+    } catch(e) {
+        showToast('启动失败: ' + e.message, 'error');
+    }
+    loadStatus();
+}
+
+async function showLog(taskId) {
+    const nameMap = {data_warmup:'backtest', run_backtest:'backtest', run_signal:'signal',
+                     evolve_factors:'evolve', run_weekly:'weekly', export_report:'export'};
+    const logKey = nameMap[taskId] || taskId;
+    const panel = document.getElementById('logPanel');
+    const title = document.getElementById('logTitle');
+    const content = document.getElementById('logContent');
+
+    panel.style.display = 'block';
+    title.textContent = TASKS.find(t=>t.id===taskId)?.name + ' — 日志';
+    content.textContent = '加载中...';
+
+    try {
+        const d = await apiFetch('/ops/api/log/' + logKey);
+        content.textContent = d.data?.log || '(暂无日志)';
+    } catch(e) {
+        content.textContent = '获取日志失败: ' + e.message;
+    }
+}
+
+function closeLog() {
+    document.getElementById('logPanel').style.display = 'none';
+}
+
+loadStatus();
+setInterval(loadStatus, 30000);
+</script>
+{% endblock %}
