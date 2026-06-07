@@ -37,8 +37,7 @@
 
 <script>
 async function refreshSignals() {
-    const r = await apiFetch('/signals/api/today');
-    const d = await r.json();
+    const d = await apiFetch('/signals/api/today');
     const topScores = d.top_scores || [];
     const buyCandidates = d.buy_candidates || [];
 
@@ -87,8 +86,7 @@ async function executeTrade() {
     btn.textContent = '⏳ 执行中...';
     btn.disabled = true;
     try {
-        const r = await apiFetch('/signals/api/execute', { method: 'POST' });
-        const d = await r.json();
+        const d = await apiFetch('/signals/api/execute', { method: 'POST' });
         const resultDiv = $('executeResult');
         resultDiv.style.display = 'block';
         resultDiv.innerHTML = `<h2>${d.status === 'ok' ? '✅' : '❌'} 调仓结果</h2><p>${d.message}</p>`;

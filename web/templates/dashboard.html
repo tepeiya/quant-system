@@ -26,8 +26,7 @@
 
 <script>
 async function loadDashboard() {
-    const r = await apiFetch('/dashboard/api/data');
-    const d = await r.json();
+    const d = await apiFetch('/dashboard/api/data');
     const pf = d.portfolio || {};
     const mc = d.macro || {};
 
@@ -50,8 +49,7 @@ async function loadDashboard() {
     setMacro('macroInflation', mc.inflation?.score);
 
     // 资金曲线
-    const hr = await apiFetch('/dashboard/api/equity_history');
-    const hist = await hr.json();
+    const hist = await apiFetch('/dashboard/api/equity_history');
     if (hist.length > 0 && window.Chart) {
         const ctx = document.getElementById('equityChart').getContext('2d');
         new Chart(ctx, {

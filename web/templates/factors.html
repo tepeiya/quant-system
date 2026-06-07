@@ -72,8 +72,7 @@
 let currentWeights = {};
 
 async function loadWeights() {
-    const r = await apiFetch('/factors/api/weights');
-    const w = await r.json();
+    const w = await apiFetch('/factors/api/weights');
     currentWeights = w;
     $('momSlider').value = w.momentum || 45;
     $('qualSlider').value = w.quality || 25;
@@ -111,7 +110,11 @@ async function saveWeights() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({weights})
         });
-        const d = await r.json();
+        const d = await apiFetch('/factors/api/update_weights', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({weights})
+        });
         $('weightResult').innerHTML = d.status === 'ok' ? '✅ ' + d.message : '❌ ' + d.message;
     } catch(e) {
         $('weightResult').innerHTML = '❌ 保存失败';
@@ -124,8 +127,7 @@ async function runEvolution() {
     btn.disabled = true;
     $('weightResult').innerHTML = '⏳ 正在计算因子IC并优化权重...';
     try {
-        const r = await apiFetch('/factors/api/evolve', { method: 'POST' });
-        const d = await r.json();
+        const d = await apiFetch('/factors/api/evolve', { method: 'POST' });
         if (d.status === 'ok') {
             $('weightResult').innerHTML = '✅ ' + d.message;
             loadWeights();
@@ -142,8 +144,7 @@ async function runEvolution() {
 }
 
 async function loadIC() {
-    const r = await apiFetch('/factors/api/ic_history');
-    const icData = await r.json();
+    const icData = await apiFetch('/factors/api/ic_history');
 
     $('icNote').textContent = icData.length + ' 个月数据';
 
@@ -196,8 +197,7 @@ async function loadIC() {
 }
 
 async function loadEvolution() {
-    const r = await apiFetch('/factors/api/evolution_history');
-    const data = await r.json();
+    const data = await apiFetch('/factors/api/evolution_history');
     const history = data.history || [];
     $('evolutionCount').textContent = '共 ' + history.length + ' 次进化';
     const body = $('evolutionBody');

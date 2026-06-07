@@ -71,8 +71,7 @@
 
 <script>
 async function refreshPlan() {
-    const r = await apiFetch('/wheel/api/plan');
-    const d = await r.json();
+    const d = await apiFetch('/wheel/api/plan');
     
     if (d.error) {
         $('planBody').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>' + d.error + '</p></div>';
@@ -120,12 +119,11 @@ async function updateConfig() {
     $('dteVal').textContent = cfg.put_dte;
     
     try {
-        const r = await apiFetch('/wheel/api/config', {
+        const d = await apiFetch('/wheel/api/config', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(cfg),
         });
-        const d = await r.json();
         $('configResult').textContent = '✅ 已保存';
         setTimeout(() => { $('configResult').textContent = ''; }, 2000);
         refreshPlan();

@@ -43,8 +43,7 @@ const CONFIG_GROUPS = {
 };
 
 async function loadConfig() {
-    const r = await apiFetch('/settings/api/all_config');
-    configData = await r.json();
+    const configData = await apiFetch('/settings/api/all_config');
     const form = document.getElementById('configForm');
     form.innerHTML = '';
     Object.entries(CONFIG_GROUPS).forEach(([group, keys]) => {
@@ -68,11 +67,10 @@ async function saveConfig() {
     const inputs = document.querySelectorAll('#configForm input[data-key]');
     const updates = {};
     inputs.forEach(inp => updates[inp.getAttribute('data-key')] = parseFloat(inp.value));
-    const r = await apiFetch('/settings/api/save_config', {
+    const d = await apiFetch('/settings/api/save_config', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(updates)
     });
-    const d = await r.json();
     document.getElementById('configMsg').textContent = d.status === 'ok' ? '✅ 已保存' : '❌ 失败';
     setTimeout(() => document.getElementById('configMsg').textContent = ' ', 3000);
 }

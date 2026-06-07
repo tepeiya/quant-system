@@ -50,8 +50,7 @@
 
 <script>
 async function refreshPos() {
-    const r = await apiFetch('/positions/api/data');
-    const d = await r.json();
+    const d = await apiFetch('/positions/api/data');
     const pos = d.positions || [];
     const s = d.summary || {};
     const eq = d.equity || 0;
@@ -88,8 +87,7 @@ async function refreshPos() {
     }
 
     // 交易记录
-    const tr = await apiFetch('/positions/api/trade_log');
-    const trades = await tr.json();
+    const trades = await apiFetch('/positions/api/trade_log');
     const tBody = $('tradeLogBody');
     if (trades.length === 0) {
         tBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8b949e;">暂无交易</td></tr>';
@@ -148,8 +146,7 @@ function drawCostChart(positions, equity) {
 async function closeAll() {
     if (!confirm('确认全部清仓？')) return;
     try {
-        const r = await apiFetch('/positions/api/close_all', { method: 'POST' });
-        const d = await r.json();
+        const d = await apiFetch('/positions/api/close_all', { method: 'POST' });
         alert(d.message);
         refreshPos();
     } catch(e) {
