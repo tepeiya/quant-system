@@ -119,11 +119,11 @@ def api_daemon_start():
     if _status["running"]:
         return err("有其他任务正在运行，请稍候")
 
-    # 直接启动（不在后台线程跑）
+    # 直接启动
     try:
         log_file = open("/tmp/daemon_web_start.log", "w")
         proc = subprocess.Popen(
-            [sys.executable, "daemon.py", "--daemon"],
+            [sys.executable, "daemon.py"],
             stdout=log_file, stderr=subprocess.STDOUT,
             env={**os.environ}
         )
@@ -131,8 +131,21 @@ def api_daemon_start():
         if _os.path.exists(pid_file):
             with open(pid_file) as _f:
                 new_pid = int(_f.read().strip())
-            if _os.path.exists(f"/proc/{new_pid}"):
+            try:
+                _os.kill(new_pid, 0)
                 return ok(message=f"守护进程已启动 (PID: {new_pid})")
+            except:
+                pass
+        # 等更久
+        time.sleep(3)
+        if _os.path.exists(pid_file):
+            with open(pid_file) as _f:
+                new_pid = int(_f.read().strip())
+            try:
+                _os.kill(new_pid, 0)
+                return ok(message=f"守护进程已启动 (PID: {new_pid})")
+            except:
+                pass
         return ok(message="守护进程启动命令已发送，请稍后刷新查看状态")
     except Exception as e:
         return err(f"启动失败: {str(e)}")

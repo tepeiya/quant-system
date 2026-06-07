@@ -326,14 +326,8 @@ if __name__ == "__main__":
         else:
             print("⚠️ 没有运行的守护进程")
     elif "--daemon" in args:
-        pid = os.fork()
-        if pid > 0:
-            print(f"✅ 守护进程已启动 (PID: {pid})")
-            sys.exit(0)
-        os.setsid()
-        with open(f"{LOG_DIR}/daemon_stdout.log", "w") as f:
-            os.dup2(f.fileno(), sys.stdout.fileno())
-            os.dup2(f.fileno(), sys.stderr.fileno())
+        # Docker 环境：直接前台运行（由 docker restart policy 管理）
+        write_pid()
         main()
     else:
         main()
