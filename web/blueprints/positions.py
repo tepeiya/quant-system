@@ -3,12 +3,10 @@
 """
 from flask import Blueprint, jsonify, render_template
 import numpy as np
+import logging
 
-from broker_manager import BrokerManager
-from portfolio_tracker import sync_from_alpaca
-
+logger = logging.getLogger("quant.positions")
 bp = Blueprint("positions", __name__, url_prefix="/positions")
-broker = BrokerManager()
 
 
 def _fix(obj):
@@ -34,15 +32,16 @@ def page():
 
 @bp.route("/api/data")
 def api_positions():
-    """当前持仓详情"""
+    """从Alpaca实时拉取持仓数据"""
+    from portfolio_tracker import sync_from_alpaca
     try:
         portfolio = sync_from_alpaca()
-    except:
+    except Exception as e:
+        logger.error(f"持仓实时同步失败: {e}")
         portfolio = {"equity": 0, "cash": 0, "positions": {}, "position_count": 0}
 
     positions = list(portfolio.get("positions", {}).values()) if portfolio.get("positions") else []
 
-    # 计算汇总
     total_cost = sum(p.get("cost_basis", 0) for p in positions)
     total_value = sum(p.get("market_value", 0) for p in positions)
     total_pnl = sum(p.get("pnl_amount", 0) for p in positions)

@@ -35,19 +35,10 @@ def save_portfolio(data: dict):
 
 
 def sync_from_alpaca(username: str = None):
-    """从Alpaca拉取实际持仓，同步到本地（缓存优先 + 网络备选）
+    """从Alpaca拉取实际持仓，同步到本地（实时优先，缓存兜底）
     支持按用户隔离"""
-    # 尝试从缓存读取
-    cached = load_portfolio()
-    if cached and cached.get("equity", 0) > 0:
-        return cached
-
     import requests, os
-    
-    # iSH SSL workaround
-    if os.environ.get("SSL_CERT_FILE"):
-        pass  # already configured, see below
-    
+
     # 优先使用用户的Key
     if username:
         try:
@@ -62,7 +53,10 @@ def sync_from_alpaca(username: str = None):
         KEY = os.environ.get("ALPACA_API_KEY_ID", "")
         SECRET = os.environ.get("ALPACA_SECRET_KEY", "")
     if not KEY or not SECRET:
-        logger.warning("Alpaca Key未设置")
+        logger.warning("Alpaca Key未设置，使用本地缓存")
+        cached = load_portfolio()
+        if cached and cached.get("equity", 0) > 0:
+            return cached
         return None
     
     base = "https://paper-api.alpaca.markets"
