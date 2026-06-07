@@ -21,5 +21,7 @@ RUN mkdir -p logs signals config data_cache
 # 端口
 EXPOSE 8765
 
-# 启动
-CMD gunicorn web_app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --log-level info
+# 启动脚本：同时运行 Web 和 Daemon
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+CMD ["/app/docker-entrypoint.sh"]

@@ -207,10 +207,14 @@ def api_log(task_name):
         "backtest": "/tmp/backtest_last.txt", "signal": "/tmp/signal_last.txt",
         "evolve": "/tmp/evolve_last.txt", "weekly": "/tmp/weekly_last.txt",
         "export": "/tmp/export_last.txt", "refresh": "/tmp/refresh_last.txt",
-        "daemon": "/tmp/daemon_web_start.log",
+        "daemon": "logs/daemon_web_start.log",
     }
     path = paths.get(task_name)
     if path and os.path.exists(path):
         with open(path) as f:
+            return ok({"log": f.read()[-5000:]})
+    # daemon 日志还可能写在 logs/daemon.log
+    if task_name == "daemon" and os.path.exists("logs/daemon.log"):
+        with open("logs/daemon.log") as f:
             return ok({"log": f.read()[-5000:]})
     return ok({"log": "(暂无日志)"})
