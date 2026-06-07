@@ -230,5 +230,13 @@ def api_log(task_name):
     path = log_files.get(task_name)
     if path and os.path.exists(path):
         with open(path) as f:
-            return ok({"log": f.read()[-5000:]})
-    return err("暂无日志")
+            content = f.read()
+        return ok({"log": content[-5000:]})
+    # 检查 daemon.log 特殊处理
+    if task_name == "daemon":
+        dp = "logs/daemon.log"
+        if os.path.exists(dp):
+            with open(dp) as f:
+                content = f.read()
+            return ok({"log": content[-5000:]})
+    return ok({"log": "(暂无日志，任务还未运行或日志文件尚未生成)"})
