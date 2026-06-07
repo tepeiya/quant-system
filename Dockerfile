@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # 复制代码
 COPY . .
 
+# 给 entrypoint 加执行权限（root 阶段做）
+RUN chmod +x /app/docker-entrypoint.sh
+
 # 清理调试文件
 RUN rm -f debug_ic.py debug_signal.py quick_signal.py test_full.py fix_stability.py || true
 
