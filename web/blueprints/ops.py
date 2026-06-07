@@ -48,8 +48,12 @@ def api_status():
         try:
             with open(daemon_pid_file) as _f:
                 daemon_pid = int(_f.read().strip())
-            # 检查进程是否存在
-            daemon_running = _os.path.exists(f"/proc/{daemon_pid}")
+            # 检查进程是否存在（Docker 容器中 /proc 可能不可用，改用 kill -0）
+            try:
+                _os.kill(daemon_pid, 0)
+                daemon_running = True
+            except (OSError, ProcessLookupError):
+                daemon_running = False
         except:
             pass
     return jsonify({
@@ -105,8 +109,11 @@ def api_daemon_start():
         try:
             with open(pid_file) as _f:
                 old_pid = int(_f.read().strip())
-            if _os.path.exists(f"/proc/{old_pid}"):
+            try:
+                _os.kill(old_pid, 0)
                 return ok(message="守护进程已在运行")
+            except (OSError, ProcessLookupError):
+                pass
         except:
             pass
 
