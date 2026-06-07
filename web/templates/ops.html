@@ -160,7 +160,8 @@ async function runTask(taskId) {
     } catch(e) {
         showToast('启动失败: ' + e.message, 'error');
     }
-    loadStatus();
+    // 等后端状态更新后再刷新
+    setTimeout(loadStatus, 2000);
 }
 
 async function showLog(taskId) {
