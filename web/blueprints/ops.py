@@ -97,17 +97,39 @@ def api_data_warmup():
 @bp.route("/api/daemon_start", methods=["POST"])
 def api_daemon_start():
     """启动自动化交易守护进程"""
+    import os as _os
+    # 先检查是否已经在运行
+    pid_file = "config/daemon.pid"
+    if _os.path.exists(pid_file):
+        try:
+            with open(pid_file) as _f:
+                old_pid = int(_f.read().strip())
+            if _os.path.exists(f"/proc/{old_pid}"):
+                return ok(message="守护进程已在运行")
+        except:
+            pass
+
     if _status["running"]:
         return err("有其他任务正在运行，请稍候")
+
     def task():
         import subprocess
-        result = subprocess.run(
-            [sys.executable, "daemon.py", "--daemon"],
-            capture_output=True, text=True, timeout=10,
-            env={**os.environ}
-        )
-        with open("logs/daemon_start.txt", "w") as f:
-            f.write(result.stdout + "\n" + result.stderr)
+        try:
+            # 用 Popen 后台启动，不等待
+            proc = subprocess.Popen(
+                [sys.executable, "daemon.py", "--daemon"],
+                stdout=open("logs/daemon_web_start.log", "w"),
+                stderr=subprocess.STDOUT,
+                env={**os.environ}
+            )
+            # 等待 pid 文件出现
+            for _ in range(10):
+                if _os.path.exists(pid_file):
+                    break
+                __import__("time").sleep(1)
+        except Exception as e:
+            with open("logs/daemon_web_start.log", "a") as f:
+                f.write(f"启动失败: {e}\n")
     _run_bg(task, "daemon_start")
     return ok(message="守护进程启动命令已发送")
 
