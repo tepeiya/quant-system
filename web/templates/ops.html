@@ -160,26 +160,9 @@ async function runTask(taskId) {
     } catch(e) {
         showToast('启动失败: ' + e.message, 'error');
     }
-    // 等后端更新，最多重试5次
-    for (let i = 0; i < 5; i++) {
-        await new Promise(r => setTimeout(r, 1000));
-        try {
-            const st = await apiFetch('/ops/api/status');
-            const daemon = st.daemon || {};
-            const s = document.getElementById('run_daemon_start');
-            const p = document.getElementById('run_daemon_stop');
-            if (s) s.disabled = daemon.running;
-            if (p) p.disabled = !daemon.running;
-            // 状态正确就不再轮询
-            if ((taskId === 'daemon_start' && daemon.running) ||
-                (taskId === 'daemon_stop' && !daemon.running)) {
-                loadStatus();
-                return;
-            }
-        } catch(e) {}
-    }
-    // 5秒后刷新一次界面保证显示同步
-    loadStatus();
+    // daemon 启停需要等后台完成，其他任务 1 秒后刷新
+    const delay = (taskId === 'daemon_start' || taskId === 'daemon_stop') ? 5000 : 1000;
+    setTimeout(loadStatus, delay);
 }
 
 async function showLog(taskId) {
