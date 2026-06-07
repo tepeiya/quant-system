@@ -109,13 +109,14 @@ def save_price_cache(data: dict):
     logger.info(f"缓存已保存: {len(data)}只")
 
 
-def refresh_cache(days_back: int = 10) -> dict:
+def refresh_cache(days_back: int = 10, use_alpaca: bool = True) -> dict:
     """
     实时更新缓存：只补最近 N 天的数据，不重下全部历史。
-    日线数据 + 技术指标自动重算。
+    优先用Alpaca批量获取（更快），失败回退 yfinance。
     
     Args:
         days_back: 拉取最近多少天的数据用于覆盖缓存（默认10个交易日）
+        use_alpaca: 是否优先使用Alpaca
     
     Returns:
         dict: {ticker: 更新行数, ...}
@@ -128,56 +129,96 @@ def refresh_cache(days_back: int = 10) -> dict:
     today = datetime.now()
     start_str = (today - timedelta(days=days_back + 10)).strftime("%Y-%m-%d")
     end_str = today.strftime("%Y-%m-%d")
-
-    updated = {}
     tickers = list(cache.keys())
+    updated = {}
 
-    for i, ticker in enumerate(tickers):
+    # Alpaca批量路径
+    if use_alpaca:
         try:
-            t = yf.Ticker(ticker)
-            df_new = t.history(start=start_str, end=end_str, auto_adjust=True)
-            if df_new is None or len(df_new) == 0:
-                continue
-
-            # 合并到缓存
-            old = cache[ticker]
-            # 去掉 old 中最后 days_back 天（可能有变化），拼接新的
-            if old is not None and len(old) > 0:
-                # 保留旧数据中不重叠的部分
-                cutoff = pd.Timestamp(today - timedelta(days=days_back + 30))
-                old_before = old[old.index < cutoff] if hasattr(old.index, 'tz') else old[old.index < cutoff.tz_localize(None)]
-                
-                # 确保 index 时区一致
-                if hasattr(df_new.index, 'tz') and df_new.index.tz is not None:
-                    df_new_idx = df_new.index.tz_localize(None)
-                    df_new.index = df_new_idx
-                
-                if hasattr(old.index, 'tz') and old.index.tz is not None:
-                    old_idx = old.index.tz_localize(None)
-                    old.index = old_idx
-                
-                # 合并：旧数据(不重叠部分) + 新数据
-                combined = pd.concat([old_before, df_new])
-                # 去重（保留最新的）
-                combined = combined[~combined.index.duplicated(keep='last')]
-                combined.sort_index(inplace=True)
-            else:
-                combined = df_new
-
-            # 重新计算技术指标
-            cache[ticker] = compute_indicators(combined)
-            updated[ticker] = len(df_new)
-
+            result_batch = {}
+            _fetch_alpaca_batch(tickers, result_batch, start_str, end_str)
+            for ticker, new_df in result_batch.items():
+                if new_df is not None and len(new_df) > 0:
+                    old = cache.get(ticker)
+                    combined = _merge_dataframes(old, new_df)
+                    cache[ticker] = compute_indicators(combined)
+                    updated[ticker] = len(new_df)
         except Exception as e:
-            logger.warning(f"{ticker} 实时更新失败: {str(e)[:60]}")
-            continue
+            logger.warning(f"Alpaca批量刷新失败: {e}，回退单只模式")
 
-        if (i + 1) % 20 == 0 or i == len(tickers) - 1:
-            save_price_cache(cache)
+    # 回退：单只 yfinance
+    remaining = [t for t in tickers if t not in updated]
+    if remaining:
+        import yfinance as yf
+        for i, ticker in enumerate(remaining):
+            try:
+                t = yf.Ticker(ticker)
+                df_new = t.history(start=start_str, end=end_str, auto_adjust=True)
+                if df_new is None or len(df_new) == 0:
+                    continue
+                old = cache.get(ticker)
+                combined = _merge_dataframes(old, df_new)
+                cache[ticker] = compute_indicators(combined)
+                updated[ticker] = len(df_new)
+            except Exception as e:
+                logger.warning(f"{ticker} 实时更新失败: {str(e)[:60]}")
+            if (i+1) % 50 == 0:
+                save_price_cache(cache)
 
     save_price_cache(cache)
     logger.info(f"实时更新完成: {len(updated)}只, 共{sum(updated.values())}行新数据")
     return updated
+
+
+def _merge_dataframes(old: pd.DataFrame | None, new: pd.DataFrame) -> pd.DataFrame:
+    """合并旧数据和新数据，去重、排序、统一时区"""
+    if old is None or len(old) == 0:
+        return new
+    # 统一时区
+    for df in [old, new]:
+        if hasattr(df.index, 'tz') and df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+    combined = pd.concat([old, new])
+    combined = combined[~combined.index.duplicated(keep='last')]
+    combined.sort_index(inplace=True)
+    return combined
+
+
+def get_realtime_prices(tickers: list[str]) -> dict[str, float]:
+    """
+    用Alpaca获取多只股票的最新实时价格（非缓存）。
+    用于信号生成前获取最新市价。
+    
+    Returns:
+        dict: {ticker: latest_price, ...}
+    """
+    from datetime import timezone
+    KEY = os.environ.get("ALPACA_API_KEY_ID", "")
+    SECRET = os.environ.get("ALPACA_SECRET_KEY", "")
+    if not KEY or not SECRET:
+        logger.warning("Alpaca未配置，无法获取实时价格")
+        return {}
+
+    try:
+        from alpaca.data import StockHistoricalDataClient
+        from alpaca.data.requests import StockLatestQuoteRequest
+
+        client = StockHistoricalDataClient(KEY, SECRET)
+        req = StockLatestQuoteRequest(symbol_or_symbols=tickers)
+        quotes = client.get_stock_latest_quote(req)
+        result = {}
+        for t in tickers:
+            q = quotes.get(t)
+            if q:
+                # 取 bid/ask 中间价作为参考价
+                result[t] = round(float(q.ask_price + q.bid_price) / 2, 2)
+        return result
+    except ImportError:
+        logger.warning("alpaca-py未安装")
+        return {}
+    except Exception as e:
+        logger.warning(f"获取实时价格失败: {e}")
+        return {}
 
 
 def _fetch_tiingo(ticker: str, start: str, end: str) -> pd.DataFrame | None:
@@ -248,20 +289,15 @@ def fetch_prices(tickers: list[str],
                  start: str = "2018-01-01",
                  end: str = None,
                  max_retries: int = 2,
-                 use_alpaca: bool = False) -> dict[str, pd.DataFrame]:
+                 use_alpaca: bool = True) -> dict[str, pd.DataFrame]:
     """
     获取价格数据。核心策略：
     1. 从缓存加载所有可用数据
-    2. 只对缺失的ticker进行网络请求
-    3. yfinance为主，Tiingo备选，Alpaca可选
-    4. 网络请求之间随机延迟防止限流
-    
-    如果 use_alpaca=True 优先走 Alpaca 批量获取（更快）
+    2. 优先走Alpaca批量获取（快且稳定），失败回退 Tiingo/yfinance
+    3. 只对缺失的ticker进行网络请求
     """
     if end is None:
         end = datetime.now().strftime("%Y-%m-%d")
-
-    import yfinance as yf
 
     # 1. 加载缓存
     cache = load_price_cache()
@@ -279,34 +315,19 @@ def fetch_prices(tickers: list[str],
     if missing:
         logger.info(f"缓存命中{len(result)}只, 需要获取{len(missing)}只")
 
-    # 2.5 Alpaca批量路径（use_alpaca=True时优先）
-    if use_alpaca and missing:
+    # 3. Alpaca批量获取（主力数据源）
+    if missing:
         alpaca_ok = _fetch_alpaca_batch(missing, result, start, end)
         if alpaca_ok > 0:
             logger.info(f"Alpaca获取: {alpaca_ok}只")
             missing = [t for t in missing if t not in result]
-            if not missing:
-                save_price_cache(result)
-                return result
 
-    # 3. 网络获取（yfinance -> Tiingo备选）
-    success = 0
-    yf_rate_limited = False
-    for i, ticker in enumerate(missing):
-        if yf_rate_limited:
-            # 已确认限流，直接用Tiingo
-            tiingo_df = _fetch_tiingo(ticker, start, end)
-            if tiingo_df is not None and len(tiingo_df) >= 200:
-                result[ticker] = tiingo_df
-                success += 1
-                if success % 10 == 0:
-                    logger.info(f"  进度[tiingo]: {success}/{len(missing)}")
-            else:
-                logger.warning(f"{ticker}[tiingo]: 获取失败，跳过")
-            continue
-
-        yf_ok = False
-        for attempt in range(max_retries):
+    # 4. yfinance/Tiingo补充（Alpaca失败的）
+    if missing:
+        logger.info(f"回退yfinance补充: {len(missing)}只")
+        import yfinance as yf
+        success = 0
+        for i, ticker in enumerate(missing):
             try:
                 df = yf.download(ticker, start=start, end=end,
                                  progress=False, auto_adjust=True)
@@ -315,51 +336,20 @@ def fetch_prices(tickers: list[str],
                         df.columns = df.columns.get_level_values(0)
                     result[ticker] = df
                     success += 1
-                    yf_ok = True
                     if success % 10 == 0:
                         logger.info(f"  进度[yf]: {success}/{len(missing)}")
-                    break
                 else:
                     logger.warning(f"{ticker}[yf]: 数据不足({len(df) if df is not None else 0}行)")
             except Exception as e:
-                err_str = str(e)
-                logger.warning(f"{ticker}[yf]: attempt{attempt+1}失败: {err_str[:60]}")
-                # 检测限流
-                if "RateLimited" in err_str or "429" in err_str or "rate limit" in err_str.lower():
-                    logger.warning("yfinance限流，整批切换到Tiingo...")
-                    yf_rate_limited = True
-                    break
-                if attempt < max_retries - 1:
-                    delay = 2 ** attempt + random.uniform(1, 3)
-                    time.sleep(delay)
+                logger.warning(f"{ticker}[yf]: {str(e)[:60]}")
+                # Tiingo兜底
+                tiingo_df = _fetch_tiingo(ticker, start, end)
+                if tiingo_df is not None and len(tiingo_df) >= 200:
+                    result[ticker] = tiingo_df
+                    success += 1
 
-        if not yf_ok and not yf_rate_limited:
-            # yfinance失败但不是限流 → 单只尝试Tiingo
-            tiingo_df = _fetch_tiingo(ticker, start, end)
-            if tiingo_df is not None and len(tiingo_df) >= 200:
-                result[ticker] = tiingo_df
-                success += 1
-                logger.info(f"  {ticker}: Tiingo备选 {len(tiingo_df)}行 ✅")
-            else:
-                logger.warning(f"{ticker}: yfinance+Tiingo均失败，跳过")
-
-        # 每5只之间随机延迟
-        if (i + 1) % 5 == 0:
-            time.sleep(random.uniform(1, 2))
-
-    # 3.5 对仍缺失的票尝试Alpaca批量补齐（自动）
-    unresolved = [t for t in missing if t not in result or result[t] is None or len(result[t]) < 200]
-    if unresolved:
-        alpaca_ok = _fetch_alpaca_batch(unresolved, result, start, end)
-        if alpaca_ok > 0:
-            success += alpaca_ok
-            logger.info(f"Alpaca补齐: {alpaca_ok}/{len(unresolved)}")
-
-    # 4. 保存缓存
-    if missing:
-        save_price_cache(result)
-        logger.info(f"获取完成: {success}/{len(missing)}")
-
+    # 5. 保存缓存
+    save_price_cache(result)
     return result
 
 
