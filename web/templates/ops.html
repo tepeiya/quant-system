@@ -91,10 +91,14 @@ async function loadStatus() {
         const running = d.running;
         const current = d.current || '';
         const last = d.last || {};
-        const log = d.log || [];
+        const daemon = d.daemon || {};
 
         const badge = document.getElementById('runningBadge');
-        if (running) {
+        const daemonTxt = daemon.running ? `🤖 守护运行中 (PID:${daemon.pid})` : '⏸️ 空闲';
+        if (daemon.running) {
+            badge.className = 'task-status status-running';
+            badge.textContent = daemonTxt;
+        } else if (running) {
             badge.className = 'task-status status-running';
             badge.textContent = '🔄 ' + current;
         } else {
@@ -102,7 +106,7 @@ async function loadStatus() {
             const anyErr = Object.values(last).some(v => v && v.status === 'error');
             if (anyErr) { badge.className = 'task-status status-error'; badge.textContent = '⚠️ 有任务失败'; }
             else if (anyOk) { badge.className = 'task-status status-ok'; badge.textContent = '✅ 就绪'; }
-            else { badge.className = 'task-status status-idle'; badge.textContent = '⏸️ 空闲'; }
+            else { badge.className = 'task-status status-idle'; badge.textContent = daemonTxt; }
         }
 
         const list = document.getElementById('taskList');
@@ -110,11 +114,22 @@ async function loadStatus() {
         list.innerHTML = TASKS.map(t => {
             const st = (last && last[t.id]) || {};
             const isRunning = running && current === t.id;
+
+            // 守护进程状态
             let statusText = '等待运行';
             let statusClass = 'status-idle';
-            if (isRunning) { statusText = '🔄 运行中...'; statusClass = 'status-running'; }
-            else if (st.status === 'ok') { statusText = '✅ ' + (st.time || '').slice(5,16); statusClass = 'status-ok'; }
-            else if (st.status === 'error') { statusText = '❌ ' + String(st.error || '').slice(0,30); statusClass = 'status-error'; }
+            let btnDisabled = running;
+
+            if (t.id === 'daemon_start') {
+                if (daemon.running) { statusText = '✅ 运行中'; statusClass = 'status-ok'; btnDisabled = true; }
+            } else if (t.id === 'daemon_stop') {
+                if (!daemon.running) { statusText = '⏸️ 未运行'; statusClass = 'status-idle'; btnDisabled = true; }
+                else { statusText = '🟢 运行中'; statusClass = 'status-ok'; }
+            } else {
+                if (isRunning) { statusText = '🔄 运行中...'; statusClass = 'status-running'; }
+                else if (st.status === 'ok') { statusText = '✅ ' + (st.time || '').slice(5,16); statusClass = 'status-ok'; }
+                else if (st.status === 'error') { statusText = '❌ ' + String(st.error || '').slice(0,30); statusClass = 'status-error'; }
+            }
 
             return `<div class="task-card">
                 <div class="task-info">
@@ -123,7 +138,7 @@ async function loadStatus() {
                 </div>
                 <span class="task-status ${statusClass}">${statusText}</span>
                 <div style="display:flex;gap:6px;">
-                    <button class="btn-task btn-run" id="run_${t.id}" onclick="runTask('${t.id}')" ${running ? 'disabled' : ''}>
+                    <button class="btn-task btn-run" id="run_${t.id}" onclick="runTask('${t.id}')" ${btnDisabled ? 'disabled' : ''}>
                         ${isRunning ? '⏳' : '▶️'} 运行
                     </button>
                     <button class="btn-task btn-log" onclick="showLog('${t.id}')">📋 日志</button>

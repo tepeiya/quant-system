@@ -39,7 +39,26 @@ def page():
 
 @bp.route("/api/status")
 def api_status():
-    return jsonify(_status)
+    """返回状态，包含 daemon 守护进程是否在运行"""
+    import os as _os
+    daemon_pid_file = "config/daemon.pid"
+    daemon_running = False
+    daemon_pid = 0
+    if _os.path.exists(daemon_pid_file):
+        try:
+            with open(daemon_pid_file) as _f:
+                daemon_pid = int(_f.read().strip())
+            # 检查进程是否存在
+            daemon_running = _os.path.exists(f"/proc/{daemon_pid}")
+        except:
+            pass
+    return jsonify({
+        **_status,
+        "daemon": {
+            "running": daemon_running,
+            "pid": daemon_pid,
+        }
+    })
 
 
 @bp.route("/api/data_warmup", methods=["POST"])
