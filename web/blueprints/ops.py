@@ -19,13 +19,27 @@ def _check_daemon():
     """检查守护进程是否存活"""
     pid_file = DAEMON_PID_FILE
     if not os.path.exists(pid_file):
+        logger.debug(f"daemon PID 文件不存在: {pid_file}")
         return False, 0
     try:
         with open(pid_file) as f:
-            pid = int(f.read().strip())
+            pid_str = f.read().strip()
+        pid = int(pid_str)
         os.kill(pid, 0)
+        logger.debug(f"daemon 运行中: PID={pid}")
         return True, pid
-    except:
+    except ValueError:
+        logger.warning(f"daemon PID 文件内容异常: {pid_str}")
+        return False, 0
+    except ProcessLookupError:
+        logger.warning(f"daemon PID {pid} 进程不存在，清理 PID 文件")
+        try:
+            os.remove(pid_file)
+        except:
+            pass
+        return False, 0
+    except Exception as e:
+        logger.warning(f"daemon 状态检查异常: {e}")
         return False, 0
 
 

@@ -63,14 +63,24 @@ def load_status() -> dict:
 
 
 def write_pid():
-    with open(PID_FILE, "w") as f:
-        f.write(str(os.getpid()))
+    import traceback
+    try:
+        os.makedirs(os.path.dirname(PID_FILE) or ".", exist_ok=True)
+        with open(PID_FILE, "w") as f:
+            f.write(str(os.getpid()))
+        logger.info(f"PID 文件已写入: {PID_FILE} -> {os.getpid()}")
+    except Exception as e:
+        logger.error(f"PID 文件写入失败 {PID_FILE}: {e}")
+        logger.error(traceback.format_exc())
 
 
 def read_pid() -> int:
     if os.path.exists(PID_FILE):
-        with open(PID_FILE) as f:
-            return int(f.read().strip())
+        try:
+            with open(PID_FILE) as f:
+                return int(f.read().strip())
+        except:
+            pass
     return 0
 
 
