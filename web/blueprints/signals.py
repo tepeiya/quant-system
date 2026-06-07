@@ -4,7 +4,6 @@
 from flask import Blueprint, jsonify, render_template
 import numpy as np
 
-from daily_signal import generate_signals
 from api_response import ok, err
 
 bp = Blueprint("signals", __name__, url_prefix="/signals")
@@ -35,21 +34,19 @@ def page():
 def api_today():
     """今日信号——快速模式：只读缓存，不联网"""
     import os, json
-    # 先找今日已生成的信号文件
     from datetime import datetime
     today = datetime.now().strftime("%Y-%m-%d")
     signal_file = f"signals/signal_{today}.json"
     if os.path.exists(signal_file):
         with open(signal_file) as f:
             return jsonify(_fix(json.load(f)))
-    
-    # 没有今日信号就找最新的
+
     import glob
     files = sorted(glob.glob("signals/signal_*.json"))
     if files:
         with open(files[-1]) as f:
             return jsonify(_fix(json.load(f)))
-    
+
     return err("无信号数据，请先生成", 404)
 
 

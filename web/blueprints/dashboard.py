@@ -7,14 +7,13 @@ import numpy as np
 import os, json, logging
 logger = logging.getLogger("quant.dashboard")
 
-from broker_manager import BrokerManager
-from portfolio_tracker import sync_from_alpaca
 from api_response import ok, err
 
 
 def get_broker():
     """获取当前用户的Broker实例"""
     from flask import session
+    from broker_manager import BrokerManager
     username = session.get("user")
     bm = BrokerManager(username=username)
     return bm.get_current()
@@ -39,11 +38,7 @@ def save_cached_portfolio(data: dict):
         json.dump(data, f, indent=2)
 
 
-from macro_monitor import macro_summary
-from daily_signal import generate_signals
-
 bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
-broker = BrokerManager()
 
 
 def _fix(obj):
@@ -101,6 +96,7 @@ def api_data():
 
     # 2) 再尝试实时同步（失败不影响）
     try:
+        from portfolio_tracker import sync_from_alpaca
         p = sync_from_alpaca(username=username)
         if p and p.get("equity") is not None:
             portfolio = p
@@ -114,6 +110,7 @@ def api_data():
 
     # 3) 宏观失败也兜底
     try:
+        from macro_monitor import macro_summary
         macro = macro_summary()
     except Exception as e:
         logger.warning(f"dashboard宏观失败，使用默认: {str(e)[:80]}")
