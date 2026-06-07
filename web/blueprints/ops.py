@@ -75,6 +75,40 @@ def api_data_warmup():
     _run_bg(task, "data_warmup")
 
 
+@bp.route("/api/daemon_start", methods=["POST"])
+def api_daemon_start():
+    """启动自动化交易守护进程"""
+    if _status["running"]:
+        return err("有其他任务正在运行，请稍候")
+    def task():
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, "daemon.py", "--daemon"],
+            capture_output=True, text=True, timeout=10,
+            env={**os.environ}
+        )
+        with open("logs/daemon_start.txt", "w") as f:
+            f.write(result.stdout + "\n" + result.stderr)
+    _run_bg(task, "daemon_start")
+    return ok(message="守护进程启动命令已发送")
+
+
+@bp.route("/api/daemon_stop", methods=["POST"])
+def api_daemon_stop():
+    """停止自动化交易守护进程"""
+    def task():
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, "daemon.py", "--stop"],
+            capture_output=True, text=True, timeout=10,
+            env={**os.environ}
+        )
+        with open("logs/daemon_stop.txt", "w") as f:
+            f.write(result.stdout + "\n" + result.stderr)
+    _run_bg(task, "daemon_stop")
+    return ok(message="守护进程停止命令已发送")
+
+
 @bp.route("/api/refresh_now", methods=["POST"])
 def api_refresh_now():
     """实时增量更新：只补最近数据，不重下全部历史"""
@@ -191,6 +225,7 @@ def api_log(task_name):
         "weekly": "logs/weekly_last.txt",
         "export": "logs/export_last.txt",
         "refresh": "logs/refresh_last.txt",
+        "daemon": "logs/daemon.log",
     }
     path = log_files.get(task_name)
     if path and os.path.exists(path):

@@ -74,6 +74,8 @@
 
 <script>
 const TASKS = [
+    {id:'daemon_start',   name:'🤖 启动自动交易', desc:'启动全天候自动交易守护进程（数据更新→信号→调仓）'},
+    {id:'daemon_stop',    name:'⏹️ 停止自动交易', desc:'停止守护进程'},
     {id:'refresh_now',    name:'🔄 实时刷新',     desc:'增量更新全缓存最新数据（只补最近交易日，不重下全部历史）'},
     {id:'data_warmup',    name:'📥 数据预热',     desc:'下载 S&P 500 全部503只股票的历史数据缓存（首次需10-30分钟）'},
     {id:'run_backtest',   name:'📊 运行回测',     desc:'执行 Multi-Factor Momentum+ 完整回测并生成图表'},
@@ -143,7 +145,7 @@ async function runTask(taskId) {
 }
 
 async function showLog(taskId) {
-    const nameMap = {refresh_now:'refresh', data_warmup:'backtest', run_backtest:'backtest', run_signal:'signal',
+    const nameMap = {daemon_start:'daemon', daemon_stop:'daemon', refresh_now:'refresh', data_warmup:'backtest', run_backtest:'backtest', run_signal:'signal',
                      evolve_factors:'evolve', run_weekly:'weekly', export_report:'export'};
     const logKey = nameMap[taskId] || taskId;
     const panel = document.getElementById('logPanel');
