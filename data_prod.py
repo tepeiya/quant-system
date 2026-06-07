@@ -82,7 +82,7 @@ def get_tickers() -> list[str]:
 
 
 # ==============================
-# 价格数据：缓存优先 + 增量更新
+# 价格数据：缓存优先 + 增量更新 + 实时补全
 # ==============================
 def load_price_cache() -> dict[str, pd.DataFrame]:
     """从缓存加载，不存在返回空dict。自动计算技术指标。"""
@@ -107,6 +107,77 @@ def save_price_cache(data: dict):
     with open(PRICE_CACHE, "wb") as f:
         pickle.dump(data, f)
     logger.info(f"缓存已保存: {len(data)}只")
+
+
+def refresh_cache(days_back: int = 10) -> dict:
+    """
+    实时更新缓存：只补最近 N 天的数据，不重下全部历史。
+    日线数据 + 技术指标自动重算。
+    
+    Args:
+        days_back: 拉取最近多少天的数据用于覆盖缓存（默认10个交易日）
+    
+    Returns:
+        dict: {ticker: 更新行数, ...}
+    """
+    cache = load_price_cache()
+    if not cache:
+        logger.warning("缓存为空，请先运行数据预热")
+        return {}
+
+    today = datetime.now()
+    start_str = (today - timedelta(days=days_back + 10)).strftime("%Y-%m-%d")
+    end_str = today.strftime("%Y-%m-%d")
+
+    updated = {}
+    tickers = list(cache.keys())
+
+    for i, ticker in enumerate(tickers):
+        try:
+            t = yf.Ticker(ticker)
+            df_new = t.history(start=start_str, end=end_str, auto_adjust=True)
+            if df_new is None or len(df_new) == 0:
+                continue
+
+            # 合并到缓存
+            old = cache[ticker]
+            # 去掉 old 中最后 days_back 天（可能有变化），拼接新的
+            if old is not None and len(old) > 0:
+                # 保留旧数据中不重叠的部分
+                cutoff = pd.Timestamp(today - timedelta(days=days_back + 30))
+                old_before = old[old.index < cutoff] if hasattr(old.index, 'tz') else old[old.index < cutoff.tz_localize(None)]
+                
+                # 确保 index 时区一致
+                if hasattr(df_new.index, 'tz') and df_new.index.tz is not None:
+                    df_new_idx = df_new.index.tz_localize(None)
+                    df_new.index = df_new_idx
+                
+                if hasattr(old.index, 'tz') and old.index.tz is not None:
+                    old_idx = old.index.tz_localize(None)
+                    old.index = old_idx
+                
+                # 合并：旧数据(不重叠部分) + 新数据
+                combined = pd.concat([old_before, df_new])
+                # 去重（保留最新的）
+                combined = combined[~combined.index.duplicated(keep='last')]
+                combined.sort_index(inplace=True)
+            else:
+                combined = df_new
+
+            # 重新计算技术指标
+            cache[ticker] = compute_indicators(combined)
+            updated[ticker] = len(df_new)
+
+        except Exception as e:
+            logger.warning(f"{ticker} 实时更新失败: {str(e)[:60]}")
+            continue
+
+        if (i + 1) % 20 == 0 or i == len(tickers) - 1:
+            save_price_cache(cache)
+
+    save_price_cache(cache)
+    logger.info(f"实时更新完成: {len(updated)}只, 共{sum(updated.values())}行新数据")
+    return updated
 
 
 def _fetch_tiingo(ticker: str, start: str, end: str) -> pd.DataFrame | None:

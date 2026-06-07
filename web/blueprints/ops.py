@@ -73,6 +73,25 @@ def api_data_warmup():
                 gc.collect()
         save_price_cache(cache)
     _run_bg(task, "data_warmup")
+
+
+@bp.route("/api/refresh_now", methods=["POST"])
+def api_refresh_now():
+    """实时增量更新：只补最近数据，不重下全部历史"""
+    if _status["running"]:
+        return err("有其他任务正在运行，请稍候")
+    def task():
+        from data_prod import refresh_cache
+        result = refresh_cache(days_back=5)
+        total = sum(result.values()) if result else 0
+        with open("logs/refresh_last.txt", "w") as f:
+            f.write(f"已更新 {len(result)} 只股票，共 {total} 行新数据\n")
+            for t, n in list(result.items())[:20]:
+                f.write(f"  {t}: {n} 行\n")
+            if len(result) > 20:
+                f.write(f"  ... 还有 {len(result)-20} 只\n")
+    _run_bg(task, "refresh_now")
+    return ok(message="实时刷新已开始，只更新最近数据")
     return ok(message="数据预热已开始，请查看进度")
 
 
@@ -171,6 +190,7 @@ def api_log(task_name):
         "evolve": "logs/evolve_last.txt",
         "weekly": "logs/weekly_last.txt",
         "export": "logs/export_last.txt",
+        "refresh": "logs/refresh_last.txt",
     }
     path = log_files.get(task_name)
     if path and os.path.exists(path):
