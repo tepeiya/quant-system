@@ -1,0 +1,14 @@
+{
+  "time": "2026-06-07 17:23:22.932980",
+  "stock_count": 103,
+  "strategy": {
+    "total_return_pct": 2.88,
+    "annual_return_pct": 2.05,
+    "max_drawdown_pct": -25.49,
+    "sharpe_ratio": 0.2
+  },
+  "benchmark": {
+    "spy_return_pct": 31.27
+  },
+  "alpha": -28.39
+}

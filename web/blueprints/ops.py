@@ -160,7 +160,7 @@ def api_refresh_now():
         from data_prod import refresh_cache
         result = refresh_cache(days_back=5)
         total = sum(result.values()) if result else 0
-        with open("logs/refresh_last.txt", "w") as f:
+        with open("/tmp/refresh_last.txt", "w") as f:
             f.write(f"已更新 {len(result)} 只股票，共 {total} 行新数据\n")
             for t, n in list(result.items())[:20]:
                 f.write(f"  {t}: {n} 行\n")
@@ -181,7 +181,7 @@ def api_run_backtest():
             capture_output=True, text=True, timeout=600,
             env={**os.environ}
         )
-        with open("logs/backtest_last.txt", "w") as f:
+        with open("/tmp/backtest_last.txt", "w") as f:
             f.write(result.stdout + "\n" + result.stderr)
     _run_bg(task, "run_backtest")
     return ok(message="回测已开始，完成后可在日志查看结果")
@@ -196,7 +196,7 @@ def api_run_signal():
             capture_output=True, text=True, timeout=300,
             env={**os.environ}
         )
-        with open("logs/signal_last.txt", "w") as f:
+        with open("/tmp/signal_last.txt", "w") as f:
             f.write(result.stdout + "\n" + result.stderr)
     _run_bg(task, "run_signal")
     return ok(message="信号生成已开始")
@@ -211,7 +211,7 @@ def api_evolve_factors():
             capture_output=True, text=True, timeout=300,
             env={**os.environ}
         )
-        with open("logs/evolve_last.txt", "w") as f:
+        with open("/tmp/evolve_last.txt", "w") as f:
             f.write(result.stdout + "\n" + result.stderr)
     _run_bg(task, "evolve_factors")
     return ok(message="因子进化已开始")
@@ -226,7 +226,7 @@ def api_run_weekly():
             capture_output=True, text=True, timeout=300,
             env={**os.environ}
         )
-        with open("logs/weekly_last.txt", "w") as f:
+        with open("/tmp/weekly_last.txt", "w") as f:
             f.write(result.stdout + "\n" + result.stderr)
     _run_bg(task, "run_weekly")
     return ok(message="周报生成已开始")
@@ -241,7 +241,7 @@ def api_export_report():
             capture_output=True, text=True, timeout=300,
             env={**os.environ}
         )
-        with open("logs/export_last.txt", "w") as f:
+        with open("/tmp/export_last.txt", "w") as f:
             f.write(result.stdout + "\n" + result.stderr)
     _run_bg(task, "export_report")
     return ok(message="报告导出已开始")
@@ -251,13 +251,13 @@ def api_export_report():
 def api_log(task_name):
     """查看最近的任务日志"""
     log_files = {
-        "backtest": "logs/backtest_last.txt",
-        "signal": "logs/signal_last.txt",
-        "evolve": "logs/evolve_last.txt",
-        "weekly": "logs/weekly_last.txt",
-        "export": "logs/export_last.txt",
-        "refresh": "logs/refresh_last.txt",
-        "daemon": "logs/daemon.log",
+        "backtest": "/tmp/backtest_last.txt",
+        "signal": "/tmp/signal_last.txt",
+        "evolve": "/tmp/evolve_last.txt",
+        "weekly": "/tmp/weekly_last.txt",
+        "export": "/tmp/export_last.txt",
+        "refresh": "/tmp/refresh_last.txt",
+        "daemon": "/tmp/daemon.log",
     }
     path = log_files.get(task_name)
     if path and os.path.exists(path):
@@ -266,7 +266,7 @@ def api_log(task_name):
         return ok({"log": content[-5000:]})
     # 检查 daemon.log 特殊处理
     if task_name == "daemon":
-        dp = "logs/daemon.log"
+        dp = "/tmp/daemon.log"
         if os.path.exists(dp):
             with open(dp) as f:
                 content = f.read()
