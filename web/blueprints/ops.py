@@ -15,11 +15,13 @@ _status = {"running": False, "last": {}, "log": []}
 
 
 def _run_bg(target, name):
-    """在后台线程运行任务"""
+    """在后台线程运行任务（不阻塞后续其他任务）"""
+    import threading as _t
+    global _status
+    _status["running"] = True
+    _status["current"] = name
     def wrapper():
         global _status
-        _status["running"] = True
-        _status["current"] = name
         try:
             target()
             _status["last"][name] = {"status": "ok", "time": str(datetime.now())}
@@ -28,8 +30,7 @@ def _run_bg(target, name):
         finally:
             _status["running"] = False
             _status["current"] = None
-    t = threading.Thread(target=wrapper, daemon=True)
-    t.start()
+    _t.Thread(target=wrapper, daemon=True).start()
 
 
 @bp.route("/")
@@ -68,8 +69,6 @@ def api_status():
 @bp.route("/api/data_warmup", methods=["POST"])
 def api_data_warmup():
     """补全 S&P 500 全量数据缓存"""
-    if _status["running"]:
-        return err("有其他任务正在运行，请稍候")
     def task():
         from data_prod import get_tickers, load_price_cache, save_price_cache
         import yfinance as yf, time, random, gc
@@ -158,8 +157,6 @@ def api_daemon_stop():
 @bp.route("/api/refresh_now", methods=["POST"])
 def api_refresh_now():
     """实时增量更新：只补最近数据，不重下全部历史"""
-    if _status["running"]:
-        return err("有其他任务正在运行，请稍候")
     def task():
         from data_prod import refresh_cache
         result = refresh_cache(days_back=5)
@@ -178,8 +175,6 @@ def api_refresh_now():
 @bp.route("/api/run_backtest", methods=["POST"])
 def api_run_backtest():
     """运行完整回测"""
-    if _status["running"]:
-        return err("有其他任务正在运行，请稍候")
     def task():
         # 在子进程中运行，避免阻塞
         result = subprocess.run(
@@ -196,8 +191,6 @@ def api_run_backtest():
 @bp.route("/api/run_signal", methods=["POST"])
 def api_run_signal():
     """生成今日信号"""
-    if _status["running"]:
-        return err("有其他任务正在运行，请稍候")
     def task():
         result = subprocess.run(
             [sys.executable, "daily_signal.py"],
@@ -213,8 +206,6 @@ def api_run_signal():
 @bp.route("/api/evolve_factors", methods=["POST"])
 def api_evolve_factors():
     """因子自动进化"""
-    if _status["running"]:
-        return err("有其他任务正在运行，请稍候")
     def task():
         result = subprocess.run(
             [sys.executable, "factor_learner.py"],
@@ -230,8 +221,6 @@ def api_evolve_factors():
 @bp.route("/api/run_weekly", methods=["POST"])
 def api_run_weekly():
     """生成周报"""
-    if _status["running"]:
-        return err("有其他任务正在运行，请稍候")
     def task():
         result = subprocess.run(
             [sys.executable, "weekly_report.py"],
@@ -247,8 +236,6 @@ def api_run_weekly():
 @bp.route("/api/export_report", methods=["POST"])
 def api_export_report():
     """导出回测报告"""
-    if _status["running"]:
-        return err("有其他任务正在运行，请稍候")
     def task():
         result = subprocess.run(
             [sys.executable, "backtest_report.py"],
