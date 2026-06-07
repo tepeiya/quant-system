@@ -121,10 +121,11 @@ async function loadStatus() {
             let btnDisabled = running;
 
             if (t.id === 'daemon_start') {
-                if (daemon.running) { statusText = '✅ 运行中'; statusClass = 'status-ok'; btnDisabled = true; }
+                if (daemon.running) { statusText = '✅ 正在运行'; statusClass = 'status-ok'; btnDisabled = true; }
+                else { statusText = '等待运行'; statusClass = 'status-idle'; }
             } else if (t.id === 'daemon_stop') {
-                if (!daemon.running) { statusText = '⏸️ 未运行'; statusClass = 'status-idle'; btnDisabled = true; }
-                else { statusText = '🟢 运行中'; statusClass = 'status-ok'; }
+                if (daemon.running) { statusText = '🟢 正在运行'; statusClass = 'status-ok'; }
+                else { statusText = '等待运行'; statusClass = 'status-idle'; btnDisabled = true; }
             } else {
                 if (isRunning) { statusText = '🔄 运行中...'; statusClass = 'status-running'; }
                 else if (st.status === 'ok') { statusText = '✅ ' + (st.time || '').slice(5,16); statusClass = 'status-ok'; }
