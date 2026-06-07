@@ -122,7 +122,7 @@ def api_daemon_start():
 
     # 直接启动（不在后台线程跑）
     try:
-        log_file = open("logs/daemon_web_start.log", "w")
+        log_file = open("/tmp/daemon_web_start.log", "w")
         proc = subprocess.Popen(
             [sys.executable, "daemon.py", "--daemon"],
             stdout=log_file, stderr=subprocess.STDOUT,
