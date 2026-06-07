@@ -141,17 +141,16 @@ def api_daemon_start():
 @bp.route("/api/daemon_stop", methods=["POST"])
 def api_daemon_stop():
     """停止自动化交易守护进程"""
-    def task():
-        import subprocess
-        result = subprocess.run(
+    import os as _os, subprocess
+    try:
+        r = subprocess.run(
             [sys.executable, "daemon.py", "--stop"],
             capture_output=True, text=True, timeout=10,
             env={**os.environ}
         )
-        with open("logs/daemon_stop.txt", "w") as f:
-            f.write(result.stdout + "\n" + result.stderr)
-    _run_bg(task, "daemon_stop")
-    return ok(message="守护进程停止命令已发送")
+        return ok(message=r.stdout.strip() or "停止命令已发送")
+    except Exception as e:
+        return err(f"停止失败: {str(e)}")
 
 
 @bp.route("/api/refresh_now", methods=["POST"])
