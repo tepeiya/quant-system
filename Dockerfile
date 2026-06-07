@@ -11,10 +11,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --default-timeout=300 -r requirements.txt
 
-# 复制全部代码 + entrypoint（还在 root 身份）
-COPY . .
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+# 复制代码（还在 root 身份）
+COPY --chown=user:user . .
 
 # 清理调试文件
 RUN rm -f debug_ic.py debug_signal.py quick_signal.py test_full.py fix_stability.py || true
@@ -25,4 +23,4 @@ ENV HOME=/home/user PATH=/home/user/.local/bin:$PATH
 
 EXPOSE 8765
 
-CMD ["/app/docker-entrypoint.sh"]
+CMD gunicorn web_app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --log-level info
