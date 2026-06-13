@@ -89,12 +89,18 @@ def api_daemon_start():
             stdout=log_file, stderr=subprocess.STDOUT,
             env={**os.environ}
         )
-        for i in range(10):
+        # 等待守护进程启动（最长 30 秒，每 1 秒检查一次）
+        for i in range(30):
             __import__("time").sleep(1)
             running, new_pid = _check_daemon()
             if running:
                 return ok(message=f"守护进程已启动 (PID: {new_pid})")
-        return err("启动超时，请查看 /tmp/daemon_web_start.log")
+        # 超时后检查日志，给出具体原因
+        err_log = ""
+        if os.path.exists("/tmp/daemon_web_start.log"):
+            with open("/tmp/daemon_web_start.log") as f:
+                err_log = f.read()[-1000:]
+        return err(f"启动超时（30秒），日志：{err_log}")
     except Exception as e:
         return err(f"启动失败: {str(e)}")
 
