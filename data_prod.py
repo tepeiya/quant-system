@@ -57,17 +57,17 @@ def get_tickers() -> list[str]:
                 return json.load(f)
         except:
             pass
-    # 尝试在线更新
+    # 尝试在线更新（1秒超时，快速失败）
     for url in [
         "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
         "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv",
     ]:
         try:
             if "wikipedia" in url:
-                tables = pd.read_html(url, timeout=10)
+                tables = pd.read_html(url, timeout=3)
                 tickers = sorted(tables[0]["Symbol"].tolist())
             else:
-                r = requests.get(url, timeout=10)
+                r = requests.get(url, timeout=3)
                 tickers = sorted([l.split(",")[0] for l in r.text.strip().split("\n")[1:] if l])
             tickers = [t.replace(".", "-") for t in tickers]
             if len(tickers) >= 400:

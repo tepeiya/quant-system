@@ -12,3 +12,4 @@ __pycache__/
 *.pyc
 *.tar.gz
 env_setup.sh
+config/secret_key.txt

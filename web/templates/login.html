@@ -61,7 +61,7 @@
                 if (d.status === 'ok') window.location.href = '/dashboard/';
                 else { errorBox.textContent = d.message; errorBox.style.display = 'block'; }
             } catch(e) {
-                errorBox.textContent = '网络错误，请检查服务器是否运行';
+                errorBox.textContent = e.message || '网络错误，请检查服务器是否运行';
                 errorBox.style.display = 'block';
             }
             btn.textContent = '登录';
