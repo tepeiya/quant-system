@@ -18,8 +18,13 @@
 import os, sys, json, logging, time, signal, threading, subprocess
 from datetime import datetime, timedelta
 
-LOG_DIR = "logs"
-os.makedirs(LOG_DIR, exist_ok=True)
+LOG_DIR = os.environ.get("DAEMON_LOG_DIR", "logs")
+try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+except PermissionError:
+    # 回退到临时目录
+    LOG_DIR = "/tmp/quant_daemon_logs"
+    os.makedirs(LOG_DIR, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,6 +34,8 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
+logger = logging.getLogger("quant.daemon")
+logger.info(f"日志目录: {LOG_DIR}")
 logger = logging.getLogger("quant.daemon")
 
 PID_FILE = "config/daemon.pid"
