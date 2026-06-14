@@ -12,35 +12,35 @@ bp = Blueprint("ops", __name__, url_prefix="/ops")
 
 _status = {"running": False, "last": {}, "log": []}
 
-DAEMON_PID_FILE = "config/daemon.pid"
+DAEMON_PID_FILES = ["/tmp/quant_daemon.pid", "config/daemon.pid"]
 
 
 def _check_daemon():
-    """检查守护进程是否存活"""
-    pid_file = DAEMON_PID_FILE
-    if not os.path.exists(pid_file):
-        logger.debug(f"daemon PID 文件不存在: {pid_file}")
-        return False, 0
-    try:
-        with open(pid_file) as f:
-            pid_str = f.read().strip()
-        pid = int(pid_str)
-        os.kill(pid, 0)
-        logger.debug(f"daemon 运行中: PID={pid}")
-        return True, pid
-    except ValueError:
-        logger.warning(f"daemon PID 文件内容异常: {pid_str}")
-        return False, 0
-    except ProcessLookupError:
-        logger.warning(f"daemon PID {pid} 进程不存在，清理 PID 文件")
+    """检查守护进程是否存活（兼容新旧 PID 文件路径）"""
+    for pid_file in DAEMON_PID_FILES:
+        if not os.path.exists(pid_file):
+            continue
         try:
-            os.remove(pid_file)
-        except:
-            pass
-        return False, 0
-    except Exception as e:
-        logger.warning(f"daemon 状态检查异常: {e}")
-        return False, 0
+            with open(pid_file) as f:
+                pid_str = f.read().strip()
+            pid = int(pid_str)
+            os.kill(pid, 0)
+            logger.debug(f"daemon 运行中: PID={pid}")
+            return True, pid
+        except ValueError:
+            logger.warning(f"daemon PID 文件内容异常: {pid_str}")
+            continue
+        except ProcessLookupError:
+            logger.warning(f"daemon PID {pid} 进程不存在，清理 PID 文件")
+            try:
+                os.remove(pid_file)
+            except:
+                pass
+            continue
+        except Exception as e:
+            logger.warning(f"daemon 状态检查异常: {e}")
+            continue
+    return False, 0
 
 
 def _run_bg(target, name):
@@ -89,18 +89,8 @@ def api_daemon_start():
             stdout=log_file, stderr=subprocess.STDOUT,
             env={**os.environ}
         )
-        # 等待守护进程启动（最长 30 秒，每 1 秒检查一次）
-        for i in range(30):
-            __import__("time").sleep(1)
-            running, new_pid = _check_daemon()
-            if running:
-                return ok(message=f"守护进程已启动 (PID: {new_pid})")
-        # 超时后检查日志，给出具体原因
-        err_log = ""
-        if os.path.exists("/tmp/daemon_web_start.log"):
-            with open("/tmp/daemon_web_start.log") as f:
-                err_log = f.read()[-1000:]
-        return err(f"启动超时（30秒），日志：{err_log}")
+        # 后台启动，立即返回成功（前端 5 秒后刷新状态）
+        return ok(message="守护进程启动中，5秒后自动刷新状态")
     except Exception as e:
         return err(f"启动失败: {str(e)}")
 
