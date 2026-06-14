@@ -1,10 +1,12 @@
 """
-数据层 - yfinance + pickle 缓存（生产版）
-====================================
+数据层 - 多数据源 + pickle 缓存（生产版）
+=====================================
+数据源优先级：
+  1. data_global（新浪/Yahoo v8/东财 — 零鉴权，优先使用）
+  2. yfinance（回退）
+  3. Tiingo（最后备选）
 核心：缓存优先。一次成功获取后永久可用。
 增量更新：每天检查缓存最新日期，只补缺失的天数。
-重试：指数退避+随机延迟，避免限频。
-备选：Tiingo（当yfinance挂时）
 """
 
 import os
@@ -27,6 +29,20 @@ PRICE_CACHE = f"{CACHE_DIR}/prices.pkl"
 FUNDA_CACHE = f"{CACHE_DIR}/fundamentals.pkl"
 TICKER_CACHE = f"{CACHE_DIR}/sp500_tickers.json"
 Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
+
+# 全局数据源 — 新浪/Yahoo v8/东财（零鉴权）
+try:
+    from data_global import (
+        fetch_stock_data, fetch_batch_data,
+        us_kline_sina, kline_yahoo, klines_to_dataframe,
+        get_us_tickers, us_quote_sina, quote_eastmoney,
+        calc_ma, calc_macd, calc_rsi, calc_kdj, calc_boll,
+    )
+    DATA_GLOBAL_AVAILABLE = True
+    logger.info("✅ data_global 数据源已加载（新浪/Yahoo v8/东财）")
+except ImportError as e:
+    DATA_GLOBAL_AVAILABLE = False
+    logger.warning(f"⚠️ data_global 未加载（{e}），回退 yfinance/Tiingo")
 
 
 # ==============================
@@ -51,13 +67,23 @@ SP500_BUILTIN = sorted([
 
 
 def get_tickers() -> list[str]:
+    # 1. 优先从东财获取实时全市场列表
+    if DATA_GLOBAL_AVAILABLE:
+        try:
+            tickers = get_us_tickers(min_price=3.0, max_count=500)
+            if len(tickers) >= 50:
+                logger.info(f"成分股(东财): {len(tickers)}只")
+                return tickers
+        except Exception as e:
+            logger.warning(f"东财获取成分股失败: {e}")
+    # 2. 缓存文件
     if os.path.exists(TICKER_CACHE):
         try:
             with open(TICKER_CACHE) as f:
                 return json.load(f)
         except:
             pass
-    # 尝试在线更新（1秒超时，快速失败）
+    # 3. 在线更新（快速失败）
     for url in [
         "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
         "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv",
@@ -315,14 +341,24 @@ def fetch_prices(tickers: list[str],
     if missing:
         logger.info(f"缓存命中{len(result)}只, 需要获取{len(missing)}只")
 
-    # 3. Alpaca批量获取（主力数据源）
+    # 3. data_global 优先（新浪/Yahoo v8/东财，零鉴权）
+    if missing and DATA_GLOBAL_AVAILABLE:
+        logger.info(f"data_global获取: {len(missing)}只...")
+        new_data = fetch_batch_data(missing, days=730)
+        for sym, df in new_data.items():
+            if sym not in result and df is not None and len(df) >= 20:
+                result[sym] = df
+        logger.info(f"data_global获取: {len(new_data)}只")
+        missing = [t for t in missing if t not in result]
+
+    # 4. Alpaca批量获取（次选）
     if missing:
         alpaca_ok = _fetch_alpaca_batch(missing, result, start, end)
         if alpaca_ok > 0:
             logger.info(f"Alpaca获取: {alpaca_ok}只")
             missing = [t for t in missing if t not in result]
 
-    # 4. yfinance/Tiingo补充（Alpaca失败的）
+    # 5. yfinance/Tiingo补充（最后备选）
     if missing:
         logger.info(f"回退yfinance补充: {len(missing)}只")
         import yfinance as yf
