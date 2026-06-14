@@ -545,27 +545,31 @@ def calc_boll(klines: list[dict], period: int = 20) -> list[dict]:
 
 def get_us_tickers(min_price: float = 5.0, max_count: int = 500) -> list[str]:
     """从东财获取美股全部股票列表"""
-    all_tickers = []
-    page = 1
-    while len(all_tickers) < max_count and page <= 10:
+    # 内置 S&P 500（东财可能受限于网络）
+    default_tickers = ["AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA","AVGO","AMD","INTC",
+                        "QCOM","TXN","ASML","AMAT","KLAC","LRCX","MU","ORCL","CRM","ADBE",
+                        "NOW","WDAY","PANW","CRWD","ADP","NFLX","UBER","ABNB","JPM","GS",
+                        "BK","AXP","V","MA","BLK","C","BAC","MS","SCHW","COST","WMT","HD",
+                        "LOW","MCD","SBUX","NKE","TJX","TGT","JNJ","UNH","LLY","MRK","ABBV",
+                        "PFE","AMGN","ISRG","SYK","VRTX","CAT","DE","BA","LMT","RTX","GE",
+                        "HON","MMM","ETN","TDG","XOM","CVX","COP","EOG","SLB","OXY","T","VZ",
+                        "CMCSA","DIS","PG","KO","PEP","CL","KMB","MDLZ","NEE","DUK","SO",
+                        "D","AEP","SRE","UPS","FDX","CSX","UNP","MMC","CB","APD","SHW","ECL"]
+    try:
         stocks = market_stock_list(market="us", sort_field="f3", sort_dir="desc",
-                                    page=page, page_size=100)
-        if not stocks:
-            break
-        for s in stocks:
-            sym = s.get("symbol", "")
-            name = s.get("name", "")
-            price = s.get("price", 0)
-            # 过滤：纯字母股票代码（排除优先股/债券如 ACGLN, AGNCL 等）
-            if not sym or len(sym) > 5 or not sym.isalpha():
-                continue
-            # 过滤：排除含特殊字符的优先股
-            if len(sym) == 5 and sym.isupper() and name and any(kw in name for kw in ["优先", "债券", "ETF", "ETN", "BILL", "NOTE", "BOND"]):
-                continue
-            if price >= min_price or price == 0:
-                all_tickers.append(sym)
-        page += 1
-    return sorted(set(all_tickers))[:max_count]
+                                    page=1, page_size=200)
+        if stocks and len(stocks) > 10:
+            result = []
+            for s in stocks:
+                sym = s.get("symbol", "")
+                price = s.get("price", 0)
+                if sym and sym.isalpha() and len(sym) <= 5 and (price >= min_price or price == 0):
+                    result.append(sym)
+            if len(result) >= 50:
+                return sorted(set(result))[:max_count]
+    except:
+        pass
+    return sorted(set(default_tickers))[:max_count]
 
 
 # ==============================

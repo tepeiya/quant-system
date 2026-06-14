@@ -42,11 +42,24 @@ def main():
     logger.info(f"缓存: {len(cache)}只")
 
     logger.info("获取SPY...")
+    spy = None
+    # 优先用 data_global（新浪/Yahoo v8）
     try:
-        spy_t = yf.Ticker("SPY")
-        spy = spy_t.history(start="2018-01-01", end="2026-05-17", auto_adjust=True)
+        from data_global import fetch_stock_data, klines_to_dataframe
+        spy_df = fetch_stock_data("SPY", days=730 * 2)
+        if spy_df is not None and len(spy_df) >= 200:
+            spy = spy_df
+            logger.info(f"SPY(data_global): {len(spy)}行")
     except Exception:
-        logger.warning("SPY下载失败，将跳过回测")
+        pass
+    # 回退 yfinance
+    if spy is None:
+        try:
+            import yfinance as yf
+            spy_t = yf.Ticker("SPY")
+            spy = spy_t.history(start="2018-01-01", end="2026-05-17", auto_adjust=True)
+        except Exception:
+            logger.warning("SPY下载失败，将跳过回测")
 
     if spy is None or len(spy) < 200:
         logger.error("没有有效的SPY数据，无法进行回测")
