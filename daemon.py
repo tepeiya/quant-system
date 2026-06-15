@@ -168,7 +168,7 @@ def run_daily_cycle():
             if shutdown_event.wait(wait_sig):
                 break
 
-        logger.info("[步骤2/3] 生成今日信号...")
+        logger.info("[步骤2/3] 生成保守策略信号...")
         try:
             r = subprocess.run(
                 [sys.executable, "daily_signal.py"],
@@ -179,15 +179,51 @@ def run_daily_cycle():
                 if line.strip():
                     logger.info(f"  {line.strip()}")
             if r.returncode != 0:
-                logger.error(f"  信号生成失败: {r.stderr[-200:]}")
+                logger.error(f"  保守信号失败: {r.stderr[-200:]}")
                 shutdown_event.wait(60)
                 continue
             else:
                 save_status(last_signal=str(datetime.now()))
         except Exception as e:
-            logger.error(f"  信号生成异常: {e}")
+            logger.error(f"  保守信号异常: {e}")
             shutdown_event.wait(60)
             continue
+
+        # ===== 动量激进策略：独立信号生成 =====
+        logger.info("[激进策略] 生成动量信号...")
+        try:
+            r = subprocess.run(
+                [sys.executable, "strategy_momentum.py", "--generate"],
+                capture_output=True, text=True, timeout=120,
+                env={**os.environ}
+            )
+            for line in r.stdout.strip().split("\n"):
+                if line.strip():
+                    logger.info(f"  [激进] {line.strip()}")
+            if r.returncode != 0:
+                logger.warning(f"  激进信号失败: {r.stderr[-200:]}")
+            else:
+                save_status(last_momentum_signal=str(datetime.now()))
+        except Exception as e:
+            logger.warning(f"  激进信号异常: {e}")
+
+        # ===== 动量激进策略：独立调仓 =====
+        logger.info("[激进策略] 自动调仓...")
+        try:
+            r = subprocess.run(
+                [sys.executable, "paper_trader_momentum.py", "--auto"],
+                capture_output=True, text=True, timeout=120,
+                env={**os.environ}
+            )
+            for line in r.stdout.strip().split("\n"):
+                if line.strip():
+                    logger.info(f"  [激进] {line.strip()}")
+            if r.returncode != 0:
+                logger.warning(f"  激进调仓失败: {r.stderr[-200:]}")
+            else:
+                save_status(last_momentum_rebalance=str(datetime.now()))
+        except Exception as e:
+            logger.warning(f"  激进调仓异常: {e}")
 
         now3 = datetime.now()
         target_rebal = now3.replace(hour=9, minute=35, second=0, microsecond=0)
@@ -197,7 +233,7 @@ def run_daily_cycle():
             if shutdown_event.wait(wait_re):
                 break
 
-        logger.info("[步骤3/3] 自动调仓...")
+        logger.info("[步骤3/3] 保守策略调仓...")
         try:
             r = subprocess.run(
                 [sys.executable, "paper_trader.py", "--auto"],
@@ -206,13 +242,13 @@ def run_daily_cycle():
             )
             for line in r.stdout.strip().split("\n"):
                 if line.strip():
-                    logger.info(f"  {line.strip()}")
+                    logger.info(f"  [保守] {line.strip()}")
             if r.returncode != 0:
-                logger.error(f"  调仓失败: {r.stderr[-200:]}")
+                logger.error(f"  保守调仓失败: {r.stderr[-200:]}")
             else:
                 save_status(last_rebalance=str(datetime.now()))
         except Exception as e:
-            logger.error(f"  调仓异常: {e}")
+            logger.error(f"  保守调仓异常: {e}")
 
         logger.info("[收盘] 记录今日权益...")
         try:

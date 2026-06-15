@@ -1,23 +1,22 @@
 {
   "strategy": "momentum_aggressive",
-  "date": "2026-06-15 12:43:03.644971",
-  "rebalance_date": "2026-06-07 00:00:00",
+  "date": "2026-06-15 12:46:20.596368",
   "tickers": [
-    "AAPL",
     "AMD",
-    "AVGO",
     "CAT",
     "GOOGL",
-    "GS",
-    "JNJ",
-    "LLY",
-    "MRK",
-    "MS",
-    "NVDA",
-    "QCOM",
-    "TSLA",
     "TXN",
-    "XOM"
+    "PANW",
+    "GS",
+    "MS",
+    "QCOM",
+    "JNJ",
+    "MRK",
+    "UNH",
+    "AAPL",
+    "NVDA",
+    "GE",
+    "LLY"
   ],
   "count": 15
 }

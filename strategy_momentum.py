@@ -321,6 +321,16 @@ def backtest():
 
 
 if __name__ == "__main__":
-    import logging
+    import logging, sys
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
-    backtest()
+    if "--generate" in sys.argv:
+        # 只生成最新信号（daemon 调用）
+        from data_prod import load_price_cache, compute_indicators
+        cache = load_price_cache()
+        for tkr in list(cache.keys()):
+            df = cache[tkr]
+            if df is not None and "Momentum_12M" not in df.columns:
+                cache[tkr] = compute_indicators(df)
+        generate_signals(cache, top_n=15)
+    else:
+        backtest()
