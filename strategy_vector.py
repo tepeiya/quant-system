@@ -171,6 +171,7 @@ class VectorStrategy:
         spy_uptrend = (spy_sma20 > spy_sma50) & (spy_sma50 > spy_sma200) & (~np.isnan(spy_sma20))
         bear_market = (spy_close < spy_sma200 * 0.85) & (~np.isnan(spy_sma200))
         high_vol = spy_atr > np.percentile(spy_atr, 80) if len(spy_atr) > 100 else np.full(len(spy_atr), False)
+        high_vol = spy_atr > np.percentile(spy_atr, 80) if len(spy_atr) > 100 else np.full(len(spy_atr), False)
 
         # 过热/极端仍保留
         spy_overheat = spy_rsi > cfg.get("market_overheat_rsi", 80)
@@ -195,12 +196,12 @@ class VectorStrategy:
         # 5. 候选标记（参数从system_config读取）
         mom_top = cfg.get("mom_rank_top_pct", 0.7)
         rsi_entry = cfg.get("rsi_entry", 80)
-        top30 = mom_rank >= mom_top
+        top_mom = mom_rank >= mom_top
         above200 = P > SMA200
         rsi_ok = RSI_mat < rsi_entry
         valid_price = ~np.isnan(P)
 
-        candidate = top30 & above200 & rsi_ok & valid_price
+        candidate = top_mom & above200 & rsi_ok & valid_price
 
         # 6. 综合评分（从factor_weights.json读取权重）
         weights = load_factor_weights()

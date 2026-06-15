@@ -71,15 +71,15 @@ def main():
                 cache[sym] = df
             if (i + 1) % 10 == 0:
                 logger.info(f"  [{i+1}/{total}] 成功: {len(cache)} 只")
-                # 每 20 只存一次
                 save_path = f"{CACHE_DIR}/prices.pkl"
                 with open(save_path, "wb") as f:
                     pickle.dump(cache, f)
                 logger.info(f"  暂存: {len(cache)} 只")
-                time.sleep(random.uniform(1, 3))
+            # 每只加延迟但不阻塞太久
+            time.sleep(random.uniform(0.8, 2.0))
         except Exception as e:
             logger.warning(f"  {sym}: {e}")
-        time.sleep(random.uniform(0.5, 1.5))
+            continue
         gc.collect()
 
     # 3. 最终保存

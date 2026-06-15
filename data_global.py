@@ -546,15 +546,12 @@ def calc_boll(klines: list[dict], period: int = 20) -> list[dict]:
 def get_us_tickers(min_price: float = 5.0, max_count: int = 500) -> list[str]:
     """从东财获取美股全部股票列表"""
     # 内置 S&P 500（东财可能受限于网络）
-    default_tickers = ["AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA","AVGO","AMD","INTC",
-                        "QCOM","TXN","ASML","AMAT","KLAC","LRCX","MU","ORCL","CRM","ADBE",
-                        "NOW","WDAY","PANW","CRWD","ADP","NFLX","UBER","ABNB","JPM","GS",
-                        "BK","AXP","V","MA","BLK","C","BAC","MS","SCHW","COST","WMT","HD",
-                        "LOW","MCD","SBUX","NKE","TJX","TGT","JNJ","UNH","LLY","MRK","ABBV",
-                        "PFE","AMGN","ISRG","SYK","VRTX","CAT","DE","BA","LMT","RTX","GE",
-                        "HON","MMM","ETN","TDG","XOM","CVX","COP","EOG","SLB","OXY","T","VZ",
-                        "CMCSA","DIS","PG","KO","PEP","CL","KMB","MDLZ","NEE","DUK","SO",
-                        "D","AEP","SRE","UPS","FDX","CSX","UNP","MMC","CB","APD","SHW","ECL"]
+    default_tickers = ["AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA","AVGO","AMD",
+                        "QCOM","TXN","ORCL","CRM","ADBE","NOW","PANW","NFLX","JPM","GS",
+                        "V","MA","BLK","BAC","MS","COST","WMT","HD","MCD","SBUX","NKE",
+                        "JNJ","UNH","LLY","MRK","ABBV","PFE","AMGN","CAT","BA","GE",
+                        "HON","XOM","CVX","COP","T","VZ","DIS","PG","KO","PEP","NEE",
+                        "UPS","MMC","CB","APD"]
     try:
         stocks = market_stock_list(market="us", sort_field="f3", sort_dir="desc",
                                     page=1, page_size=200)
