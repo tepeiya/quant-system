@@ -183,6 +183,64 @@ def api_reset_config():
     reset()
     return jsonify({"status": "ok", "message": "配置已重置"})
 
+
+# ===== 双策略资金分配 =====
+
+@bp.route("/api/cap_allocation")
+def api_cap_allocation():
+    """获取当前资金分配比例"""
+    import os
+    return jsonify({
+        "conservative": float(os.environ.get("CONSERVATIVE_CAP_RATIO", "0.5")),
+        "momentum": float(os.environ.get("MOMENTUM_CAP_RATIO", "0.5")),
+    })
+
+
+@bp.route("/api/save_cap_allocation", methods=["POST"])
+def api_save_cap_allocation():
+    """保存资金分配比例到 .env 文件"""
+    data = __import__("flask").request.json or {}
+    conservative = float(data.get("conservative", 0.5))
+    momentum = float(data.get("momentum", 0.5))
+    if conservative + momentum > 1.0:
+        return err("两策略合计不能超过 100%")
+    if conservative < 0 or momentum < 0:
+        return err("比例不能为负数")
+    if conservative > 1 or momentum > 1:
+        return err("比例不能超过 100%")
+
+    import os
+    env_file = ".env"
+    lines = []
+    if os.path.exists(env_file):
+        with open(env_file) as f:
+            lines = f.readlines()
+
+    updates = {
+        "CONSERVATIVE_CAP_RATIO": str(conservative),
+        "MOMENTUM_CAP_RATIO": str(momentum),
+    }
+
+    for key, value in updates.items():
+        found = False
+        for i, line in enumerate(lines):
+            if line.strip().startswith(f"{key}="):
+                lines[i] = f"{key}={value}\n"
+                found = True
+                break
+        if not found:
+            lines.append(f"{key}={value}\n")
+        os.environ[key] = value
+
+    with open(env_file, "w") as f:
+        f.writelines(lines)
+
+    return jsonify({
+        "status": "ok",
+        "message": f"资金分配已保存: 保守 {conservative*100:.0f}% + 激进 {momentum*100:.0f}%",
+        "data": {"conservative": conservative, "momentum": momentum},
+    })
+
 @bp.route("/")
 def page():
     return render_template("settings.html")

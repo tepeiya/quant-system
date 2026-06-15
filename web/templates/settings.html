@@ -12,8 +12,51 @@
     </div>
 </div>
 
+<div class="panel mt-16">
+    <h2>💰 双策略资金分配</h2>
+    <p style="font-size:12px;color:#8b949e;margin:4px 0 12px;">两策略合计 ≤ 100%，剩余自动留作现金</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div style="background:#0d1117;border-radius:8px;padding:16px;border:1px solid #21262d;">
+            <h3 style="font-size:12px;color:#58a6ff;margin:0 0 12px;">🛡️ 保守策略</h3>
+            <label style="font-size:12px;color:#8b949e;">资金比例</label>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <input type="range" id="conservativeSlider" min="0" max="100" value="50"
+                       style="flex:1;" oninput="updateAllocation()">
+                <span id="conservativeVal" style="font-size:14px;color:#e6edf3;min-width:40px;text-align:right;">50%</span>
+            </div>
+            <div style="font-size:11px;color:#8b949e;margin-top:8px;">
+                8-10只 · 动量+质量+择时 · 回测+46%
+            </div>
+        </div>
+        <div style="background:#0d1117;border-radius:8px;padding:16px;border:1px solid #21262d;">
+            <h3 style="font-size:12px;color:#d29922;margin:0 0 12px;">🚀 激进策略</h3>
+            <label style="font-size:12px;color:#8b949e;">资金比例</label>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <input type="range" id="momentumSlider" min="0" max="100" value="50"
+                       style="flex:1;" oninput="updateAllocation()">
+                <span id="momentumVal" style="font-size:14px;color:#e6edf3;min-width:40px;text-align:right;">50%</span>
+            </div>
+            <div style="font-size:11px;color:#8b949e;margin-top:8px;">
+                15只 · 纯动量不择时 · 回测+124%
+            </div>
+        </div>
+    </div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:12px;">
+        <button class="btn primary" onclick="saveAllocation()">💾 保存资金分配</button>
+        <span id="allocMsg" style="font-size:13px;color:#8b949e;"> </span>
+    </div>
+    <div style="margin-top:12px;padding:10px;background:#0d1117;border-radius:8px;border:1px solid #21262d;">
+        <div style="font-size:12px;color:#8b949e;margin-bottom:6px;">资金分布预览</div>
+        <div style="display:flex;height:24px;border-radius:4px;overflow:hidden;border:1px solid #30363d;">
+            <div id="barConservative" style="background:#58a6ff;transition:width .3s;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;width:50%;">50%</div>
+            <div id="barMomentum" style="background:#d29922;transition:width .3s;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;width:50%;">50%</div>
+            <div id="barCash" style="background:#30363d;transition:width .3s;display:flex;align-items:center;justify-content:center;font-size:11px;color:#8b949e;width:0%;">0%</div>
+        </div>
+    </div>
+</div>
+
 <script>
-// === 配置标签 ===
+// === 策略参数 ===
 const CONFIG_LABELS = {
     stop_loss_pct: '止损 (%)', trailing_stop_activate_pct: '移动止损启动 (%)',
     trailing_stop_distance_pct: '移动止损距离 (%)',
@@ -83,5 +126,68 @@ async function resetConfig() {
 }
 
 loadConfig();
+loadAllocation();
+
+// === 资金分配 ===
+async function loadAllocation() {
+    try {
+        const d = await apiFetch('/settings/api/cap_allocation');
+        document.getElementById('conservativeSlider').value = d.conservative * 100;
+        document.getElementById('momentumSlider').value = d.momentum * 100;
+        updateAllocation();
+    } catch(e) {
+        console.error('loadAllocation error:', e);
+    }
+}
+
+function updateAllocation() {
+    const c = parseInt(document.getElementById('conservativeSlider').value);
+    const m = parseInt(document.getElementById('momentumSlider').value);
+    const total = c + m;
+    const cash = Math.max(0, 100 - total);
+    
+    document.getElementById('conservativeVal').textContent = c + '%';
+    document.getElementById('momentumVal').textContent = m + '%';
+    
+    document.getElementById('barConservative').style.width = c + '%';
+    document.getElementById('barConservative').textContent = c > 8 ? c + '%' : '';
+    document.getElementById('barMomentum').style.width = m + '%';
+    document.getElementById('barMomentum').textContent = m > 8 ? m + '%' : '';
+    document.getElementById('barCash').style.width = cash + '%';
+    document.getElementById('barCash').textContent = cash > 8 ? cash + '% 现金' : '';
+    
+    const msg = document.getElementById('allocMsg');
+    if (total > 100) {
+        msg.textContent = '⚠️ 两策略合计超过 100%';
+        msg.style.color = '#f85149';
+    } else if (cash > 0) {
+        msg.textContent = `📌 剩余 ${cash}% 留作现金缓冲`;
+        msg.style.color = '#8b949e';
+    } else {
+        msg.textContent = '✅ 全部资金已分配';
+        msg.style.color = '#3fb950';
+    }
+}
+
+async function saveAllocation() {
+    const c = parseInt(document.getElementById('conservativeSlider').value) / 100;
+    const m = parseInt(document.getElementById('momentumSlider').value) / 100;
+    
+    if (c + m > 1.0) {
+        document.getElementById('allocMsg').textContent = '❌ 合计不能超过 100%';
+        return;
+    }
+    
+    try {
+        const d = await apiFetch('/settings/api/save_cap_allocation', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({conservative: c, momentum: m})
+        });
+        document.getElementById('allocMsg').textContent = d.status === 'ok' ? '✅ ' + d.message : '❌ ' + d.message;
+    } catch(e) {
+        document.getElementById('allocMsg').textContent = '❌ ' + e.message;
+    }
+}
 </script>
 {% endblock %}
