@@ -17,6 +17,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [MOMENTUM] %(message
 logger = logging.getLogger("quant.momentum")
 
 SIGNAL_FILE = "signals/signal_momentum.json"
+# ===== 资金分配配置 =====
+# 激进策略占用总资金的比例（剩余留给保守策略）
+MOMENTUM_CAP_RATIO = float(os.environ.get("MOMENTUM_CAP_RATIO", "0.5"))
+
 TRADE_LOG = "signals/trade_log_momentum.json"
 
 
@@ -107,8 +111,10 @@ def execute_rebalance(auto: bool = False):
         except:
             pass
 
-    target_per = total_equity / target_count
-    logger.info(f"总资产: ${total_equity:.2f}, 每只目标: ${target_per:.2f}")
+    # 激进策略只使用总资金的 MOMENTUM_CAP_RATIO
+    allocated = total_equity * MOMENTUM_CAP_RATIO
+    target_per = allocated / target_count
+    logger.info(f"总资产: ${total_equity:.2f}, 激进分配: ${allocated:.2f} ({MOMENTUM_CAP_RATIO*100:.0f}%), 每只目标: ${target_per:.2f}")
 
     trades = []
     trade_log = load_trade_log()

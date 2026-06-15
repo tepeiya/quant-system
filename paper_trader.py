@@ -26,6 +26,8 @@ logger = logging.getLogger("quant.paper")
 
 SIGNALS_DIR = "signals"
 TRADE_LOG = "signals/trade_log.json"
+# 保守策略占用总资金比例（剩余留给激进策略）
+CONSERVATIVE_CAP_RATIO = float(os.environ.get("CONSERVATIVE_CAP_RATIO", "0.5"))
 
 
 def get_alpaca():

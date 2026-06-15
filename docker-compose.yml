@@ -11,6 +11,9 @@ services:
       - FRED_API_KEY=${FRED_API_KEY}
       - PUSHPLUS_TOKEN=${PUSHPLUS_TOKEN}
       - TZ=Asia/Shanghai
+      # 双策略资金分配（两策略合计 ≤ 1.0）
+      - CONSERVATIVE_CAP_RATIO=${CONSERVATIVE_CAP_RATIO:-0.5}
+      - MOMENTUM_CAP_RATIO=${MOMENTUM_CAP_RATIO:-0.5}
     volumes:
       - ./data_cache:/app/data_cache
       - ./signals:/app/signals
