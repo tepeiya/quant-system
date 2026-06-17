@@ -167,16 +167,22 @@ def run_momentum_strategy(prices: dict[str, pd.DataFrame],
                     entry_prices[j] = 0
                     peak_prices[j] = 0
 
-            # 买入目标池中的新股票（等权）
-            target_value_per = portfolio_value / max_pos
-            for tkr in target_tickers:
+            # [升级] 动量加权买入（不是等权）
+            mom_scores = np.array([mom_row[tickers.index(tkr)] if tickers.index(tkr) < len(mom_row) else 0
+                                    for tkr in target_tickers])
+            mom_scores = np.maximum(mom_scores, 0.01)
+            total_mom = np.sum(mom_scores) if np.sum(mom_scores) > 0 else len(target_tickers)
+            for idx, tkr in enumerate(target_tickers):
                 j = tickers.index(tkr)
                 if shares[j] > 0:
-                    continue  # 已持有
+                    continue
                 price = P[i, j]
                 if np.isnan(price) or price <= 0:
                     continue
-                qty = int(target_value_per / price)
+                # 动量越强仓位越大
+                weight = mom_scores[idx] / total_mom if total_mom > 0 else 1.0 / len(target_tickers)
+                alloc = portfolio_value * 0.95 * weight
+                qty = int(alloc / price)
                 cost = qty * price
                 if cost > cash:
                     qty = int(cash / price)

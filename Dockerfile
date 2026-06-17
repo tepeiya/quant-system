@@ -5,8 +5,8 @@ WORKDIR /app
 
 # 安装依赖
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --default-timeout=300 -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip install --no-cache-dir --default-timeout=300 -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 复制代码
 COPY . .

@@ -608,7 +608,7 @@ def fetch_stock_data(symbol: str, days: int = 730) -> "pd.DataFrame | None":
         if not df.empty and len(df) >= 20:
             return df
     # 回退 Yahoo
-    klines = kline_yahoo(symbol, interval="1d", days=days_needed)
+    klines = kline_yahoo(symbol, interval="1d", range_="2y")
     if klines and len(klines) >= 20:
         df = klines_to_dataframe(klines)
         if not df.empty and len(df) >= 20:
