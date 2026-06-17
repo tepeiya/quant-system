@@ -47,9 +47,9 @@ def api_list():
                 "date": date,
                 "trend": market.get("trend", "?"),
                 "action": market.get("action", "?"),
-                "top3": [s["ticker"] for s in top[:3]],
+                "top3": [(s[0] if isinstance(s, list) else s.get("ticker","?")) for s in top[:3]],
                 "candidate_count": len(candidates),
-                "top_score": top[0]["score"] if top else 0,
+                "top_score": (top[0][1] if isinstance(top[0], list) else top[0].get("score", 0)) if top else 0,
             })
         except:
             pass
