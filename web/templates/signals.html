@@ -3,96 +3,114 @@
 {% block content %}
 
 <div class="panel">
-    <div class="flex mb-12" style="justify-content:space-between">
-        <h2>🏆 今日信号 Top 10</h2>
-        <div class="flex">
-            <button class="btn" onclick="refreshSignals()">🔄 刷新</button>
-            <button class="btn primary" onclick="executeTrade()">⚡ 调仓</button>
+    <div class="flex mb-12" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <h2 style="margin:0;">🏆 今日信号</h2>
+        <div class="flex" style="gap:6px;">
+            <button class="btn" onclick="refreshSignals()" style="font-size:12px;padding:6px 12px;">🔄 刷新</button>
+            <button class="btn primary" onclick="executeTrade()" style="font-size:12px;padding:6px 12px;">⚡ 调仓</button>
         </div>
     </div>
-    <div class="table-wrapper">
-    <table>
-        <thead>
-            <tr>
-                <th>#</th><th>股票</th><th>评分</th><th>价格</th>
-                <th>动量%</th><th>质量分</th><th>RSI</th><th>ATR</th>
-            </tr>
-        </thead>
-        <tbody id="signalsBody"></tbody>
-    </table>
-    </div>
-</div>
 
-<div class="panel">
-    <h2>🟢 买入候选</h2>
-    <div class="table-wrapper">
-    <table>
-        <thead><tr><th>#</th><th>股票</th><th>评分</th><th>价格</th><th>动量%</th><th>质量分</th></tr></thead>
-        <tbody id="candidatesBody"></tbody>
-    </table>
-    </div>
+    <!-- 市场状态 -->
+    <div id="marketCard" style="margin-bottom:12px;"></div>
+
+    <!-- Top 10 卡片列表（手机友好） -->
+    <h3 style="font-size:13px;color:#8b949e;margin:0 0 8px;">📊 评分排名 Top 10</h3>
+    <div id="topList" style="display:flex;flex-direction:column;gap:6px;"></div>
+
+    <!-- 买入候选 -->
+    <h3 style="font-size:13px;color:#8b949e;margin:16px 0 8px;">🟢 买入候选</h3>
+    <div id="candidateList" style="display:flex;flex-direction:column;gap:6px;"></div>
 </div>
 
 <div id="executeResult" class="panel" style="display:none"></div>
+
+<style>
+.signal-row {
+    display:flex;align-items:center;padding:10px 12px;
+    background:#161b22;border:1px solid #30363d;border-radius:8px;
+    gap:8px;
+}
+.signal-row .rank { font-size:12px;color:#484f58;min-width:20px; }
+.signal-row .name { flex:1;font-size:14px;font-weight:600;color:#e6edf3; }
+.signal-row .score { font-size:14px;font-weight:700;min-width:36px;text-align:right; }
+.signal-row .price { font-size:12px;color:#8b949e;min-width:70px;text-align:right; }
+.signal-row .change { font-size:12px;min-width:65px;text-align:right; }
+.market-badge {
+    display:inline-block;padding:4px 10px;border-radius:12px;
+    font-size:12px;font-weight:600;
+}
+</style>
 
 <script>
 async function refreshSignals() {
     const d = await apiFetch('/signals/api/today');
     const topScores = d.top_scores || [];
     const buyCandidates = d.buy_candidates || [];
+    const market = d.market || {};
 
-    // Top 10
-    const sBody = $('signalsBody');
+    // 市场状态
+    const mc = document.getElementById('marketCard');
+    const trend = market.trend || '?';
+    const action = market.action || '-';
+    const trendColor = trend.includes('多头') ? '#3fb950' : (trend.includes('熊') ? '#f85149' : '#d29922');
+    mc.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;">
+            <span class="market-badge" style="background:${trendColor}22;color:${trendColor};">${trend}</span>
+            <span style="font-size:12px;color:#8b949e;">${action}</span>
+            <span style="font-size:11px;color:#484f58;margin-left:auto;">${d.date || ''}</span>
+        </div>`;
+
+    // Top 10 卡片列表
+    const tl = document.getElementById('topList');
     if (topScores.length === 0) {
-        sBody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8b949e;">暂无数据</td></tr>';
+        tl.innerHTML = '<div style="text-align:center;color:#8b949e;padding:20px;font-size:13px;">暂无数据</div>';
     } else {
-        sBody.innerHTML = topScores.map((s, i) => {
-            const volClass = s.vol_factor === '放大' ? 'positive' : (s.vol_factor === '缩减' ? 'negative' : 'neutral');
-            return `<tr>
-                <td>${i + 1}</td>
-                <td><b>${s.ticker}</b></td>
-                <td>${s.score?.toFixed(1)}</td>
-                <td>$${(s.price || 0).toFixed(2)}</td>
-                <td class="${pnlClass(s.mom)}">${formatPct(s.mom)}</td>
-                <td>${(s.quality || 0).toFixed(1)}</td>
-                <td>${s.rsi ?? '-'}</td>
-                <td>${s.atr ? s.atr.toFixed(1) + '%' : '-'}</td>
-                <td class="${volClass}">${s.vol_factor || '-'}</td>
-            </tr>`;
+        tl.innerHTML = topScores.map((s, i) => {
+            const ticker = Array.isArray(s) ? s[0] : s.ticker || '?';
+            const score = Array.isArray(s) ? s[1] : s.score || 0;
+            return `<div class="signal-row">
+                <span class="rank">#${i + 1}</span>
+                <span class="name">${ticker}</span>
+                <span class="score" style="color:${score >= 60 ? '#3fb950' : '#d29922'};">${score.toFixed(0)}</span>
+            </div>`;
         }).join('');
     }
 
     // 买入候选
-    const cBody = $('candidatesBody');
+    const cl = document.getElementById('candidateList');
     if (buyCandidates.length === 0) {
-        cBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8b949e;">暂无候选</td></tr>';
+        cl.innerHTML = '<div style="text-align:center;color:#8b949e;padding:20px;font-size:13px;">暂无候选</div>';
     } else {
-        cBody.innerHTML = buyCandidates.map((c, i) => `
-            <tr>
-                <td>${i + 1}</td>
-                <td><b>${c.ticker}</b></td>
-                <td>${c.score?.toFixed(1)}</td>
-                <td>$${(c.price || 0).toFixed(2)}</td>
-                <td class="${pnlClass(c.mom)}">${formatPct(c.mom)}</td>
-                <td>${(c.quality || 0).toFixed(1)}</td>
-            </tr>
-        `).join('');
+        cl.innerHTML = buyCandidates.map((c, i) => {
+            const chg = c.mom || 0;
+            const chgClass = chg > 0 ? '#3fb950' : (chg < 0 ? '#f85149' : '#8b949e');
+            return `<div class="signal-row">
+                <span class="rank">#${i + 1}</span>
+                <span class="name">${c.ticker}</span>
+                <span class="score" style="color:${c.score >= 60 ? '#3fb950' : '#d29922'};">${c.score.toFixed(0)}</span>
+                <span class="price">$${(c.price || 0).toFixed(0)}</span>
+                <span class="change" style="color:${chgClass};">${chg > 0 ? '+' : ''}${chg.toFixed(1)}%</span>
+            </div>`;
+        }).join('');
     }
 }
 
 async function executeTrade() {
-    if (!confirm('确认执行调仓？\n\n系统将对比当前持仓与信号推荐，\n自动生成买卖指令。\n\n⚠️ 请确认市场已开盘')) return false;
-    const btn = event.target;
+    if (!confirm('确认执行调仓？')) return;
+    const btn = document.querySelector('[onclick="executeTrade()"]');
     btn.textContent = '⏳ 执行中...';
     btn.disabled = true;
     try {
         const d = await apiFetch('/signals/api/execute', { method: 'POST' });
-        const resultDiv = $('executeResult');
+        const resultDiv = document.getElementById('executeResult');
         resultDiv.style.display = 'block';
-        resultDiv.innerHTML = `<h2>${d.status === 'ok' ? '✅' : '❌'} 调仓结果</h2><p>${d.message}</p>`;
+        resultDiv.innerHTML = `<div style="padding:12px;border-radius:8px;background:#0d1117;border:1px solid #30363d;">
+            <span style="font-size:16px;">${d.status === 'ok' ? '✅' : '❌'}</span>
+            <span style="margin-left:8px;font-size:13px;">${d.message}</span></div>`;
         setTimeout(() => { resultDiv.style.display = 'none'; }, 10000);
     } catch(e) {
-        alert('调仓失败: ' + e);
+        alert('调仓失败: ' + e.message);
     }
     btn.textContent = '⚡ 调仓';
     btn.disabled = false;
