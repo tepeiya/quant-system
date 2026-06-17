@@ -291,7 +291,7 @@ async function showStock(ticker) {
                     '<div class="card-grid" style="grid-template-columns:repeat(2,1fr);">' +
                     '<div class="card"><div class="label">行业</div><div class="value" style="font-size:14px;">' + sec.name + '</div></div>' +
                     '<div class="card"><div class="label">现价</div><div class="value">\$' + s.price.toFixed(2) + '</div></div>' +
-                    '<div class="card"><div class="label">综合评分</div><div class="value" style="color:' + (s.score >= 60 ? '#3fb950' : '#d29922') + ';">' + s.score.toFixed(0) + '</div></div>' +
+                    '<div class="card"><div class="label">综合评分</div><div class="value" style="color:' + ((s.score || 50) >= 60 ? '#3fb950' : '#d29922') + ';">' + (s.score || 50).toFixed(0) + '</div></div>' +
                     '<div class="card"><div class="label">周涨跌幅</div><div class="value ' + chgClass + '">' + chgStr + '</div></div>' +
                     '<div class="card"><div class="label">动量(12M)</div><div class="value">' + (s.momentum || 0).toFixed(1) + '%</div></div>' +
                     '<div class="card"><div class="label">RSI</div><div class="value">' + (s.rsi || '-') + '</div></div>' +
