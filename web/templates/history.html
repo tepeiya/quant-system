@@ -63,10 +63,10 @@ async function showDetail(date) {
     let html = '';
 
     // 大盘卡片
-    html += `<div class="card-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px;">
-        <div class="card"><div class="label">趋势</div><div class="value">${m.trend || '?'}</div></div>
-        <div class="card"><div class="label">建议</div><div class="value">${m.action || '?'}</div></div>
-        <div class="card"><div class="label">SPY</div><div class="value">$${(m.spy || 0).toFixed(0)}</div></div>
+    html += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px;background:#0d1117;border:1px solid #21262d;border-radius:8px;">
+        <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:#484f58;">趋势</span><span style="font-size:13px;font-weight:600;">${m.trend || '?'}</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:#484f58;">建议</span><span style="font-size:13px;font-weight:600;">${m.action || '?'}</span></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto;"><span style="font-size:11px;color:#484f58;">SPY</span><span style="font-size:13px;font-weight:600;">$${(m.spy || 0).toFixed(0)}</span></div>
     </div>`;
 
     // Top 10（卡片式）
