@@ -9,36 +9,23 @@ logger = logging.getLogger("warmup_full")
 CACHE_DIR = "data_cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
-# S&P 500 完整列表（318只，去重）
-SP500 = sorted([
-    "A", "AAP", "AAPL", "ABBV", "ABC", "ABNB", "ABT", "ACGL", "ADBE", "ADM", "ADP", "ADSK",
-    "AEE", "AEP", "AES", "AFL", "AJG", "ALGN", "ALL", "ALLE", "AMAT", "AMCR", "AMD", "AME",
-    "AMGN", "AMP", "AMT", "AMZN", "ANSS", "AON", "APA", "APD", "APO", "AR", "ARES", "ASML",
-    "ATO", "AVGO", "AWK", "AXP", "AZO", "BA", "BAC", "BAX", "BDX", "BEN", "BG", "BIIB",
-    "BJ", "BK", "BKR", "BLK", "BLL", "BRO", "BSX", "BWXT", "BX", "C", "CAG", "CAH", "CARR",
-    "CAT", "CB", "CBOE", "CCI", "CCK", "CDNS", "CE", "CF", "CG", "CHD", "CHTR", "CI", "CL",
-    "CLX", "CMA", "CMCSA", "CME", "CMI", "CMS", "CNC", "CNP", "COP", "COST", "CPB", "CRM",
-    "CRWD", "CSX", "CTRA", "CTVA", "CVS", "CVX", "CW", "D", "DE", "DG", "DGX", "DHI", "DHR",
-    "DIS", "DLTR", "DOV", "DOW", "DTE", "DUK", "DVA", "DVN", "DXCM", "EA", "ECL", "ED",
-    "EIX", "EL", "EMN", "EMR", "EOG", "EQIX", "ES", "ETN", "EW", "EXC", "F", "FANG", "FAST",
-    "FDX", "FE", "FITB", "FLS", "FMC", "FTNT", "FTV", "GD", "GE", "GILD", "GIS", "GM",
-    "GOOGL", "GRMN", "GS", "GWW", "HAL", "HBAN", "HCA", "HD", "HEI", "HES", "HIG", "HII",
-    "HON", "HRL", "HSY", "HUM", "ICE", "IDXX", "IEX", "IFF", "ILMN", "INTC", "IP", "IR",
-    "ISRG", "ITT", "JCI", "JNJ", "JPM", "K", "KBR", "KDP", "KEY", "KKR", "KLAC", "KMB",
-    "KMI", "KO", "KR", "LECO", "LEN", "LH", "LHX", "LIN", "LLY", "LMT", "LNC", "LNG",
-    "LNT", "LOW", "LRCX", "MA", "MAS", "MCD", "MCHP", "MCK", "MCO", "MDLZ", "MDT", "MET",
-    "META", "MKTX", "MMC", "MMM", "MNST", "MOH", "MRK", "MRO", "MS", "MSA", "MSFT", "MTB",
-    "MTDR", "MU", "MUR", "NDAQ", "NEE", "NFLX", "NI", "NKE", "NOC", "NOW", "NRG", "NSC",
-    "NTRS", "NVDA", "NVR", "NXPI", "OKE", "OLN", "ORCL", "ORLY", "OSK", "OTIS", "OWL",
-    "OXY", "PANW", "PCAR", "PEG", "PEP", "PFE", "PFG", "PG", "PGR", "PH", "PHM", "PKG",
-    "PKI", "PLD", "PNC", "PODD", "PPG", "PR", "PRU", "PXD", "QCOM", "RE", "REGN", "RF",
-    "RMD", "RNR", "ROK", "ROST", "RPM", "RRC", "RTX", "SBUX", "SCHW", "SEE", "SHW", "SJM",
-    "SLB", "SNA", "SNPS", "SO", "SPGI", "SRE", "STI", "STT", "STZ", "SWK", "SWN", "SYK",
-    "SYY", "T", "TDG", "TFX", "TGT", "TJX", "TMO", "TOL", "TPG", "TRGP", "TROW", "TRV",
-    "TSLA", "TT", "TTC", "TXN", "TXT", "UBER", "UNH", "UNP", "UPS", "V", "VRTX", "VZ",
-    "WAT", "WBA", "WEC", "WFC", "WMB", "WMT", "WRK", "WSO", "WST", "WTRG", "WTW", "XOM",
-    "XYL", "ZION", "ZTS",
-])
+# S&P 500 完整列表（优先读取缓存文件）
+CACHE_LIST = "data_cache/sp500_tickers.json"
+SP500 = []
+if os.path.exists(CACHE_LIST):
+    try:
+        with open(CACHE_LIST) as f:
+            SP500 = sorted(json.load(f))
+        logger.info(f"SP500 列表: {len(SP500)} 只（来自缓存文件）")
+    except:
+        pass
+if not SP500:
+    SP500 = sorted([
+        "AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA","AVGO","AMD",
+        "JPM","V","MA","JNJ","UNH","LLY","XOM","CVX","PG","KO","PEP",
+        "COST","WMT","HD","MCD","NKE","DIS","T","VZ","NEE",
+    ])
+    logger.info(f"SP500 列表: {len(SP500)} 只（内置列表）")
 
 
 def compute_indicators(df):
