@@ -40,7 +40,11 @@ def api_positions():
         logger.error(f"持仓实时同步失败: {e}")
         portfolio = {"equity": 0, "cash": 0, "positions": {}, "position_count": 0}
 
-    positions = list(portfolio.get("positions", {}).values()) if portfolio.get("positions") else []
+    raw = portfolio.get("positions", {})
+    positions = []
+    for sym, data in raw.items():
+        data["symbol"] = sym
+        positions.append(data)
 
     total_cost = sum(p.get("cost_basis", 0) for p in positions)
     total_value = sum(p.get("market_value", 0) for p in positions)
