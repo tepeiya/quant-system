@@ -63,9 +63,9 @@ async function showDetail(date) {
     let html = '';
 
     // 大盘卡片
-    html += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px;background:#0d1117;border:1px solid #21262d;border-radius:8px;">
+    html += `<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;padding:10px;background:#0d1117;border:1px solid #21262d;border-radius:8px;">
         <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:#484f58;">趋势</span><span style="font-size:13px;font-weight:600;">${m.trend || '?'}</span></div>
-        <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:#484f58;">建议</span><span style="font-size:13px;font-weight:600;">${m.action || '?'}</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:#484f58;">建议</span><span style="font-size:13px;font-weight:600;text-align:center;">${m.action || '?'}</span></div>
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;"><span style="font-size:11px;color:#484f58;">SPY</span><span style="font-size:13px;font-weight:600;">$${(m.spy || 0).toFixed(0)}</span></div>
     </div>`;
 
