@@ -39,6 +39,13 @@ def _update_realtime_prices(cache: dict, max_tickers: int = 100) -> dict:
     base = "https://data.alpaca.markets"
     auth = (KEY, SECRET)
 
+    # 快速检查 Alpaca 是否可达
+    try:
+        requests.get(f"{base}/v2/stocks/AAPL/trades/latest", auth=auth, timeout=3)
+    except:
+        logger.warning("Alpaca 数据API不可达，跳过实时更新")
+        return cache
+
     tickers = sorted(cache.keys())[:max_tickers]
     logger.info(f"实时数据: {len(tickers)}只...")
     updated = 0
