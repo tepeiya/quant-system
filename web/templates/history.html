@@ -3,124 +3,103 @@
 {% block content %}
 
 <div class="panel">
-    <div class="flex mb-12" style="justify-content:space-between">
-        <h2>📜 信号历史 (最近90天)</h2>
-        <button class="btn" onclick="refreshHistory()">🔄 刷新</button>
+    <div class="flex mb-12" style="justify-content:space-between;align-items:center;">
+        <h2 style="margin:0;">📜 信号历史</h2>
+        <button class="btn" onclick="refreshHistory()" style="font-size:12px;padding:6px 12px;">🔄 刷新</button>
     </div>
-    <div class="table-wrapper">
-    <table>
-        <thead>
-            <tr>
-                <th>日期</th><th>趋势</th><th>建议</th>
-                <th>Top3</th><th>候选数</th><th>最高分</th><th></th>
-            </tr>
-        </thead>
-        <tbody id="historyBody"></tbody>
-    </table>
-    </div>
+    <div id="historyList" style="display:flex;flex-direction:column;gap:8px;"></div>
 </div>
 
 <!-- 详情弹窗 -->
-<div id="detailModal" class="modal" style="display:none">
-    <div class="modal-content panel">
-        <div class="flex mb-12" style="justify-content:space-between">
-            <h2 id="detailDate">-</h2>
-            <button class="btn" onclick="closeDetail()">✕</button>
+<div id="detailModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100;justify-content:center;align-items:center;">
+    <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;">
+        <div class="flex mb-12" style="justify-content:space-between;align-items:center;">
+            <h2 id="detailDate" style="margin:0;font-size:16px;">-</h2>
+            <button class="btn" onclick="closeDetail()" style="font-size:12px;padding:4px 10px;">✕ 关闭</button>
         </div>
         <div id="detailBody"></div>
     </div>
 </div>
 
-<style>
-.modal {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.7); display: flex;
-    justify-content: center; align-items: center; z-index: 100;
-}
-.modal-content {
-    max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;
-}
-</style>
-
 <script>
 async function refreshHistory() {
     const d = await apiFetch('/history/api/list');
     const signals = d.signals || [];
+    const list = $('historyList');
 
-    const body = $('historyBody');
     if (signals.length === 0) {
-        body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#8b949e;">暂无信号历史</td></tr>';
+        list.innerHTML = '<div style="text-align:center;padding:30px;color:#8b949e;">暂无信号历史</div>';
         return;
     }
 
-    body.innerHTML = signals.map(s => {
-        const trendClass = s.trend?.includes('多头') ? 'positive' : (s.trend?.includes('熊') ? 'negative' : 'neutral');
-        return `<tr>
-            <td>${s.date}</td>
-            <td class="${trendClass}">${s.trend || '?'}</td>
-            <td>${s.action || '?'}</td>
-            <td>${(s.top3 || []).join(', ')}</td>
-            <td>${s.candidate_count || 0}</td>
-            <td>${s.top_score?.toFixed(1) || '-'}</td>
-            <td><button class="btn" onclick="showDetail('${s.date}')">详情</button></td>
-        </tr>`;
+    list.innerHTML = signals.map(s => {
+        const trend = s.trend || '?';
+        const trendColor = trend.includes('多头') ? '#3fb950' : (trend.includes('熊') ? '#f85149' : '#d29922');
+        return `<div class="pos-card" style="cursor:pointer;" onclick="showDetail('${s.date}')">
+            <div class="pos-header">
+                <span style="font-size:15px;font-weight:600;color:#e6edf3;">${s.date}</span>
+                <span style="font-size:11px;padding:2px 8px;border-radius:8px;background:${trendColor}22;color:${trendColor};">${trend}</span>
+                <span style="margin-left:auto;font-size:12px;color:#8b949e;">Top: ${(s.top3 || []).slice(0,2).join(', ')}</span>
+            </div>
+            <div class="pos-details" style="grid-template-columns:repeat(3,1fr);">
+                <div class="pos-detail"><div class="label">建议</div><div class="value" style="font-size:13px;">${s.action || '?'}</div></div>
+                <div class="pos-detail"><div class="label">候选</div><div class="value" style="font-size:13px;">${s.candidate_count || 0} 只</div></div>
+                <div class="pos-detail"><div class="label">最高分</div><div class="value" style="font-size:13px;">${s.top_score?.toFixed(0) || '-'}</div></div>
+            </div>
+        </div>`;
     }).join('');
 }
 
 async function showDetail(date) {
-    $('detailDate').textContent = '📊 ' + date + ' 信号详情';
-    $('detailModal').style.display = 'flex';
-    $('detailBody').innerHTML = '<p style="color:#8b949e;">加载中...</p>';
+    document.getElementById('detailDate').textContent = '📊 ' + date;
+    document.getElementById('detailModal').style.display = 'flex';
+    document.getElementById('detailBody').innerHTML = '<p style="color:#8b949e;">加载中...</p>';
 
-    const d = await apiFetch(`/history/api/detail?date=${date}`);
+    const d = await apiFetch('/history/api/detail?date=' + date);
+    const m = d.market || {};
+    const top = d.top_scores || [];
+    const cand = d.buy_candidates || [];
 
     let html = '';
-    // 大盘
-    const m = d.market || {};
+
+    // 大盘卡片
     html += `<div class="card-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px;">
         <div class="card"><div class="label">趋势</div><div class="value">${m.trend || '?'}</div></div>
         <div class="card"><div class="label">建议</div><div class="value">${m.action || '?'}</div></div>
         <div class="card"><div class="label">SPY</div><div class="value">$${(m.spy || 0).toFixed(0)}</div></div>
     </div>`;
 
-    // Top 10
-    const top = d.top_scores || [];
+    // Top 10（卡片式）
     if (top.length > 0) {
         html += '<h3 style="margin:12px 0 8px;font-size:13px;color:#8b949e;">🏆 评分 Top 10</h3>';
-        html += '<div class="table-wrapper"><table><thead><tr><th>股票</th><th>评分</th><th>价格</th><th>动量%</th><th>质量分</th></tr></thead><tbody>';
-        top.slice(0, 10).forEach(s => {
-            html += `<tr>
-                <td><b>${s.ticker}</b></td>
-                <td>${s.score?.toFixed(1)}</td>
-                <td>$${(s.price || 0).toFixed(2)}</td>
-                <td class="${pnlClass(s.momentum_pct)}">${formatPct(s.momentum_pct)}</td>
-                <td>${(s.quality || 0).toFixed(1)}</td>
-            </tr>`;
+        top.slice(0, 10).forEach((s, i) => {
+            const ticker = Array.isArray(s) ? s[0] : s.ticker || '?';
+            const score = Array.isArray(s) ? s[1] : s.score || 0;
+            html += `<div class="signal-row">
+                <span class="rank">#${i + 1}</span>
+                <span class="name">${ticker}</span>
+                <span class="score" style="color:${score >= 60 ? '#3fb950' : '#d29922'};">${score.toFixed(0)}</span>
+            </div>`;
         });
-        html += '</tbody></table>';
     }
 
     // 买入候选
-    const cand = d.buy_candidates || [];
     if (cand.length > 0) {
         html += '<h3 style="margin:12px 0 8px;font-size:13px;color:#8b949e;">🟢 买入候选</h3>';
-        html += '<table><thead><tr><th>股票</th><th>评分</th><th>价格</th><th>动量%</th></tr></thead><tbody>';
         cand.forEach(c => {
-            html += `<tr>
-                <td><b>${c.ticker}</b></td>
-                <td>${c.score?.toFixed(1)}</td>
-                <td>$${(c.price || 0).toFixed(2)}</td>
-                <td class="${pnlClass(c.momentum_pct)}">${formatPct(c.momentum_pct)}</td>
-            </tr>`;
+            html += `<div class="signal-row">
+                <span class="name">${c.ticker}</span>
+                <span class="score" style="color:${c.score >= 60 ? '#3fb950' : '#d29922'};">${c.score.toFixed(0)}</span>
+                <span class="price">$${(c.price || 0).toFixed(0)}</span>
+            </div>`;
         });
-        html += '</tbody></table>';
     }
 
-    $('detailBody').innerHTML = html;
+    document.getElementById('detailBody').innerHTML = html;
 }
 
 function closeDetail() {
-    $('detailModal').style.display = 'none';
+    document.getElementById('detailModal').style.display = 'none';
 }
 
 refreshHistory();
