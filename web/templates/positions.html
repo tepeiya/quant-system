@@ -2,51 +2,64 @@
 {% block title %}持仓 - 量化系统{% endblock %}
 {% block content %}
 
+<!-- 顶部摘要卡片 -->
 <div class="card-grid" id="posSummary">
     <div class="card"><div class="label">持仓数量</div><div class="value" id="posCount">-</div></div>
     <div class="card"><div class="label">总成本</div><div class="value" id="totalCost">-</div></div>
     <div class="card"><div class="label">总市值</div><div class="value" id="totalValue">-</div></div>
-    <div class="card"><div class="label">总PnL</div><div class="value" id="totalPnl">-</div><div class="sub" id="totalPnlPct"></div></div>
-    <div class="card"><div class="label">仓位比例</div><div class="value" id="exposure">-</div></div>
+    <div class="card"><div class="label">总盈亏</div><div class="value" id="totalPnl">-</div><div class="sub" id="totalPnlPct"></div></div>
+    <div class="card"><div class="label">仓位</div><div class="value" id="exposure">-</div></div>
     <div class="card"><div class="label">现金</div><div class="value" id="cash">-</div></div>
 </div>
 
-<div class="row-2">
-    <div class="panel">
-        <div class="flex mb-12" style="justify-content:space-between">
-            <h2>📋 持仓明细</h2>
-            <div class="flex">
-                <button class="btn" onclick="refreshPos()">🔄 刷新</button>
-                <button class="btn danger" onclick="closeAll()">🗑️ 清仓</button>
-            </div>
-        </div>
-        <div class="table-wrapper">
-        <table id="positionsTable">
-            <thead>
-                <tr>
-                    <th>股票</th><th>数量</th><th>均价</th><th>现价</th>
-                    <th>成本</th><th>市值</th><th>PnL</th><th>PnL%</th><th>占比</th>
-                </tr>
-            </thead>
-            <tbody id="positionsBody"></tbody>
-        </table>
-        </div>
-    </div>
-    <div class="panel">
-        <h2>📈 持仓成本对比</h2>
-        <canvas id="costChart" height="200"></canvas>
-    </div>
+<div style="display:flex;gap:8px;margin-bottom:12px;">
+    <button class="btn" onclick="refreshPos()" style="flex:1;font-size:12px;padding:8px;">🔄 刷新</button>
+    <button class="btn danger" onclick="closeAll()" style="flex:1;font-size:12px;padding:8px;">🗑️ 清仓</button>
 </div>
 
-<div class="panel">
-    <h2>📝 最近交易</h2>
-    <div class="table-wrapper">
-    <table id="tradeLogTable">
-        <thead><tr><th>时间</th><th>操作</th><th>股票</th><th>数量</th><th>价格</th><th>金额</th></tr></thead>
-        <tbody id="tradeLogBody"></tbody>
-    </table>
-    </div>
-</div>
+<!-- 持仓明细卡片列表（手机友好） -->
+<h3 style="font-size:13px;color:#8b949e;margin:0 0 8px;">📋 持仓明细</h3>
+<div id="positionsList" style="display:flex;flex-direction:column;gap:8px;"></div>
+
+<!-- 最近交易 -->
+<h3 style="font-size:13px;color:#8b949e;margin:16px 0 8px;">📝 最近交易</h3>
+<div id="tradeLogList" style="display:flex;flex-direction:column;gap:6px;"></div>
+
+<style>
+.pos-card {
+    background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px;
+}
+.pos-header {
+    display:flex;align-items:center;gap:10px;margin-bottom:10px;
+}
+.pos-symbol {
+    font-size:18px;font-weight:700;color:#e6edf3;
+}
+.pos-pnl-badge {
+    font-size:12px;font-weight:600;padding:2px 10px;border-radius:10px;
+}
+.pos-details {
+    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+}
+.pos-detail {
+    text-align:center;
+}
+.pos-detail .label {
+    font-size:10px;color:#484f58;margin-bottom:2px;
+}
+.pos-detail .value {
+    font-size:14px;font-weight:600;color:#c9d1d9;
+}
+.trade-row {
+    display:flex;align-items:center;padding:8px 12px;
+    background:#0d1117;border:1px solid #21262d;border-radius:6px;gap:8px;
+    font-size:12px;
+}
+.trade-row .time { color:#484f58;min-width:80px; }
+.trade-row .side { font-weight:600;min-width:36px; }
+.trade-row .sym { font-weight:600;min-width:50px; }
+.trade-row .detail { color:#8b949e;margin-left:auto; }
+</style>
 
 <script>
 async function refreshPos() {
@@ -66,81 +79,50 @@ async function refreshPos() {
     $('exposure').textContent = (s.exposure_pct || 0).toFixed(1) + '%';
     $('cash').textContent = formatCurrency(d.cash);
 
-    // 持仓表格
-    const body = $('positionsBody');
+    // 持仓卡片列表
+    const list = $('positionsList');
     if (pos.length === 0) {
-        body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8b949e;">空仓</td></tr>';
+        list.innerHTML = '<div style="text-align:center;padding:30px;color:#8b949e;">📭 空仓</div>';
     } else {
-        body.innerHTML = pos.map(p => `
-            <tr>
-                <td><b>${p.symbol}</b></td>
-                <td>${p.qty}</td>
-                <td>$${(p.avg_entry || 0).toFixed(2)}</td>
-                <td>$${(p.current_price || 0).toFixed(2)}</td>
-                <td>${formatCurrency(p.cost_basis)}</td>
-                <td>${formatCurrency(p.market_value)}</td>
-                <td class="${pnlClass(p.pnl)}">${formatCurrency(p.pnl)}</td>
-                <td class="${pnlClass(p.pnl_pct)}">${formatPct(p.pnl_pct)}</td>
-                <td>${((p.market_value || 0) / eq * 100).toFixed(1)}%</td>
-            </tr>
-        `).join('');
-    }
-
-    // 交易记录
-    const trades = await apiFetch('/positions/api/trade_log');
-    const tBody = $('tradeLogBody');
-    if (trades.length === 0) {
-        tBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8b949e;">暂无交易</td></tr>';
-    } else {
-        tBody.innerHTML = trades.slice().reverse().slice(0, 20).map(t => {
-            const sideClass = t.side?.toUpperCase() === 'BUY' ? 'badge buy' : 'badge sell';
-            return `<tr>
-                <td>${(t.time || '').slice(0, 16)}</td>
-                <td><span class="${sideClass}">${t.side?.toUpperCase()}</span></td>
-                <td><b>${t.symbol}</b></td>
-                <td>${t.qty}</td>
-                <td>$${(t.price || 0).toFixed(2)}</td>
-                <td>${formatCurrency(t.value)}</td>
-            </tr>`;
+        list.innerHTML = pos.map(p => {
+            const pnl = p.pnl || 0;
+            const pnlPct = p.pnl_pct || 0;
+            const pnlColor = pnl >= 0 ? '#3fb950' : '#f85149';
+            const pnlBg = pnl >= 0 ? 'rgba(63,185,80,0.15)' : 'rgba(248,81,73,0.15)';
+            const pnlIcon = pnl >= 0 ? '🟢' : '🔴';
+            return `<div class="pos-card">
+                <div class="pos-header">
+                    <span class="pos-symbol">${p.symbol}</span>
+                    <span class="pos-pnl-badge" style="background:${pnlBg};color:${pnlColor};">${pnlIcon} ${formatPct(pnlPct)}</span>
+                    <span style="margin-left:auto;font-size:13px;color:#8b949e;">x${p.qty}</span>
+                </div>
+                <div class="pos-details">
+                    <div class="pos-detail"><div class="label">均价</div><div class="value">$${(p.avg_entry || 0).toFixed(2)}</div></div>
+                    <div class="pos-detail"><div class="label">现价</div><div class="value">$${(p.current_price || 0).toFixed(2)}</div></div>
+                    <div class="pos-detail"><div class="label">市值</div><div class="value">${formatCurrency(p.market_value)}</div></div>
+                    <div class="pos-detail"><div class="label">盈亏</div><div class="value" style="color:${pnlColor};">${formatCurrency(pnl)}</div></div>
+                </div>
+            </div>`;
         }).join('');
     }
 
-    // 持仓成本对比图
-    drawCostChart(pos, eq);
-}
-
-function drawCostChart(positions, equity) {
-    if (!positions.length || !window.Chart) return;
-    const ctx = document.getElementById('costChart').getContext('2d');
-    const labels = positions.map(p => p.symbol);
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: '成本',
-                    data: positions.map(p => p.cost_basis || 0),
-                    backgroundColor: 'rgba(88,166,255,0.6)',
-                    borderRadius: 3,
-                },
-                {
-                    label: '当前市值',
-                    data: positions.map(p => p.market_value || 0),
-                    backgroundColor: positions.map(p => (p.market_value || 0) >= (p.cost_basis || 0) ? 'rgba(63,185,80,0.6)' : 'rgba(248,81,73,0.6)'),
-                    borderRadius: 3,
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { labels: { color: '#8b949e' } } },
-            scales: {
-                x: { grid: { display: false }, ticks: { color: '#8b949e' } },
-                y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', callback: v => '$' + v.toLocaleString() } }
-            }
-        }
-    });
+    // 交易记录卡片
+    const trades = await apiFetch('/positions/api/trade_log');
+    const tList = $('tradeLogList');
+    if (trades.length === 0) {
+        tList.innerHTML = '<div style="text-align:center;padding:20px;color:#8b949e;font-size:13px;">暂无交易</div>';
+    } else {
+        tList.innerHTML = trades.slice().reverse().slice(0, 15).map(t => {
+            const sideClass = t.side?.toUpperCase() === 'BUY' ? '#3fb950' : '#f85149';
+            const sideIcon = t.side?.toUpperCase() === 'BUY' ? '🟢' : '🔴';
+            return `<div class="trade-row">
+                <span class="time">${(t.time || '').slice(5, 16)}</span>
+                <span class="side" style="color:${sideClass};">${sideIcon} ${t.side?.toUpperCase()}</span>
+                <span class="sym">${t.symbol}</span>
+                <span class="detail">x${t.qty} @ $${(t.price || 0).toFixed(2)}</span>
+            </div>`;
+        }).join('');
+    }
 }
 
 async function closeAll() {
