@@ -631,13 +631,24 @@ class BrokerManager:
         return self.get_current()
 
     def get_strategy_broker_id(self, strategy: str) -> str:
-        """获取指定策略绑定的券商ID"""
+        """获取指定策略绑定的券商ID（优先专用券商，再回退通用券商）"""
+        dedicated = None
+        general = None
         for bid, bc in self.config.items():
             if not bc.get("enabled"):
                 continue
             strategies = bc.get("strategies", [])
-            if strategy in strategies:
-                return bid
+            if strategy not in strategies:
+                continue
+            # 如果这个券商只绑定这一个策略 → 专用券商，优先使用
+            if len(strategies) == 1 and strategies[0] == strategy:
+                dedicated = bid
+            else:
+                general = bid
+        if dedicated:
+            return dedicated
+        if general:
+            return general
         return get_default_broker_id()
 
     def enable(self, broker_id: str, enabled: bool = True):
