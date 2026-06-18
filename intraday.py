@@ -112,9 +112,11 @@ def scan_intraday_signals() -> list[dict]:
         if price < cfg["min_price"] or price > cfg["max_price"]:
             continue
 
-        # 用日K模拟日内动量：今日涨幅、近3日涨幅、成交量比
+        # 多维度日内动量评分
         today_chg = (close[-1] - close[-2]) / close[-2] * 100 if len(close) >= 2 else 0
         week_chg = (close[-1] - close[-6]) / close[-6] * 100 if len(close) >= 6 else 0
+        month_chg = (close[-1] - close[-21]) / close[-21] * 100 if len(close) >= 21 else 0
+
         volume = df["Volume"].values[-1] if "Volume" in df.columns else 0
         vol_ma = np.mean(df["Volume"].values[-20:]) if len(df["Volume"].values) >= 20 else 1
         vol_ratio = volume / vol_ma if vol_ma > 0 else 0
@@ -122,8 +124,36 @@ def scan_intraday_signals() -> list[dict]:
         if vol_ratio < cfg["min_volume_ratio"]:
             continue
 
-        # 综合评分：今日涨幅权重最高
-        score = today_chg * 0.6 + week_chg * 0.4
+        # RSI 过滤（RSI > 80 不追高）
+        rsi = None
+        if "RSI" in df.columns:
+            rsi = float(df["RSI"].values[-1])
+            if rsi > 85:
+                continue
+
+        # 波动率调整（高波限制买入量）
+        atr = df["ATR_Pct"].values[-1] if "ATR_Pct" in df.columns else 2.0
+
+        # 综合评分：短中长动量加权 + 成交量确认
+        mom_score = today_chg * 0.5 + week_chg * 0.3 + month_chg * 0.2
+        vol_bonus = 0
+        if vol_ratio > 2.0:
+            vol_bonus = 2.0
+        elif vol_ratio > 1.5:
+            vol_bonus = 1.0
+
+        # 均线趋势加分（价格在SMA20之上加分）
+        sma20 = df["SMA20"].values[-1] if "SMA20" in df.columns else price
+        trend_bonus = 1.0 if price > sma20 else -1.0
+
+        # ATR调整（高波动扣分，低波动加分）
+        vol_penalty = -0.5 if atr > 3.0 else (0.5 if atr < 1.5 else 0)
+
+        score = mom_score + vol_bonus + trend_bonus + vol_penalty
+
+        # 风控：今日涨幅过高不追（>8%）
+        if today_chg > 8.0:
+            continue
         signals.append({
             "ticker": t,
             "score": round(score, 2),
@@ -196,8 +226,12 @@ def run_backtest(days: int = 365) -> dict:
             today_ret = (price - prev) / prev * 100
             vol_ratio = volume[i] / vol_ma[i] if vol_ma[i] > 0 else 0
 
-            if today_ret > 1.0 and vol_ratio > 1.2 and price > 10 and price < 500:
-                # 买入
+            # 改进的入场条件
+            atr_val = df["ATR_Pct"].values[i] if "ATR_Pct" in df.columns else 2.0
+            rsi_val = df["RSI"].values[i] if "RSI" in df.columns else 50
+
+            if today_ret > 0.5 and today_ret < 5.0 and vol_ratio > 1.3 and \
+               price > 10 and price < 500 and rsi_val < 80:
                 qty = int(capital * cfg["per_position_pct"] / price)
                 if qty <= 0:
                     continue
@@ -206,8 +240,20 @@ def run_backtest(days: int = 365) -> dict:
                     continue
                 capital -= cost
 
-                # 日内持有，收盘卖出
-                sell_price = price  # 简化为收盘价卖出
+                # 日内持有 + 止盈止损
+                sell_price = price
+                exit_chg = 0
+                for j in range(i, min(i + 3, len(close))):
+                    c = close[j]
+                    ret = (c - price) / price * 100
+                    if ret < -2.0:  # 止损 -2%
+                        sell_price = price * 0.98
+                        break
+                    if ret > 3.0:  # 止盈 +3%
+                        sell_price = price * 1.03
+                        break
+                    sell_price = c
+
                 proceeds = qty * sell_price * (1 - commission)
                 pnl = proceeds - cost
                 capital += proceeds
@@ -215,8 +261,6 @@ def run_backtest(days: int = 365) -> dict:
                 if pnl > 0:
                     wins += 1
                 daily_returns.append(pnl / cost * 100 if cost > 0 else 0)
-                trade_log.append({"ticker": t, "buy": round(price, 2), "sell": round(sell_price, 2),
-                                   "qty": qty, "pnl": round(pnl, 2)})
 
     total_return = (capital - 100000) / 100000 * 100
     win_rate = wins / total_trades * 100 if total_trades > 0 else 0
