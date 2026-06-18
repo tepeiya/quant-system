@@ -225,36 +225,6 @@ def run_daily_cycle():
         except Exception as e:
             logger.warning(f"  激进调仓异常: {e}")
 
-        # ===== 日内交易：每30分钟扫描 =====
-        now_intra = datetime.now()
-        if now_intra.hour >= 9 and now_intra.hour < 16:
-            logger.info("[日内交易] 扫描信号...")
-            try:
-                r = subprocess.run(
-                    [sys.executable, "intraday.py", "--scan"],
-                    capture_output=True, text=True, timeout=60,
-                    env={**os.environ}
-                )
-                for line in r.stdout.strip().split("\n"):
-                    if line.strip() and "{" not in line:
-                        logger.info(f"  [日内] {line.strip()}")
-                save_status(last_intraday_scan=str(datetime.now()))
-            except Exception as e:
-                logger.warning(f"  日内扫描异常: {e}")
-
-            logger.info("[日内交易] 执行...")
-            try:
-                r = subprocess.run(
-                    [sys.executable, "intraday_trader.py", "--auto"],
-                    capture_output=True, text=True, timeout=60,
-                    env={**os.environ}
-                )
-                for line in r.stdout.strip().split("\n"):
-                    if line.strip():
-                        logger.info(f"  [日内] {line.strip()}")
-            except Exception as e:
-                logger.warning(f"  日内执行异常: {e}")
-
         now3 = datetime.now().replace(microsecond=0)
         target_rebal = now3.replace(hour=9, minute=35, second=0, microsecond=0)
         if now3 < target_rebal:
@@ -352,6 +322,7 @@ def main():
     threads = [
         ("每日交易循环", run_daily_cycle),
         ("盘中止损监控", run_stop_loss_monitor),
+        ("日内交易轮询", run_intraday_loop),
     ]
     for name, func in threads:
         t = threading.Thread(target=func, daemon=True, name=name)
