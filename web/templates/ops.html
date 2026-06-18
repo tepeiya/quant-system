@@ -4,197 +4,120 @@
 
 <style>
 .task-card {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 10px;
-    padding: 18px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    transition: border-color .2s;
-    margin-bottom: 12px;
+    background:#161b22;border:1px solid #30363d;border-radius:10px;
+    padding:14px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px;
+    align-items:center;transition:border-color .2s;
 }
-.task-card:hover { border-color: #58a6ff; }
-.task-info { flex: 1; }
-.task-info h3 { margin: 0 0 4px; font-size: 15px; color: #e6edf3; }
-.task-info p { margin: 0; font-size: 12px; color: #8b949e; }
-.task-status { font-size: 11px; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
-.status-idle { color: #8b949e; background: #21262d; }
-.status-ok { color: #3fb950; background: rgba(63,185,80,.15); }
-.status-error { color: #f85149; background: rgba(248,81,73,.15); }
-.status-running { color: #d29922; background: rgba(210,153,34,.15); animation: pulse 1.5s infinite; }
+.task-card:hover { border-color:#58a6ff; }
+.task-info { flex:1;min-width:150px; }
+.task-info h3 { margin:0 0 2px;font-size:14px;color:#e6edf3; }
+.task-info p { margin:0;font-size:11px;color:#8b949e;line-height:1.4; }
+.task-status { font-size:10px;padding:3px 8px;border-radius:12px;white-space:nowrap; }
+.status-idle { color:#8b949e;background:#21262d; }
+.status-ok { color:#3fb950;background:rgba(63,185,80,.15); }
+.status-error { color:#f85149;background:rgba(248,81,73,.15); }
+.status-running { color:#d29922;background:rgba(210,153,34,.15);animation:pulse 1.5s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-.btn-task { padding: 8px 20px; font-size: 13px; border-radius: 8px; border: none; cursor: pointer; white-space: nowrap; }
-.btn-run { background: #238636; color: #fff; }
-.btn-run:hover { background: #2ea043; }
-.btn-run:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
-.btn-log { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
-.btn-log:hover { background: #30363d; }
-
-#logPanel {
-    display: none;
-    margin-top: 16px;
-    background: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 10px;
-    padding: 16px;
-}
-#logPanel pre {
-    margin: 0;
-    font-size: 12px;
-    line-height: 1.5;
-    color: #c9d1d9;
-    max-height: 400px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-}
+.btn-group { display:flex;gap:6px;flex-wrap:wrap; }
+.btn-sm { padding:6px 12px;font-size:11px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap; }
+.btn-run { background:#238636;color:#fff; }
+.btn-run:hover { background:#2ea043; }
+.btn-run:disabled { background:#21262d;color:#484f58;cursor:not-allowed; }
+.btn-log { background:#21262d;color:#c9d1d9;border:1px solid #30363d; }
+.btn-log:hover { background:#30363d; }
 </style>
 
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-    <h2 style="margin:0;">🛠️ 运维中心</h2>
-    <div style="display:flex;align-items:center;gap:8px;">
-        <span id="runningBadge" class="task-status status-idle">⏸️ 空闲</span>
-        <span style="font-size:11px;color:#484f58;">每30秒自动刷新</span>
-    </div>
+<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+    <h2 style="margin:0;font-size:18px;">🛠️ 运维中心</h2>
+    <span id="runningBadge" class="task-status status-idle">⏸️ 空闲</span>
+    <span style="font-size:10px;color:#484f58;margin-left:auto;">每30秒刷新</span>
 </div>
 
-<div id="taskList">
-    <!-- 由 JS 动态渲染 -->
-</div>
+<div id="taskList"></div>
 
-<div id="logPanel">
+<div id="logPanel" style="display:none;margin-top:12px;background:#0d1117;border:1px solid #30363d;border-radius:10px;padding:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <strong id="logTitle" style="font-size:13px;color:#e6edf3;">日志</strong>
-        <button class="btn-task btn-log" onclick="closeLog()">✕ 关闭</button>
+        <button class="btn-sm btn-log" onclick="closeLog()">✕ 关闭</button>
     </div>
-    <pre id="logContent">加载中...</pre>
+    <pre id="logContent" style="margin:0;font-size:11px;line-height:1.5;color:#c9d1d9;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"></pre>
 </div>
 
 <script>
 const TASKS = [
-    {id:'daemon_start',   name:'🤖 启动自动交易', desc:'启动全天候自动交易守护进程（数据更新→信号→调仓）'},
-    {id:'daemon_stop',    name:'⏹️ 停止自动交易', desc:'停止守护进程'},
-    {id:'refresh_now',    name:'🔄 实时刷新',     desc:'增量更新全缓存最新数据（只补最近交易日，不重下全部历史）'},
-    {id:'data_warmup',    name:'📥 数据预热',     desc:'下载 S&P 500 全部503只股票的历史数据缓存（首次需10-30分钟）'},
-    {id:'run_backtest',   name:'📊 运行回测',     desc:'执行 Multi-Factor Momentum+ 完整回测并生成图表'},
-    {id:'run_signal',     name:'🏆 生成信号',     desc:'基于最新数据生成今日选股信号和评分排名'},
-    {id:'evolve_factors', name:'🧬 因子进化',     desc:'IC追踪 + 滑动窗口优化，自动调整因子权重'},
-    {id:'run_weekly',     name:'📋 生成周报',     desc:'输出本周绩效总结、持仓分析和收益归因'},
-    {id:'export_report',  name:'📄 导出回测报告', desc:'生成带 SPY 对比的回测报告 JSON'},
-    {id:'intraday_scan',  name:'⚡ 日内扫描',      desc:'扫描日内交易信号并执行'},
-    {id:'intraday_close', name:'🗑️ 日内清仓',      desc:'强制清仓所有日内持仓'},
+    {id:'daemon_start',name:'🤖 启动自动交易',desc:'全天候自动交易（数据→信号→调仓）'},
+    {id:'daemon_stop',name:'⏹️ 停止自动交易',desc:'停止守护进程'},
+    {id:'intraday_scan',name:'⚡ 日内扫描',desc:'扫描日内信号并执行'},
+    {id:'intraday_close',name:'🗑️ 日内清仓',desc:'强制清仓日内持仓'},
+    {id:'refresh_now',name:'🔄 实时刷新',desc:'增量更新缓存'},
+    {id:'run_signal',name:'🏆 生成信号',desc:'生成今日选股信号'},
+    {id:'run_backtest',name:'📊 运行回测',desc:'执行完整回测'},
+    {id:'data_warmup',name:'📥 数据预热',desc:'下载全部股票历史数据'},
+    {id:'evolve_factors',name:'🧬 因子进化',desc:'自动调整因子权重'},
+    {id:'export_report',name:'📄 导出回测报告',desc:'生成SPY对比报告'},
 ];
 
 async function loadStatus() {
     try {
         const d = await apiFetch('/ops/api/status');
-        const running = d.running;
-        const current = d.current || '';
-        const last = d.last || {};
-        const daemon = d.daemon || {};
-
+        const running = d.running, current = d.current || '', last = d.last || {}, daemon = d.daemon || {};
         const badge = document.getElementById('runningBadge');
-        const daemonTxt = daemon.running ? `🤖 守护运行中 (PID:${daemon.pid})` : '⏸️ 空闲';
-        if (daemon.running) {
-            badge.className = 'task-status status-running';
-            badge.textContent = daemonTxt;
-        } else if (running) {
-            badge.className = 'task-status status-running';
-            badge.textContent = '🔄 ' + current;
-        } else {
-            const anyOk = Object.values(last).some(v => v && v.status === 'ok');
+        if (daemon.running) { badge.className = 'task-status status-running'; badge.textContent = '🤖 守护运行中'; }
+        else if (running) { badge.className = 'task-status status-running'; badge.textContent = '🔄 运行中'; }
+        else {
             const anyErr = Object.values(last).some(v => v && v.status === 'error');
+            const anyOk = Object.values(last).some(v => v && v.status === 'ok');
             if (anyErr) { badge.className = 'task-status status-error'; badge.textContent = '⚠️ 有任务失败'; }
             else if (anyOk) { badge.className = 'task-status status-ok'; badge.textContent = '✅ 就绪'; }
-            else { badge.className = 'task-status status-idle'; badge.textContent = daemonTxt; }
+            else { badge.className = 'task-status status-idle'; badge.textContent = '⏸️ 空闲'; }
         }
-
         const list = document.getElementById('taskList');
-        if (!list) return;
         list.innerHTML = TASKS.map(t => {
-            const st = (last && last[t.id]) || {};
-            const isRunning = running && current === t.id;
-
-            // 守护进程状态
-            let statusText = '等待运行';
-            let statusClass = 'status-idle';
-            let btnDisabled = running;
-
+            const st = (last&&last[t.id])||{}, isRunning = running && current === t.id;
+            let stText = '等待运行', stCls = 'status-idle', btnOff = running;
             if (t.id === 'daemon_start') {
-                if (daemon.running) { statusText = '✅ 正在运行'; statusClass = 'status-ok'; btnDisabled = true; }
-                else { statusText = '等待运行'; statusClass = 'status-idle'; }
+                if (daemon.running) { stText = '✅ 运行中'; stCls = 'status-ok'; btnOff = true; }
             } else if (t.id === 'daemon_stop') {
-                if (daemon.running) { statusText = '🟢 正在运行'; statusClass = 'status-ok'; }
-                else { statusText = '等待运行'; statusClass = 'status-idle'; btnDisabled = true; }
+                if (daemon.running) { stText = '🟢 运行中'; stCls = 'status-ok'; }
+                else { stText = '等待运行'; stCls = 'status-idle'; btnOff = true; }
             } else {
-                if (isRunning) { statusText = '🔄 运行中...'; statusClass = 'status-running'; }
-                else if (st.status === 'ok') { statusText = '✅ ' + (st.time || '').slice(5,16); statusClass = 'status-ok'; }
-                else if (st.status === 'error') { statusText = '❌ ' + String(st.error || '').slice(0,30); statusClass = 'status-error'; }
+                if (isRunning) { stText = '🔄 运行中'; stCls = 'status-running'; }
+                else if (st.status === 'ok') { stText = '✅ '+(st.time||'').slice(5,16); stCls = 'status-ok'; }
+                else if (st.status === 'error') { stText = '❌ '+(st.error||'').slice(0,20); stCls = 'status-error'; }
             }
-
             return `<div class="task-card">
                 <div class="task-info">
                     <h3>${t.name}</h3>
                     <p>${t.desc}</p>
                 </div>
-                <span class="task-status ${statusClass}">${statusText}</span>
-                <div style="display:flex;gap:6px;">
-                    <button class="btn-task btn-run" id="run_${t.id}" onclick="runTask('${t.id}')" ${btnDisabled ? 'disabled' : ''}>
-                        ${isRunning ? '⏳' : '▶️'} 运行
-                    </button>
-                    <button class="btn-task btn-log" onclick="showLog('${t.id}')">📋 日志</button>
+                <span class="task-status ${stCls}">${stText}</span>
+                <div class="btn-group">
+                    <button class="btn-sm btn-run" id="run_${t.id}" onclick="runTask('${t.id}')" ${btnOff?'disabled':''}>▶️ 运行</button>
+                    <button class="btn-sm btn-log" onclick="showLog('${t.id}')">📋 日志</button>
                 </div>
             </div>`;
         }).join('');
-    } catch(e) {
-        console.error('loadStatus error:', e);
-    }
+    } catch(e) {}
 }
 
-async function runTask(taskId) {
-    try {
-        const btn = document.getElementById('run_' + taskId);
-        if (btn) { btn.disabled = true; btn.textContent = '⏳ 启动中...'; }
-        const d = await apiFetch('/ops/api/' + taskId, {method:'POST'});
-        showToast(d.message || '任务已启动', d.status === 'ok' ? 'success' : 'error');
-    } catch(e) {
-        showToast('启动失败: ' + e.message, 'error');
-    }
-    // daemon 启停需要等后台完成，其他任务 1 秒后刷新
-    const delay = (taskId === 'daemon_start' || taskId === 'daemon_stop') ? 5000 : 1000;
-    setTimeout(loadStatus, delay);
+async function runTask(id) {
+    const btn = document.getElementById('run_'+id); if(btn){btn.disabled=true;btn.textContent='⏳';}
+    try { const d = await apiFetch('/ops/api/'+id,{method:'POST'}); showToast(d.message||'已启动',d.status==='ok'?'success':'error'); }
+    catch(e) { showToast('失败: '+e.message,'error'); }
+    setTimeout(loadStatus, id.startsWith('daemon')?5000:1000);
 }
 
-async function showLog(taskId) {
-    const nameMap = {daemon_start:'daemon', daemon_stop:'daemon', refresh_now:'refresh', data_warmup:'backtest', run_backtest:'backtest', run_signal:'signal',
-                     evolve_factors:'evolve', run_weekly:'weekly', export_report:'export'};
-    const logKey = nameMap[taskId] || taskId;
-    const panel = document.getElementById('logPanel');
-    const title = document.getElementById('logTitle');
-    const content = document.getElementById('logContent');
-
-    if (!panel || !title || !content) return;
-
-    panel.style.display = 'block';
-    const task = TASKS.find(t=>t.id===taskId);
-    title.textContent = (task ? task.name : taskId) + ' — 日志';
-    content.textContent = '加载中...';
-
-    try {
-        const d = await apiFetch('/ops/api/log/' + logKey);
-        content.textContent = (d.data && d.data.log) || '(暂无日志)';
-    } catch(e) {
-        content.textContent = '获取日志失败: ' + e.message;
-    }
+async function showLog(id) {
+    const map={daemon_start:'daemon',daemon_stop:'daemon',refresh_now:'refresh',data_warmup:'backtest',run_backtest:'backtest',run_signal:'signal',evolve_factors:'evolve',export_report:'export'};
+    const key=map[id]||id, task=TASKS.find(t=>t.id===id);
+    document.getElementById('logPanel').style.display='block';
+    document.getElementById('logTitle').textContent=(task?task.name:id)+' — 日志';
+    document.getElementById('logContent').textContent='加载中...';
+    try { const d=await apiFetch('/ops/api/log/'+key); document.getElementById('logContent').textContent=(d.data&&d.data.log)||'(暂无日志)'; }
+    catch(e) { document.getElementById('logContent').textContent='获取失败: '+e.message; }
 }
-
-function closeLog() {
-    document.getElementById('logPanel').style.display = 'none';
-}
-
+function closeLog(){document.getElementById('logPanel').style.display='none';}
 loadStatus();
-setInterval(loadStatus, 30000);
+setInterval(loadStatus,30000);
 </script>
 {% endblock %}
