@@ -113,31 +113,37 @@ def clean_pid():
 # ====== 每日交易循环 ======
 
 def run_daily_cycle():
-    logger.info("[主循环] 启动，每天9:00-9:35执行交易流程")
+    logger.info("[主循环] 启动，每天美东时间9:00-9:35执行交易流程（夏令时=北京时间22:30-23:05）")
+    # 夏令时 美东=北京时间-12
+    DATA_HOUR = 22   # 北京时间22:00 = 美东10:00（数据更新）
+    SIGNAL_HOUR = 22  # 北京时间22:30 = 美东10:30（信号生成）
+    SIGNAL_MIN = 30
+    REBAL_HOUR = 22   # 北京时间23:05 = 美东11:05（调仓）
+    REBAL_MIN = 35
 
     while not shutdown_event.is_set():
         now = datetime.now()
 
         if now.weekday() >= 5:
             next_monday = now + timedelta(days=(7 - now.weekday()))
-            next_run = next_monday.replace(hour=9, minute=0, second=0, microsecond=0)
+            next_run = next_monday.replace(hour=DATA_HOUR, minute=0, second=0, microsecond=0)
             wait = (next_run - now).total_seconds()
             logger.info(f"[主循环] 周末跳过，下次运行: {next_run}")
             shutdown_event.wait(min(wait, 3600))
             continue
 
-        next_9am = now.replace(hour=9, minute=0, second=0, microsecond=0)
-        if now >= next_9am:
-            next_9am += timedelta(days=1)
+        next_start = now.replace(hour=DATA_HOUR, minute=0, second=0, microsecond=0)
+        if now >= next_start:
+            next_start += timedelta(days=1)
 
-        wait_seconds = (next_9am - now).total_seconds()
+        wait_seconds = (next_start - now).total_seconds()
         if wait_seconds > 0 and wait_seconds < 86400:
-            logger.info(f"[主循环] 下次交易流程: {next_9am} (等待{wait_seconds/60:.0f}分钟)")
+            logger.info(f"[主循环] 下次交易流程: {next_start} (等待{wait_seconds/60:.0f}分钟)")
             if shutdown_event.wait(wait_seconds):
                 break
 
         logger.info("=" * 55)
-        logger.info("  🔥 开始日交易流程")
+        logger.info("  🔥 开始日交易流程（美东时间）")
         logger.info("=" * 55)
 
         today_str = now.strftime("%Y-%m-%d")
@@ -161,7 +167,7 @@ def run_daily_cycle():
             logger.error(f"  数据更新异常: {e}")
 
         now2 = datetime.now().replace(microsecond=0)
-        target_signal = now2.replace(hour=9, minute=30, second=0, microsecond=0)
+        target_signal = now2.replace(hour=SIGNAL_HOUR, minute=SIGNAL_MIN, second=0, microsecond=0)
         if now2 < target_signal:
             wait_sig = (target_signal - now2).total_seconds()
             logger.info(f"  等待信号时间: {wait_sig/60:.0f}分钟")
@@ -276,6 +282,80 @@ if pf:
             logger.error(f"  收盘记录失败: {e}")
 
         logger.info(f"✅ 今日交易流程完成，等待明天")
+
+
+# ====== 日内交易轮询（美股盘中每30分钟） ======
+
+def run_intraday_loop():
+    """每30分钟扫描并执行日内交易
+    美股夏令时 美东9:30-16:00 = 北京时间21:30-05:00
+    """
+    interval = 30 * 60
+    logger.info("[日内] 轮询线程启动，美东9:30-16:00 (北京21:30-05:00) 每30分钟执行")
+
+    while not shutdown_event.is_set():
+        now = datetime.now()
+        if now.weekday() >= 5:
+            shutdown_event.wait(3600)
+            continue
+
+        hour = now.hour
+        minute = now.minute
+
+        # 非美股交易时间跳过（夏令时：北京21:30-05:00）
+        if hour >= 5 and hour < 21:
+            shutdown_event.wait(1800)
+            continue
+        if hour == 21 and minute < 30:
+            shutdown_event.wait(1800)
+            continue
+        if hour >= 4 and minute >= 45:
+            shutdown_event.wait(3600)
+            continue
+
+        logger.info("[日内] 扫描信号...")
+        try:
+            r = subprocess.run(
+                [sys.executable, "intraday.py", "--scan"],
+                capture_output=True, text=True, timeout=60,
+                env={**os.environ}
+            )
+            for line in r.stdout.strip().split("\n"):
+                if line.strip() and "{" not in line and "}" not in line:
+                    logger.info(f"  [日内] {line.strip()}")
+            save_status(last_intraday_scan=str(datetime.now()))
+        except Exception as e:
+            logger.warning(f"  [日内] 扫描异常: {e}")
+
+        logger.info("[日内] 执行...")
+        try:
+            r = subprocess.run(
+                [sys.executable, "intraday_trader.py", "--auto"],
+                capture_output=True, text=True, timeout=60,
+                env={**os.environ}
+            )
+            for line in r.stdout.strip().split("\n"):
+                if line.strip():
+                    logger.info(f"  [日内] {line.strip()}")
+        except Exception as e:
+            logger.warning(f"  [日内] 执行异常: {e}")
+
+        # 收盘前强制清仓（美东15:45 = 北京04:45）
+        if hour >= 4 and minute >= 45:
+            logger.info("[日内] 收盘前，强制清仓...")
+            try:
+                r = subprocess.run(
+                    [sys.executable, "intraday_trader.py", "--close-all"],
+                    capture_output=True, text=True, timeout=30,
+                    env={**os.environ}
+                )
+                for line in r.stdout.strip().split("\n"):
+                    if line.strip():
+                        logger.info(f"  [日内] {line.strip()}")
+            except Exception as e:
+                logger.warning(f"  [日内] 清仓异常: {e}")
+
+        shutdown_event.wait(interval)
 
 
 # ====== 盘中止损监控 ======
