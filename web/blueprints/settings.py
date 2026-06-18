@@ -303,8 +303,19 @@ def api_save_intraday_config():
 
 @bp.route("/api/env_vars")
 def api_env_vars():
-    """获取所有可配置的环境变量"""
+    """获取所有可配置的环境变量（直接从 .env 文件读取）"""
     import os
+    # 从 .env 文件读取
+    env_values = {}
+    env_file = ".env"
+    if os.path.exists(env_file):
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    env_values[k.strip()] = v.strip()
+
     keys = [
         {"key": "PUSHPLUS_TOKEN", "label": "PushPlus Token", "type": "secret", "desc": "微信推送"},
         {"key": "TIINGO_API_KEY", "label": "Tiingo API Key", "type": "secret", "desc": "数据源（备用）"},
@@ -314,6 +325,6 @@ def api_env_vars():
         {"key": "INTRADAY_CAP_RATIO", "label": "日内资金比例", "type": "number", "desc": "0-1, 默认0.2"},
     ]
     for k in keys:
-        val = os.environ.get(k["key"], "")
+        val = env_values.get(k["key"], "")
         k["set"] = bool(val)
     return jsonify(keys)
