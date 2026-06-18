@@ -83,6 +83,8 @@ const TASKS = [
     {id:'evolve_factors', name:'🧬 因子进化',     desc:'IC追踪 + 滑动窗口优化，自动调整因子权重'},
     {id:'run_weekly',     name:'📋 生成周报',     desc:'输出本周绩效总结、持仓分析和收益归因'},
     {id:'export_report',  name:'📄 导出回测报告', desc:'生成带 SPY 对比的回测报告 JSON'},
+    {id:'intraday_scan',  name:'⚡ 日内扫描',      desc:'扫描日内交易信号并执行'},
+    {id:'intraday_close', name:'🗑️ 日内清仓',      desc:'强制清仓所有日内持仓'},
 ];
 
 async function loadStatus() {

@@ -211,6 +211,26 @@ def api_export_report():
     return ok(message="报告导出已开始")
 
 
+@bp.route("/api/intraday_scan", methods=["POST"])
+def api_intraday_scan():
+    def task():
+        subprocess.run([sys.executable, "intraday.py", "--scan"],
+            capture_output=True, timeout=60, env={**os.environ})
+        subprocess.run([sys.executable, "intraday_trader.py", "--auto"],
+            capture_output=True, timeout=60, env={**os.environ})
+    _run_bg(task, "intraday_scan")
+    return ok(message="日内扫描已开始")
+
+
+@bp.route("/api/intraday_close", methods=["POST"])
+def api_intraday_close():
+    def task():
+        subprocess.run([sys.executable, "intraday_trader.py", "--close-all"],
+            capture_output=True, timeout=30, env={**os.environ})
+    _run_bg(task, "intraday_close")
+    return ok(message="日内清仓指令已发送")
+
+
 @bp.route("/api/log/<task_name>")
 def api_log(task_name):
     paths = {
