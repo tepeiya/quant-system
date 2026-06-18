@@ -66,7 +66,7 @@ def api_save_env():
         f.writelines(lines)
 
     os.environ[key] = value
-    return jsonify({"status": "ok", "message": f"{key} 已保存，重启后生效"})
+    return jsonify({"status": "ok", "message": f"{key} 已保存（即时生效）"})
 
 
 @bp.route("/api/broker_keys")
