@@ -132,20 +132,40 @@ def _get_intraday_info() -> dict:
         "positions": 0,
         "pnl": 0,
         "today_trades": 0,
+        "mode": "shared",
     }
     try:
         from alpaca.trading.client import TradingClient
         from broker_manager import BrokerManager, load_config
 
-        # 读日内策略绑定的券商
         bm = BrokerManager()
-        broker_id = bm.get_strategy_broker_id("intraday")
-        cfg = load_config().get(broker_id, {})
-        key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
-        secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
-        client = TradingClient(key, secret, paper=cfg.get("paper", True))
-        acct = client.get_account()
-        equity = float(acct.equity)
+        ratio = float(os.environ.get("INTRADAY_CAP_RATIO", "0.20"))
+
+        # 检查是否有启用的日内专用券商
+        intraday_broker_id = bm.get_strategy_broker_id("intraday")
+        cfg = load_config().get(intraday_broker_id, {})
+        dedicated_enabled = cfg.get("enabled", False) and bool(os.environ.get(cfg.get("env_key_id", ""), ""))
+
+        if dedicated_enabled:
+            # 专用账户模式
+            mode = "dedicated"
+            key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+            secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+            client = TradingClient(key, secret, paper=cfg.get("paper", True))
+            acct = client.get_account()
+            equity = float(acct.equity)
+            allocated = equity
+        else:
+            # 共享模式：从主账户按比例分配
+            mode = "shared"
+            main_broker_id = bm.get_strategy_broker_id("conservative")
+            cfg = load_config().get(main_broker_id, {})
+            key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+            secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+            client = TradingClient(key, secret, paper=cfg.get("paper", True))
+            acct = client.get_account()
+            equity = float(acct.equity)
+            allocated = equity * ratio
         client = TradingClient(key, secret, paper=cfg.get("paper", True))
         acct = client.get_account()
         equity = float(acct.equity)
