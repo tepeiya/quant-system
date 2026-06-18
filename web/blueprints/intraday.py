@@ -98,18 +98,24 @@ def api_backtest():
 @bp.route("/api/scan", methods=["POST"])
 def api_scan():
     """扫描日内信号"""
-    import sys, importlib
-    # 强制从根目录导入策略模块，不是当前blueprint
-    spec = importlib.util.spec_from_file_location("intraday_module", "intraday.py")
-    intraday_mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(intraday_mod)
+    import subprocess, sys, json
     try:
-        signal = intraday_mod.generate_signal()
-        backtest = intraday_mod.run_backtest(days=365) if hasattr(intraday_mod, 'run_backtest') else {}
-        os.makedirs("signals", exist_ok=True)
-        with open("signals/intraday_backtest.json", "w") as f:
-            json.dump(backtest, f, indent=2)
-        return jsonify(signal)
+        # 用 subprocess 调用策略模块，避免导入冲突
+        r = subprocess.run(
+            [sys.executable, "-c", 
+             "import sys, json; sys.path.insert(0, '.'); "
+             "from intraday import generate_signal, run_backtest; "
+             "sig = generate_signal(); "
+             "bt = run_backtest(days=365); "
+             "import os; os.makedirs('signals', exist_ok=True); "
+             "json.dump(sig, open('signals/intraday_signal.json','w')); "
+             "json.dump(bt, open('signals/intraday_backtest.json','w')); "
+             "print(json.dumps(sig))"],
+            capture_output=True, text=True, timeout=60)
+        if r.returncode == 0:
+            return jsonify(json.loads(r.stdout))
+        else:
+            return err(r.stderr[:200])
     except Exception as e:
         return err(str(e))
 
