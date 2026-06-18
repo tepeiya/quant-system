@@ -131,3 +131,26 @@ def api_close_all():
         return ok(message="日内持仓已清仓")
     except Exception as e:
         return err(str(e))
+
+
+@bp.route("/api/positions")
+def api_positions():
+    """获取日内持仓"""
+    try:
+        from intraday_trader import get_alpaca
+        client = get_alpaca()
+        positions = []
+        for p in client.get_all_positions():
+            qty = int(float(p.qty))
+            if qty > 0:
+                positions.append({
+                    "symbol": p.symbol,
+                    "qty": qty,
+                    "current_price": round(float(p.current_price), 2),
+                    "avg_entry": round(float(p.avg_entry_price), 2),
+                    "pnl_pct": round(float(p.unrealized_plpc) * 100, 2),
+                    "market_value": round(float(p.market_value), 2),
+                })
+        return jsonify({"positions": positions})
+    except Exception as e:
+        return jsonify({"positions": [], "error": str(e)})
