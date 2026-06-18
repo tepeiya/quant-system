@@ -21,13 +21,12 @@ SIGNAL_FILE = "signals/signal_momentum.json"
 # 激进策略占用总资金的比例（剩余留给保守策略）
 MOMENTUM_CAP_RATIO = float(os.environ.get("MOMENTUM_CAP_RATIO", "0.5"))
 
-TRADE_LOG = "signals/trade_log_momentum.json"
 
-
-def get_alpaca():
-    from broker_manager import get_default_broker_id, load_config
-    default_id = get_default_broker_id()
-    cfg = load_config().get(default_id, {})
+def get_alpaca(strategy: str = "momentum"):
+    from broker_manager import BrokerManager, load_config
+    bm = BrokerManager()
+    broker_id = bm.get_strategy_broker_id(strategy)
+    cfg = load_config().get(broker_id, {})
     from alpaca.trading.client import TradingClient
     key_name = cfg.get("env_key_id", "ALPACA_API_KEY_ID")
     sec_name = cfg.get("env_secret", "ALPACA_SECRET_KEY")

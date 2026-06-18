@@ -36,6 +36,18 @@ DEFAULT_CONFIG = {
         "env_secret": "ALPACA_SECRET_KEY",
         "base_url": "https://paper-api.alpaca.markets",
         "data_url": "https://data.alpaca.markets",
+        "strategies": ["conservative", "momentum", "intraday"],  # 关联的策略
+    },
+    "alpaca_paper_intraday": {
+        "name": "Alpaca 日内专用",
+        "enabled": False,
+        "type": "alpaca",
+        "paper": True,
+        "env_key_id": "ALPACA_INTRADAY_KEY_ID",
+        "env_secret": "ALPACA_INTRADAY_SECRET",
+        "base_url": "https://paper-api.alpaca.markets",
+        "data_url": "https://data.alpaca.markets",
+        "strategies": ["intraday"],
     },
     "ibkr": {
         "name": "盈透证券 (实盘)",
@@ -113,6 +125,7 @@ def list_brokers() -> list[dict]:
             "paper": bc.get("paper", False),
             "enabled": bc.get("enabled", False),
             "ready": bc.get("enabled", False) and key_set and secret_set,
+            "strategies": bc.get("strategies", []),
         })
     return brokers
 
@@ -597,6 +610,27 @@ class BrokerManager:
                 self.use(available[0]["id"])
         return self._current
     
+    def get_for_strategy(self, strategy: str) -> "BrokerInterface":
+        """获取指定策略绑定的券商"""
+        for bid, bc in self.config.items():
+            if not bc.get("enabled"):
+                continue
+            strategies = bc.get("strategies", [])
+            if strategy in strategies:
+                return self.use(bid)
+        # 回退到默认
+        return self.get_current()
+
+    def get_strategy_broker_id(self, strategy: str) -> str:
+        """获取指定策略绑定的券商ID"""
+        for bid, bc in self.config.items():
+            if not bc.get("enabled"):
+                continue
+            strategies = bc.get("strategies", [])
+            if strategy in strategies:
+                return bid
+        return get_default_broker_id()
+
     def enable(self, broker_id: str, enabled: bool = True):
         """启用/禁用券商"""
         if broker_id in self.config:

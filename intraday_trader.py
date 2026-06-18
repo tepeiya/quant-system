@@ -18,10 +18,11 @@ TRADE_LOG = "signals/intraday_trades.json"
 CAPITAL_RATIO = float(os.environ.get("INTRADAY_CAP_RATIO", "0.20"))
 
 
-def get_alpaca():
-    from broker_manager import get_default_broker_id, load_config
-    default_id = get_default_broker_id()
-    cfg = load_config().get(default_id, {})
+def get_alpaca(strategy: str = "intraday"):
+    from broker_manager import BrokerManager, load_config
+    bm = BrokerManager()
+    broker_id = bm.get_strategy_broker_id(strategy)
+    cfg = load_config().get(broker_id, {})
     from alpaca.trading.client import TradingClient
     key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
     secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
