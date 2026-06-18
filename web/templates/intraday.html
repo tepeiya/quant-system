@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}日内交易 - 量化系统{% endblock %}
+{% block content %}
+
+<div class="panel">
+    <div class="flex mb-12" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <h2 style="margin:0;">⚡ 日内交易</h2>
+        <div style="display:flex;gap:6px;">
+            <button class="btn" onclick="refreshData()" style="font-size:12px;padding:6px 12px;">🔄 刷新</button>
+            <button class="btn primary" onclick="executeScan()" style="font-size:12px;padding:6px 12px;">📡 扫描信号</button>
+            <button class="btn danger" onclick="closeAllIntraday()" style="font-size:12px;padding:6px 12px;">🗑️ 清仓</button>
+        </div>
+    </div>
+
+    <!-- 资金分配 -->
+    <div style="margin-bottom:12px;">
+        <h3 style="font-size:13px;color:#8b949e;margin:0 0 6px;">💰 资金分配</h3>
+        <div class="card-grid" id="allocSummary" style="grid-template-columns:repeat(4,1fr);"></div>
+    </div>
+
+    <!-- 今日信号 -->
+    <h3 style="font-size:13px;color:#8b949e;margin:0 0 8px;">📡 今日信号</h3>
+    <div id="signalList" style="display:flex;flex-direction:column;gap:6px;"></div>
+
+    <!-- 当前持仓 -->
+    <h3 style="font-size:13px;color:#8b949e;margin:16px 0 8px;">📋 日内持仓</h3>
+    <div id="intradayPositions" style="display:flex;flex-direction:column;gap:6px;"></div>
+
+    <!-- 回测结果 -->
+    <h3 style="font-size:13px;color:#8b949e;margin:16px 0 8px;">📊 回测表现</h3>
+    <div id="backtestResult" style="display:flex;flex-direction:column;gap:6px;"></div>
+</div>
+
+<script>
+async function refreshData() {
+    // 资金分配
+    const al = document.getElementById('allocSummary');
+    try {
+        const a = await apiFetch('/intraday/api/allocation');
+        al.innerHTML = `
+            <div class="card"><div class="label">总权益</div><div class="value">$${(a.equity||0).toFixed(0)}</div></div>
+            <div class="card"><div class="label">日内分配</div><div class="value">$${(a.allocated||0).toFixed(0)}</div></div>
+            <div class="card"><div class="label">已用</div><div class="value">$${(a.used||0).toFixed(0)}</div></div>
+            <div class="card"><div class="label">可用</div><div class="value">$${(a.available||0).toFixed(0)}</div></div>`;
+    } catch(e) { al.innerHTML = '<div style="color:#8b949e;">获取失败</div>'; }
+
+    // 信号
+    try {
+        const s = await apiFetch('/intraday/api/signals');
+        const list = document.getElementById('signalList');
+        const cands = s.candidates || [];
+        if (cands.length === 0) {
+            list.innerHTML = '<div style="text-align:center;padding:20px;color:#8b949e;">暂无信号</div>';
+        } else {
+            list.innerHTML = cands.map((c, i) => {
+                const cls = c.today_chg > 0 ? '#3fb950' : '#f85149';
+                return `<div class="signal-row">
+                    <span class="rank">#${i + 1}</span>
+                    <span class="name">${c.ticker}</span>
+                    <span class="score" style="color:${c.score > 0 ? '#3fb950' : '#f85149'};">${c.score > 0 ? '+' : ''}${c.score.toFixed(1)}</span>
+                    <span class="price">$${(c.price||0).toFixed(0)}</span>
+                    <span class="change" style="color:${cls};">${c.today_chg > 0 ? '+' : ''}${(c.today_chg||0).toFixed(2)}%</span>
+                </div>`;
+            }).join('');
+        }
+    } catch(e) {}
+
+    // 回测
+    try {
+        const b = await apiFetch('/intraday/api/backtest');
+        const bt = document.getElementById('backtestResult');
+        bt.innerHTML = `<div class="card-grid" style="grid-template-columns:repeat(4,1fr);">
+            <div class="card"><div class="label">总收益</div><div class="value" style="color:${b.total_return_pct > 0 ? '#3fb950' : '#f85149'};">${(b.total_return_pct||0).toFixed(1)}%</div></div>
+            <div class="card"><div class="label">交易次数</div><div class="value">${b.total_trades||0}</div></div>
+            <div class="card"><div class="label">胜率</div><div class="value" style="color:${(b.win_rate_pct||0) > 50 ? '#3fb950' : '#d29922'};">${(b.win_rate_pct||0).toFixed(0)}%</div></div>
+            <div class="card"><div class="label">最大回撤</div><div class="value" style="color:#f85149;">${(b.max_drawdown_pct||0).toFixed(1)}%</div></div>
+        </div>`;
+    } catch(e) {}
+
+    // 日内持仓
+    try {
+        const p = await apiFetch('/intraday/api/positions');
+        const pl = document.getElementById('intradayPositions');
+        const pos = p.positions || [];
+        if (pos.length === 0) {
+            pl.innerHTML = '<div style="text-align:center;padding:20px;color:#8b949e;">🈳 无日内持仓</div>';
+        } else {
+            pl.innerHTML = pos.map(p => {
+                const cls = p.pnl_pct > 0 ? '#3fb950' : '#f85149';
+                return `<div class="signal-row">
+                    <span class="name">${p.symbol}</span>
+                    <span style="font-size:12px;color:#8b949e;">x${p.qty}</span>
+                    <span class="price">$${(p.current_price||0).toFixed(2)}</span>
+                    <span class="change" style="color:${cls};">${(p.pnl_pct||0).toFixed(2)}%</span>
+                </div>`;
+            }).join('');
+        }
+    } catch(e) {}
+}
+
+async function executeScan() {
+    try {
+        const d = await apiFetch('/intraday/api/scan', {method:'POST'});
+        showToast('扫描完成: ' + (d.candidates||[]).length + '只信号', 'success');
+        refreshData();
+    } catch(e) {
+        showToast('扫描失败: ' + e.message, 'error');
+    }
+}
+
+async function closeAllIntraday() {
+    if (!confirm('确认清仓所有日内持仓？')) return;
+    try {
+        const d = await apiFetch('/intraday/api/close_all', {method:'POST'});
+        showToast(d.message, 'success');
+        refreshData();
+    } catch(e) {
+        showToast('清仓失败: ' + e.message, 'error');
+    }
+}
+
+refreshData();
+setInterval(refreshData, 60000);
+</script>
+{% endblock %}
