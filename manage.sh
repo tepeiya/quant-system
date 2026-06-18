@@ -50,6 +50,41 @@ case "$1" in
     echo "🧠 手动执行因子进化..."
     python3 factor_learner.py --apply
     ;;
+  sync)
+    echo "🔄 一键同步代码到 VPS..."
+    VPS_IP="${VPS_IP:-103.236.94.93}"
+    VPS_PORT="${VPS_PORT:-22}"
+    VPS_USER="${VPS_USER:-root}"
+    VPS_PASS="${VPS_PASS:-}"
+
+    if [ -z "$VPS_PASS" ]; then
+      echo "⚠️  请设置 VPS_PASS 环境变量"
+      echo "   export VPS_PASS='your_password'"
+      exit 1
+    fi
+
+    echo "  1. 推送代码到 GitHub..."
+    git push origin main 2>/dev/null || echo "  ⚠️ GitHub 推送失败，继续..."
+    
+    echo "  2. 复制文件到 VPS..."
+    sshpass -p "$VPS_PASS" scp -P "$VPS_PORT" -o StrictHostKeyChecking=no \
+      strategy_vector.py strategy_momentum.py intraday.py intraday_trader.py \
+      daemon.py daily_signal.py push_notify.py \
+      web_app.py web/blueprints/*.py web/templates/*.html \
+      "${VPS_USER}@${VPS_IP}:/root/m-plus/" 2>/dev/null || true
+
+    echo "  3. 复制到容器并重启..."
+    sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -p "$VPS_PORT" \
+      "${VPS_USER}@${VPS_IP}" "
+        for f in strategy_vector.py strategy_momentum.py daemon.py intramomentum.py push_notify.py; do
+          docker cp /root/m-plus/\$f m-plus-m-plus-1:/app/\$f 2>/dev/null
+        done
+        docker cp /root/m-plus/web/blueprints/ m-plus-m-plus-1:/app/web/ 2>/dev/null
+        docker cp /root/m-plus/web/templates/ m-plus-m-plus-1:/app/web/ 2>/dev/null
+        docker restart m-plus-m-plus-1
+      "
+    echo "✅ 同步完成"
+    ;;
   *)
     echo "用法: sh manage.sh {start|stop|restart|status|logs|signal|rebalance|evolve}"
     exit 1

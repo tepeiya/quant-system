@@ -278,6 +278,30 @@ if pf:
                     last_pnl_record=str(datetime.now()),
                 )
                 logger.info(f"  权益: ${daily.get('equity',0):.2f}, 现金: ${daily.get('cash',0):.2f}, 持仓: {daily.get('positions',0)}只")
+
+            # 收盘后发送微信通知
+            try:
+                from push_notify import send_daily_summary
+                send_daily_summary(
+                    equity=daily.get("equity", 0),
+                    pnl=daily.get("pnl", 0),
+                    positions=daily.get("position_count", 0),
+                    signal_count=0,
+                )
+            except:
+                pass
+
+            # 收盘后检查缓存是否需要刷新
+            try:
+                from cache_manager import check_cache_health
+                health = check_cache_health()
+                if health["needs_refresh"]:
+                    logger.info(f"缓存过期({health['age_days']}天), 计划刷新")
+                    import threading
+                    threading.Thread(target=_refresh_cache_bg, daemon=True).start()
+            except:
+                pass
+
         except Exception as e:
             logger.error(f"  收盘记录失败: {e}")
 
@@ -361,8 +385,10 @@ def run_intraday_loop():
 # ====== 盘中止损监控 ======
 
 def run_stop_loss_monitor():
+    """每5分钟检查止损 + 云端止损单"""
     interval = 300
-    logger.info("[止损] 盘中监控启动")
+    logger.info("[止损] 盘中监控启动（含云端止损单）")
+    cloud_orders_set = False
     while not shutdown_event.is_set():
         try:
             from stop_loss_monitor import check_and_stop
@@ -370,9 +396,55 @@ def run_stop_loss_monitor():
             if result:
                 logger.warning(f"[止损] 触发{len(result)}笔: {result}")
                 save_status(last_stop_loss=str(datetime.now()), stop_triggered=len(result))
+
+            # 云端止损单（每天仅开盘设置一次）
+            if not cloud_orders_set:
+                try:
+                    from alpaca.trading.client import TradingClient
+                    from alpaca.trading.requests import StopLossOrderRequest
+                    from alpaca.trading.enums import OrderSide, TimeInForce
+                    from broker_manager import get_default_broker_id, load_config
+
+                    default_id = get_default_broker_id()
+                    cfg = load_config().get(default_id, {})
+                    key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+                    secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+                    client = TradingClient(key, secret, paper=cfg.get("paper", True))
+
+                    positions = client.get_all_positions()
+                    existing_orders = {o.symbol for o in client.get_orders(status='OPEN')}
+
+                    count = 0
+                    for p in positions:
+                        sym = p.symbol
+                        qty = int(float(p.qty))
+                        if qty <= 0 or sym in existing_orders:
+                            continue
+                        entry = float(p.avg_entry_price)
+                        stop_price = round(entry * 0.88, 2)
+                        if stop_price > 0:
+                            client.submit_order(StopLossOrderRequest(
+                                symbol=sym, qty=qty, side=OrderSide.SELL,
+                                stop_price=stop_price, time_in_force=TimeInForce.DAY))
+                            count += 1
+                    if count > 0:
+                        logger.info(f"[止损] 已设置{count}个云端止损单")
+                    cloud_orders_set = True
+                except Exception as e:
+                    logger.debug(f"[止损] 云端止损单跳过: {e}")
+
         except Exception as e:
             logger.debug(f"[止损] 检查跳过: {e}")
         shutdown_event.wait(interval)
+
+
+def _refresh_cache_bg():
+    """后台刷新缓存"""
+    try:
+        from cache_manager import refresh_if_needed
+        refresh_if_needed()
+    except:
+        pass
 
 
 # ====== 信号处理 ======
