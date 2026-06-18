@@ -98,11 +98,14 @@ def api_backtest():
 @bp.route("/api/scan", methods=["POST"])
 def api_scan():
     """扫描日内信号"""
-    from intraday import generate_signal, run_backtest
+    import sys, importlib
+    # 强制从根目录导入策略模块，不是当前blueprint
+    spec = importlib.util.spec_from_file_location("intraday_module", "intraday.py")
+    intraday_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(intraday_mod)
     try:
-        signal = generate_signal()
-        # 同时跑回测
-        backtest = run_backtest(days=365)
+        signal = intraday_mod.generate_signal()
+        backtest = intraday_mod.run_backtest(days=365) if hasattr(intraday_mod, 'run_backtest') else {}
         os.makedirs("signals", exist_ok=True)
         with open("signals/intraday_backtest.json", "w") as f:
             json.dump(backtest, f, indent=2)
