@@ -21,8 +21,9 @@ def api_allocation():
     try:
         from alpaca.trading.client import TradingClient
         from broker_manager import BrokerManager, load_config
+        # 日内也读主账户的资金
         bm = BrokerManager()
-        broker_id = bm.get_strategy_broker_id("intraday")
+        broker_id = bm.get_strategy_broker_id("conservative")
         cfg = load_config().get(broker_id, {})
         key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
         secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")

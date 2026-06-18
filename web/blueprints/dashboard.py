@@ -139,10 +139,13 @@ def _get_intraday_info() -> dict:
 
         # 读日内策略绑定的券商
         bm = BrokerManager()
-        intraday_broker_id = bm.get_strategy_broker_id("intraday")
-        cfg = load_config().get(intraday_broker_id, {})
+        broker_id = bm.get_strategy_broker_id("intraday")
+        cfg = load_config().get(broker_id, {})
         key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
         secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+        client = TradingClient(key, secret, paper=cfg.get("paper", True))
+        acct = client.get_account()
+        equity = float(acct.equity)
         client = TradingClient(key, secret, paper=cfg.get("paper", True))
         acct = client.get_account()
         equity = float(acct.equity)
