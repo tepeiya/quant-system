@@ -55,7 +55,7 @@ def api_allocation():
     ratio = float(os.environ.get("INTRADAY_CAP_RATIO", "0.20"))
     allocated = equity * ratio
     used = 0
-    positions = []
+    pos_list = []
     try:
         from alpaca.trading.client import TradingClient
         client = TradingClient(
@@ -63,7 +63,8 @@ def api_allocation():
             os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), ""),
             paper=True)
         for p in client.get_all_positions():
-            positions.append(p.symbol)
+            pos_list.append(p.symbol)
+            used += float(p.market_value)
     except:
         pass
 
@@ -72,6 +73,9 @@ def api_allocation():
         "cash": round(cash, 2),
         "allocated": round(allocated, 2),
         "ratio": ratio,
+        "used": round(used, 2),
+        "available": round(max(allocated - used, 0), 2),
+        "positions": len(pos_list),
     })
 
 
