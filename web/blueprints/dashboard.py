@@ -135,9 +135,12 @@ def _get_intraday_info() -> dict:
     }
     try:
         from alpaca.trading.client import TradingClient
-        from broker_manager import get_default_broker_id, load_config
-        default_id = get_default_broker_id()
-        cfg = load_config().get(default_id, {})
+        from broker_manager import BrokerManager, load_config
+
+        # 读日内策略绑定的券商
+        bm = BrokerManager()
+        intraday_broker_id = bm.get_strategy_broker_id("intraday")
+        cfg = load_config().get(intraday_broker_id, {})
         key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
         secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
         client = TradingClient(key, secret, paper=cfg.get("paper", True))
