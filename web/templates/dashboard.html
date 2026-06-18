@@ -48,6 +48,20 @@ async function loadDashboard() {
     setMacro('macroGold', mc.gold?.score);
     setMacro('macroInflation', mc.inflation?.score);
 
+    // 日内账户详情
+    const id = d.intraday || {};
+    if (id.allocated > 0) {
+        let html = '<div class="panel mt-12"><h2>⚡ 日内交易</h2>';
+        html += '<div class="card-grid" style="grid-template-columns:repeat(4,1fr);">';
+        html += '<div class="card"><div class="label">分配</div><div class="value">$' + (id.allocated||0).toFixed(0) + '</div></div>';
+        html += '<div class="card"><div class="label">已用</div><div class="value">$' + (id.used||0).toFixed(0) + '</div></div>';
+        html += '<div class="card"><div class="label">可用</div><div class="value">$' + (id.available||0).toFixed(0) + '</div></div>';
+        html += '<div class="card"><div class="label">PnL</div><div class="value" style="color:' + (id.pnl >= 0 ? '#3fb950' : '#f85149') + ';">$' + (id.pnl||0).toFixed(0) + '</div></div>';
+        html += '</div></div>';
+        const macroPanel = document.querySelector('.panel.mb-12');
+        if (macroPanel) macroPanel.insertAdjacentHTML('afterend', html);
+    }
+
     // 资金曲线
     const hist = await apiFetch('/dashboard/api/equity_history');
     if (hist.length > 0 && window.Chart) {

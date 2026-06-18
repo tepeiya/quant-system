@@ -118,8 +118,59 @@ def api_data():
     payload = _fix({
         "portfolio": portfolio,
         "macro": macro,
+        "intraday": _get_intraday_info(),
     })
     return jsonify(payload)
+
+
+def _get_intraday_info() -> dict:
+    """获取日内交易账户详情"""
+    result = {
+        "allocated": 0,
+        "ratio": 0,
+        "used": 0,
+        "positions": 0,
+        "pnl": 0,
+        "today_trades": 0,
+    }
+    try:
+        from alpaca.trading.client import TradingClient
+        from broker_manager import get_default_broker_id, load_config
+        default_id = get_default_broker_id()
+        cfg = load_config().get(default_id, {})
+        key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+        secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+        client = TradingClient(key, secret, paper=cfg.get("paper", True))
+        acct = client.get_account()
+        equity = float(acct.equity)
+
+        ratio = float(os.environ.get("INTRADAY_CAP_RATIO", "0.20"))
+        allocated = equity * ratio
+
+        positions = client.get_all_positions()
+        pos_value = sum(float(p.market_value) for p in positions) if positions else 0
+        pos_pnl = sum(float(p.unrealized_pl) for p in positions) if positions else 0
+
+        # 今日日内交易次数
+        today_trades = 0
+        if os.path.exists("signals/intraday_trades.json"):
+            with open("signals/intraday_trades.json") as f:
+                log = json.load(f)
+            today = str(datetime.now().strftime("%Y-%m-%d"))
+            today_trades = sum(1 for t in log.get("trades", []) if today in str(t.get("time", "")))
+
+        result = {
+            "allocated": round(allocated, 2),
+            "ratio": ratio,
+            "used": round(pos_value, 2),
+            "available": round(allocated - pos_value, 2),
+            "positions": len(positions) if positions else 0,
+            "pnl": round(pos_pnl, 2),
+            "today_trades": today_trades,
+        }
+    except:
+        pass
+    return result
 
 
 @bp.route("/api/equity_history")
