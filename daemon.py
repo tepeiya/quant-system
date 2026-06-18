@@ -160,7 +160,7 @@ def run_daily_cycle():
         except Exception as e:
             logger.error(f"  数据更新异常: {e}")
 
-        now2 = datetime.now()
+        now2 = datetime.now().replace(microsecond=0)
         target_signal = now2.replace(hour=9, minute=30, second=0, microsecond=0)
         if now2 < target_signal:
             wait_sig = (target_signal - now2).total_seconds()
@@ -225,7 +225,37 @@ def run_daily_cycle():
         except Exception as e:
             logger.warning(f"  激进调仓异常: {e}")
 
-        now3 = datetime.now()
+        # ===== 日内交易：每30分钟扫描 =====
+        now_intra = datetime.now()
+        if now_intra.hour >= 9 and now_intra.hour < 16:
+            logger.info("[日内交易] 扫描信号...")
+            try:
+                r = subprocess.run(
+                    [sys.executable, "intraday.py", "--scan"],
+                    capture_output=True, text=True, timeout=60,
+                    env={**os.environ}
+                )
+                for line in r.stdout.strip().split("\n"):
+                    if line.strip() and "{" not in line:
+                        logger.info(f"  [日内] {line.strip()}")
+                save_status(last_intraday_scan=str(datetime.now()))
+            except Exception as e:
+                logger.warning(f"  日内扫描异常: {e}")
+
+            logger.info("[日内交易] 执行...")
+            try:
+                r = subprocess.run(
+                    [sys.executable, "intraday_trader.py", "--auto"],
+                    capture_output=True, text=True, timeout=60,
+                    env={**os.environ}
+                )
+                for line in r.stdout.strip().split("\n"):
+                    if line.strip():
+                        logger.info(f"  [日内] {line.strip()}")
+            except Exception as e:
+                logger.warning(f"  日内执行异常: {e}")
+
+        now3 = datetime.now().replace(microsecond=0)
         target_rebal = now3.replace(hour=9, minute=35, second=0, microsecond=0)
         if now3 < target_rebal:
             wait_re = (target_rebal - now3).total_seconds()
