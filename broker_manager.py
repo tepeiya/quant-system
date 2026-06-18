@@ -110,14 +110,23 @@ def save_config(config: dict):
 def list_brokers() -> list[dict]:
     """列出所有券商（包括未启用的）"""
     config = load_config()
+    # 读取 .env 文件中的 Key 值
+    env_values = {}
+    env_file = ".env"
+    if os.path.exists(env_file):
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    env_values[k.strip()] = v.strip()
+
     brokers = []
     for bid, bc in config.items():
-        try:
-            key_set = bool(os.environ.get(bc.get("env_key_id", "")))
-            secret_set = bool(os.environ.get(bc.get("env_secret", "")))
-        except:
-            key_set = False
-            secret_set = False
+        key_id = bc.get("env_key_id", "")
+        secret = bc.get("env_secret", "")
+        key_set = bool(env_values.get(key_id, ""))
+        secret_set = bool(env_values.get(secret, ""))
         brokers.append({
             "id": bid,
             "name": bc.get("name", bid),
