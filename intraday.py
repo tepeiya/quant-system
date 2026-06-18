@@ -100,7 +100,8 @@ def scan_intraday_signals() -> list[dict]:
         return []
 
     cfg = load_config()
-    tickers = sorted(cache.keys())[:100]
+    tickers = sorted(cache.keys())[:60]
+
     signals = []
 
     for t in tickers:

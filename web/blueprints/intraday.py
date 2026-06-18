@@ -111,7 +111,7 @@ def api_scan():
              "json.dump(sig, open('signals/intraday_signal.json','w')); "
              "json.dump(bt, open('signals/intraday_backtest.json','w')); "
              "print(json.dumps(sig))"],
-            capture_output=True, text=True, timeout=60)
+            capture_output=True, text=True, timeout=120)
         if r.returncode == 0:
             return jsonify(json.loads(r.stdout))
         else:
