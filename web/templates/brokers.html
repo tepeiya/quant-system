@@ -12,32 +12,59 @@
     <div id="keyList" style="margin-top:8px;"></div>
 </div>
 
+<style>
+.sel-strategy { font-size:11px;padding:4px 6px;border:1px solid #30363d;border-radius:5px;background:#0d1117;color:#c9d1d9; }
+</style>
+
 <script>
+const ALL_STRATEGIES = ["conservative", "momentum", "intraday"];
+const STRATEGY_LABELS = {conservative:"🛡️ 保守", momentum:"🚀 激进", intraday:"⚡ 日内"};
+
 async function loadBrokers() {
     try {
         const d = await apiFetch('/brokers/api/list');
         const brokers = d.data || d || [];
         const div = document.getElementById('brokerList');
-        div.innerHTML = brokers.map(b => `
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid #21262d;">
-                <div>
-                    <b>${b.name}</b>
-                    <div style="font-size:11px;color:#8b949e;">${b.type} ${b.paper ? '📄' : '🔴'}</div>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
+        div.innerHTML = brokers.map(b => {
+            const selected = b.strategies || [];
+            const opts = ALL_STRATEGIES.map(s =>
+                `<option value="${s}" ${selected.includes(s) ? 'selected' : ''}>${STRATEGY_LABELS[s]||s}</option>`
+            ).join('');
+            return `<div style="padding:12px;border-bottom:1px solid #21262d;">
+                <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+                    <div style="flex:1;min-width:120px;">
+                        <b style="font-size:14px;">${b.name}</b>
+                        <div style="font-size:11px;color:#8b949e;">${b.type} ${b.paper ? '📄 纸交易' : '🔴 实盘'}</div>
+                    </div>
+                    <select class="sel-strategy" id="strat_${b.id}" multiple style="min-width:120px;" onchange="saveStrategies('${b.id}')">
+                        ${opts}
+                    </select>
                     <span style="font-size:12px;${b.ready ? 'color:#3fb950;' : b.enabled ? 'color:#d29922;' : 'color:#484f58;'}">
                         ${b.ready ? '✅ 就绪' : b.enabled ? '⚠️ 未配置' : '⏸️ 未启用'}
                     </span>
-                    <div style="font-size:11px;color:#8b949e;margin-top:4px;">策略: ${b.strategies ? b.strategies.join(', ') : '-'}</div>
-                    <button class="btn" onclick="setDefaultBroker('${b.id}')" style="padding:4px 10px;font-size:11px;${b.default ? 'background:#1f6feb;color:#fff;' : ''}">${b.default ? '⭐ 默认' : '设为默认'}</button>
-                    <button class="btn" onclick="toggleBroker('${b.id}', ${b.enabled})" style="padding:5px 12px;font-size:12px;">
+                    <button class="btn" onclick="toggleBroker('${b.id}', ${b.enabled})" style="padding:5px 10px;font-size:12px;">
                         ${b.enabled ? '⏹️ 停用' : '▶️ 启用'}
                     </button>
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     } catch(e) {
         showToast('加载券商失败: ' + e.message, 'error');
+    }
+}
+
+async function saveStrategies(brokerId) {
+    const sel = document.getElementById('strat_' + brokerId);
+    if (!sel) return;
+    const strategies = Array.from(sel.selectedOptions).map(o => o.value);
+    try {
+        await apiFetch('/brokers/api/strategies', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({broker_id: brokerId, strategies})
+        });
+        showToast('策略绑定已更新', 'success');
+    } catch(e) {
+        showToast('保存失败: ' + e.message, 'error');
     }
 }
 
@@ -45,15 +72,14 @@ async function loadKeys() {
     try {
         const d = await apiFetch('/brokers/api/keys');
         const list = d.data?.keys || d.keys || [];
-        const keyDiv = document.getElementById('keyList');
-        keyDiv.innerHTML = list.map(item => `
+        document.getElementById('keyList').innerHTML = list.map(item => `
             <div style="padding:10px;border-bottom:1px solid #21262d;">
                 <div style="font-weight:600;margin-bottom:8px;">${item.name}</div>
                 ${(item.fields || []).map(f => `
-                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
-                        <div style="min-width:180px;font-size:12px;color:#8b949e;">${f.label}</div>
-                        <input id="k_${f.key}" type="${f.secret ? 'password' : 'text'}" placeholder="${f.set ? '已设置（留空不改）' : '请输入'}" style="flex:1;padding:6px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;">
-                        <button class="btn" onclick="saveBrokerKey('${f.key}')" style="padding:4px 10px;">保存</button>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+                        <div style="min-width:160px;font-size:12px;color:#8b949e;">${f.label}</div>
+                        <input id="k_${f.key}" type="${f.secret ? 'password' : 'text'}" placeholder="${f.set ? '已设置' : '未设置'}" style="flex:1;min-width:120px;padding:6px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;">
+                        <button class="btn" onclick="saveBrokerKey('${f.key}')" style="padding:4px 10px;font-size:12px;">保存</button>
                     </div>
                 `).join('')}
             </div>
@@ -71,22 +97,8 @@ async function toggleBroker(id, enabled) {
         });
         showToast('已更新券商状态', 'success');
         loadBrokers();
-        loadKeys();
     } catch(e) {
         showToast('切换失败: ' + e.message, 'error');
-    }
-}
-
-async function setDefaultBroker(id) {
-    try {
-        await apiFetch('/brokers/api/set_default', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({broker_id: id})
-        });
-        showToast('默认券商已更新', 'success');
-        loadBrokers();
-    } catch(e) {
-        showToast('设置默认失败: ' + e.message, 'error');
     }
 }
 
