@@ -244,3 +244,75 @@ def api_save_cap_allocation():
 @bp.route("/")
 def page():
     return render_template("settings.html")
+
+
+# ===== 因子权重 =====
+
+@bp.route("/api/factor_weights")
+def api_factor_weights():
+    """获取因子权重"""
+    import json, os
+    path = "config/factor_weights.json"
+    if os.path.exists(path):
+        with open(path) as f:
+            return jsonify(json.load(f))
+    return jsonify({"momentum": 45, "quality": 26, "trend": 13, "value": 8, "lowvol": 6, "volume": 6})
+
+
+@bp.route("/api/save_factor_weights", methods=["POST"])
+def api_save_factor_weights():
+    """保存因子权重"""
+    data = __import__("flask").request.json or {}
+    import json, os
+    os.makedirs("config", exist_ok=True)
+    with open("config/factor_weights.json", "w") as f:
+        json.dump(data, f, indent=2)
+    return ok(message="因子权重已保存")
+
+
+# ===== 日内配置 =====
+
+@bp.route("/api/intraday_config")
+def api_intraday_config():
+    """获取日内配置"""
+    import json, os
+    path = "config/intraday_config.json"
+    if os.path.exists(path):
+        with open(path) as f:
+            return jsonify(json.load(f))
+    return jsonify({
+        "enabled": False, "max_positions": 3, "per_position_pct": 0.15,
+        "capital_pct": 0.20, "stop_loss_pct": 2.0, "take_profit_pct": 3.0,
+        "scan_interval_minutes": 30, "min_volume_ratio": 1.2,
+    })
+
+
+@bp.route("/api/save_intraday_config", methods=["POST"])
+def api_save_intraday_config():
+    """保存日内配置"""
+    data = __import__("flask").request.json or {}
+    import json, os
+    os.makedirs("config", exist_ok=True)
+    with open("config/intraday_config.json", "w") as f:
+        json.dump(data, f, indent=2)
+    return ok(message="日内配置已保存")
+
+
+# ===== 环境变量管理 =====
+
+@bp.route("/api/env_vars")
+def api_env_vars():
+    """获取所有可配置的环境变量"""
+    import os
+    keys = [
+        {"key": "PUSHPLUS_TOKEN", "label": "PushPlus Token", "type": "secret", "desc": "微信推送"},
+        {"key": "TIINGO_API_KEY", "label": "Tiingo API Key", "type": "secret", "desc": "数据源（备用）"},
+        {"key": "FRED_API_KEY", "label": "FRED API Key", "type": "secret", "desc": "宏观数据"},
+        {"key": "ALPACA_INTRADAY_KEY_ID", "label": "日内账户 Key ID", "type": "secret", "desc": "日内专用账户"},
+        {"key": "ALPACA_INTRADAY_SECRET", "label": "日内账户 Secret", "type": "secret", "desc": "日内专用账户"},
+        {"key": "INTRADAY_CAP_RATIO", "label": "日内资金比例", "type": "number", "desc": "0-1, 默认0.2"},
+    ]
+    for k in keys:
+        val = os.environ.get(k["key"], "")
+        k["set"] = bool(val)
+    return jsonify(keys)

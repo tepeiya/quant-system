@@ -2,103 +2,101 @@
 {% block title %}设置 - M+{% endblock %}
 {% block content %}
 
+<!-- 策略参数 -->
 <div class="panel">
     <h2>🧩 策略参数</h2>
-    <div id="configForm" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;"></div>
-    <div class="flex mt-16 gap-8">
+    <div id="configForm" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
+    <div class="flex mt-12 gap-8" style="margin-top:12px;">
         <button class="btn primary" onclick="saveConfig()">💾 保存全部</button>
         <button class="btn danger" onclick="resetConfig()">↩️ 恢复默认</button>
-        <span id="configMsg" style="font-size:13px;"> </span>
+        <span id="configMsg" style="font-size:12px;color:#8b949e;">&nbsp;</span>
     </div>
 </div>
 
-<div class="panel mt-16">
+<!-- 双策略资金分配 -->
+<div class="panel mt-12">
     <h2>💰 双策略资金分配</h2>
-    <p style="font-size:12px;color:#8b949e;margin:4px 0 12px;">两策略合计 ≤ 100%，剩余自动留作现金</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        <div style="background:#0d1117;border-radius:8px;padding:16px;border:1px solid #21262d;">
-            <h3 style="font-size:12px;color:#58a6ff;margin:0 0 12px;">🛡️ 保守策略</h3>
-            <label style="font-size:12px;color:#8b949e;">资金比例</label>
-            <div style="display:flex;align-items:center;gap:8px;">
-                <input type="range" id="conservativeSlider" min="0" max="100" value="50"
-                       style="flex:1;" oninput="updateAllocation()">
-                <span id="conservativeVal" style="font-size:14px;color:#e6edf3;min-width:40px;text-align:right;">50%</span>
-            </div>
-            <div style="font-size:11px;color:#8b949e;margin-top:8px;">
-                8-10只 · 动量+质量+择时 · 回测+46%
-            </div>
+    <p style="font-size:11px;color:#8b949e;margin:4px 0 12px;">两策略合计 ≤ 100%</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="background:#0d1117;border-radius:8px;padding:12px;border:1px solid #21262d;">
+            <div style="font-size:12px;color:#58a6ff;margin-bottom:8px;">🛡️ 保守策略</div>
+            <input type="range" id="conservativeSlider" min="0" max="100" value="50" style="width:100%;" oninput="updateAlloc()">
+            <div style="text-align:right;font-size:13px;color:#e6edf3;" id="conservativeVal">50%</div>
         </div>
-        <div style="background:#0d1117;border-radius:8px;padding:16px;border:1px solid #21262d;">
-            <h3 style="font-size:12px;color:#d29922;margin:0 0 12px;">🚀 激进策略</h3>
-            <label style="font-size:12px;color:#8b949e;">资金比例</label>
-            <div style="display:flex;align-items:center;gap:8px;">
-                <input type="range" id="momentumSlider" min="0" max="100" value="50"
-                       style="flex:1;" oninput="updateAllocation()">
-                <span id="momentumVal" style="font-size:14px;color:#e6edf3;min-width:40px;text-align:right;">50%</span>
-            </div>
-            <div style="font-size:11px;color:#8b949e;margin-top:8px;">
-                15只 · 纯动量不择时 · 回测+124%
-            </div>
+        <div style="background:#0d1117;border-radius:8px;padding:12px;border:1px solid #21262d;">
+            <div style="font-size:12px;color:#d29922;margin-bottom:8px;">🚀 激进策略</div>
+            <input type="range" id="momentumSlider" min="0" max="100" value="50" style="width:100%;" oninput="updateAlloc()">
+            <div style="text-align:right;font-size:13px;color:#e6edf3;" id="momentumVal">50%</div>
         </div>
     </div>
     <div style="margin-top:12px;display:flex;align-items:center;gap:12px;">
-        <button class="btn primary" onclick="saveAllocation()">💾 保存资金分配</button>
-        <span id="allocMsg" style="font-size:13px;color:#8b949e;"> </span>
-    </div>
-    <div style="margin-top:12px;padding:10px;background:#0d1117;border-radius:8px;border:1px solid #21262d;">
-        <div style="font-size:12px;color:#8b949e;margin-bottom:6px;">资金分布预览</div>
-        <div style="display:flex;height:24px;border-radius:4px;overflow:hidden;border:1px solid #30363d;">
-            <div id="barConservative" style="background:#58a6ff;transition:width .3s;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;width:50%;">50%</div>
-            <div id="barMomentum" style="background:#d29922;transition:width .3s;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;width:50%;">50%</div>
-            <div id="barCash" style="background:#30363d;transition:width .3s;display:flex;align-items:center;justify-content:center;font-size:11px;color:#8b949e;width:0%;">0%</div>
-        </div>
+        <button class="btn primary" onclick="saveAlloc()">💾 保存</button>
+        <span id="allocMsg" style="font-size:12px;color:#8b949e;">&nbsp;</span>
     </div>
 </div>
 
-<script>
-// === 策略参数 ===
-const CONFIG_LABELS = {
-    stop_loss_pct: '止损 (%)', trailing_stop_activate_pct: '移动止损启动 (%)',
-    trailing_stop_distance_pct: '移动止损距离 (%)',
-    stop_loss_atr_multiple: 'ATR止损倍数', trailing_stop_atr_multiple: 'ATR跟踪止损倍数',
-    rsi_exit: 'RSI退出阈值', rsi_entry: '买入RSI上限',
-    market_overheat_rsi: '大盘过热RSI', market_extreme_rsi: '大盘极端RSI',
-    market_reduce_ratio: '过热减仓比例', max_positions: '最大持仓数',
-    score_threshold: '评分阈值', mom_rank_top_pct: '动量排名门槛',
-    max_position_pct: '单票上限', max_sector_pct: '行业上限',
-    semi_single_limit: '半导体单票上限', semi_total_limit: '半导体总上限',
-    buy_cash_ratio: '买入现金比例',
-    max_share_price: '单股价格上限($)',
-    atr_low_threshold: '低波ATR阈值%', atr_medium_threshold: '中波ATR阈值%',
-    atr_high_threshold: '高波ATR阈值%',
-    atr_cap_low: '低波仓位上限', atr_cap_medium: '中波仓位上限',
-    atr_cap_high: '高波仓位上限', atr_cap_extreme: '极高波仓位上限',
-    min_hold_days: '最短持有天数', churn_keep_score: '换手保留分',
-    alert_total_drawdown: '总回撤告警 (%)', alert_single_loss: '单票亏损告警 (%)',
-    circuit_daily_loss: '单日熔断%', circuit_consecutive_loss: '连续亏损熔断%',
-    circuit_max_drawdown: '最大回撤熔断%', circuit_cooldown_hours: '熔断冷却小时',
-};
+<!-- 因子权重 -->
+<div class="panel mt-12">
+    <h2>⚖️ 因子权重</h2>
+    <p style="font-size:11px;color:#8b949e;margin:4px 0 12px;">总和 ≈ 100</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;" id="factorWeights"></div>
+    <div style="margin-top:10px;">
+        <button class="btn primary" onclick="saveFactorWeights()">💾 保存因子权重</button>
+        <span id="factorMsg" style="font-size:12px;color:#8b949e;margin-left:8px;">&nbsp;</span>
+    </div>
+</div>
 
-const CONFIG_GROUPS = {
-    '策略参数': ['stop_loss_pct','stop_loss_atr_multiple','trailing_stop_activate_pct','trailing_stop_atr_multiple','rsi_exit','rsi_entry','score_threshold','mom_rank_top_pct','max_positions'],
-    '仓位控制': ['max_position_pct','max_sector_pct','semi_single_limit','semi_total_limit','buy_cash_ratio','max_share_price','atr_low_threshold','atr_medium_threshold','atr_high_threshold','atr_cap_low','atr_cap_medium','atr_cap_high','atr_cap_extreme'],
-    '风控告警': ['alert_total_drawdown','alert_single_loss','circuit_daily_loss','circuit_consecutive_loss','circuit_max_drawdown','circuit_cooldown_hours'],
+<!-- 日内配置 -->
+<div class="panel mt-12">
+    <h2>⚡ 日内交易配置</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;" id="intradayConfig"></div>
+    <div style="margin-top:10px;">
+        <button class="btn primary" onclick="saveIntradayConfig()">💾 保存日内配置</button>
+        <span id="intradayMsg" style="font-size:12px;color:#8b949e;margin-left:8px;">&nbsp;</span>
+    </div>
+</div>
+
+<!-- 环境变量 -->
+<div class="panel mt-12">
+    <h2>🔐 环境变量</h2>
+    <div id="envVarList" style="display:flex;flex-direction:column;gap:8px;"></div>
+</div>
+
+<script>
+// ===== 策略参数 =====
+const LABELS = {
+    stop_loss_pct:'止损%', trailing_stop_activate_pct:'移动止损启动%',
+    stop_loss_atr_multiple:'ATR止损倍数', trailing_stop_atr_multiple:'ATR跟踪倍数',
+    rsi_exit:'RSI退出', rsi_entry:'买入RSI上限',
+    market_overheat_rsi:'过热RSI', market_extreme_rsi:'极端RSI',
+    market_reduce_ratio:'过热减仓比例', max_positions:'最大持仓',
+    score_threshold:'评分阈值', mom_rank_top_pct:'动量排名门槛',
+    max_position_pct:'单票上限%', max_sector_pct:'行业上限%',
+    buy_cash_ratio:'买入现金比例', max_share_price:'单股上限$',
+    min_hold_days:'最短持有天数', churn_keep_score:'换手保留分',
+    alert_total_drawdown:'总回撤告警%', alert_single_loss:'单票亏损告警%',
+    circuit_daily_loss:'单日熔断%', circuit_consecutive_loss:'连续亏损熔断%',
+    circuit_max_drawdown:'最大回撤熔断%', circuit_cooldown_hours:'熔断冷却小时',
+};
+const GROUPS = {
+    '策略参数':['stop_loss_pct','stop_loss_atr_multiple','trailing_stop_activate_pct','trailing_stop_atr_multiple','rsi_exit','rsi_entry','score_threshold','mom_rank_top_pct','max_positions'],
+    '仓位控制':['max_position_pct','max_sector_pct','buy_cash_ratio','max_share_price','min_hold_days','churn_keep_score'],
+    '风控告警':['alert_total_drawdown','alert_single_loss','circuit_daily_loss','circuit_consecutive_loss','circuit_max_drawdown','circuit_cooldown_hours'],
 };
 
 async function loadConfig() {
-    const configData = await apiFetch('/settings/api/all_config');
+    const d = await apiFetch('/settings/api/all_config');
     const form = document.getElementById('configForm');
     form.innerHTML = '';
-    Object.entries(CONFIG_GROUPS).forEach(([group, keys]) => {
+    Object.entries(GROUPS).forEach(([g, keys]) => {
         let html = `<div style="background:#0d1117;border-radius:8px;padding:12px;border:1px solid #21262d;">
-            <h3 style="font-size:12px;color:#8b949e;text-transform:uppercase;margin-bottom:10px;">${group}</h3>`;
+            <h3 style="font-size:11px;color:#8b949e;text-transform:uppercase;margin-bottom:10px;">${g}</h3>`;
         keys.forEach(k => {
-            const label = CONFIG_LABELS[k] || k;
-            const val = configData[k];
-            html += `<label style="display:block;margin-bottom:10px;font-size:12px;">
+            const label = LABELS[k]||k, val = d[k];
+            html += `<label style="display:block;margin-bottom:8px;font-size:11px;">
                 <span style="color:#8b949e;">${label}</span>
-                <input type="number" value="${val}" data-key="${k}" 
-                       style="width:100%;padding:6px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#c9d1d9;margin-top:4px;">
+                <input type="number" value="${val}" data-key="${k}"
+                       style="width:100%;padding:5px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#c9d1d9;margin-top:3px;font-size:12px;">
             </label>`;
         });
         html += '</div>';
@@ -107,87 +105,116 @@ async function loadConfig() {
 }
 
 async function saveConfig() {
-    const inputs = document.querySelectorAll('#configForm input[data-key]');
     const updates = {};
-    inputs.forEach(inp => updates[inp.getAttribute('data-key')] = parseFloat(inp.value));
-    const d = await apiFetch('/settings/api/save_config', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(updates)
-    });
-    document.getElementById('configMsg').textContent = d.status === 'ok' ? '✅ 已保存' : '❌ 失败';
-    setTimeout(() => document.getElementById('configMsg').textContent = ' ', 3000);
+    document.querySelectorAll('#configForm input[data-key]').forEach(inp =>
+        updates[inp.getAttribute('data-key')] = parseFloat(inp.value));
+    const d = await apiFetch('/settings/api/save_config', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});
+    document.getElementById('configMsg').textContent = d.status==='ok'?'✅ 已保存':'❌ 失败';
+    setTimeout(()=>document.getElementById('configMsg').textContent='&nbsp;',3000);
+}
+async function resetConfig() {
+    if(!confirm('恢复默认参数？')) return;
+    await apiFetch('/settings/api/reset_config',{method:'POST'});
+    document.getElementById('configMsg').textContent='✅ 已重置';
+    setTimeout(()=>location.reload(),1500);
 }
 
-async function resetConfig() {
-    if (!confirm('确认恢复默认参数？')) return;
-    const r = await apiFetch('/settings/api/reset_config', {method: 'POST'});
-    document.getElementById('configMsg').textContent = '✅ 已重置';
-    setTimeout(() => location.reload(), 1500);
+// ===== 资金分配 =====
+async function loadAlloc() {
+    const d = await apiFetch('/settings/api/cap_allocation');
+    document.getElementById('conservativeSlider').value = (d.conservative||0.5)*100;
+    document.getElementById('momentumSlider').value = (d.momentum||0.5)*100;
+    updateAlloc();
+}
+function updateAlloc() {
+    const c=parseInt(document.getElementById('conservativeSlider').value);
+    const m=parseInt(document.getElementById('momentumSlider').value);
+    document.getElementById('conservativeVal').textContent=c+'%';
+    document.getElementById('momentumVal').textContent=m+'%';
+    document.getElementById('allocMsg').textContent=c+m>100?'⚠️ 超过100%':c+m<100?`📌 ${100-c-m}% 现金`:'✅ 全部已分配';
+}
+async function saveAlloc() {
+    const c=parseInt(document.getElementById('conservativeSlider').value)/100;
+    const m=parseInt(document.getElementById('momentumSlider').value)/100;
+    if(c+m>1) return;
+    const d=await apiFetch('/settings/api/save_cap_allocation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({conservative:c,momentum:m})});
+    document.getElementById('allocMsg').textContent=d.status==='ok'?'✅ '+d.message:'❌ '+d.message;
+}
+
+// ===== 因子权重 =====
+async function loadFactorWeights() {
+    const d = await apiFetch('/settings/api/factor_weights');
+    const div = document.getElementById('factorWeights');
+    const labels = {momentum:'📈 动量',quality:'🏆 质量',trend:'📊 趋势',value:'💰 价值',lowvol:'🛡️ 低波',volume:'📶 成交量'};
+    div.innerHTML = Object.entries(d).map(([k,v])=>`
+        <label style="background:#0d1117;border-radius:6px;padding:8px;border:1px solid #21262d;font-size:11px;">
+            <span style="color:#8b949e;">${labels[k]||k}</span>
+            <input type="number" value="${v}" id="fw_${k}" style="width:100%;padding:4px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#c9d1d9;margin-top:3px;font-size:12px;">
+        </label>
+    `).join('');
+}
+async function saveFactorWeights() {
+    const data = {};
+    document.querySelectorAll('#factorWeights input').forEach(inp => data[inp.id.replace('fw_','')] = parseFloat(inp.value));
+    const d = await apiFetch('/settings/api/save_factor_weights',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    document.getElementById('factorMsg').textContent = d.status==='ok'?'✅ 已保存':'❌ 失败';
+}
+
+// ===== 日内配置 =====
+async function loadIntradayConfig() {
+    const d = await apiFetch('/settings/api/intraday_config');
+    const labels = {enabled:'启用',max_positions:'最大持仓',per_position_pct:'单只比例',capital_pct:'资金比例',stop_loss_pct:'止损%',take_profit_pct:'止盈%',scan_interval_minutes:'扫描间隔(分)',min_volume_ratio:'最小量比'};
+    const div = document.getElementById('intradayConfig');
+    div.innerHTML = Object.entries(d).map(([k,v])=>{
+        if(k==='enabled') return `<label style="background:#0d1117;border-radius:6px;padding:10px;border:1px solid #21262d;font-size:12px;display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="ic_${k}" ${v?'checked':''} style="width:18px;height:18px;">
+            <span style="color:#e6edf3;">启用日内交易</span>
+        </label>`;
+        return `<label style="background:#0d1117;border-radius:6px;padding:8px;border:1px solid #21262d;font-size:11px;">
+            <span style="color:#8b949e;">${labels[k]||k}</span>
+            <input type="number" step="0.01" value="${v}" id="ic_${k}" style="width:100%;padding:4px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#c9d1d9;margin-top:3px;font-size:12px;">
+        </label>`;
+    }).join('');
+}
+async function saveIntradayConfig() {
+    const data = {};
+    document.querySelectorAll('#intradayConfig input').forEach(inp => {
+        const k = inp.id.replace('ic_','');
+        if(inp.type==='checkbox') data[k] = inp.checked;
+        else data[k] = parseFloat(inp.value);
+    });
+    const d = await apiFetch('/settings/api/save_intraday_config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    document.getElementById('intradayMsg').textContent = d.status==='ok'?'✅ 已保存':'❌ 失败';
+}
+
+// ===== 环境变量 =====
+async function loadEnvVars() {
+    const d = await apiFetch('/settings/api/env_vars');
+    const div = document.getElementById('envVarList');
+    div.innerHTML = d.map(item => `
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;">
+            <div style="min-width:120px;font-size:12px;font-weight:600;color:#e6edf3;">${item.label}</div>
+            <input id="ev_${item.key}" type="${item.type==='secret'?'password':'text'}"
+                   placeholder="${item.set?'已设置（留空不改）':'未设置'}"
+                   style="flex:1;min-width:120px;padding:5px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#c9d1d9;font-size:12px;">
+            <div style="font-size:10px;color:#484f58;min-width:60px;">${item.desc}</div>
+            <button class="btn" onclick="saveEnvVar('${item.key}')" style="padding:4px 10px;font-size:11px;">保存</button>
+        </div>
+    `).join('');
+}
+async function saveEnvVar(key) {
+    const v = document.getElementById('ev_'+key).value.trim();
+    if(!v) return;
+    const d = await apiFetch('/settings/api/save_env',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
+    showToast(d.message || '已保存', d.status==='ok'?'success':'error');
+    document.getElementById('ev_'+key).value = '';
+    loadEnvVars();
 }
 
 loadConfig();
-loadAllocation();
-
-// === 资金分配 ===
-async function loadAllocation() {
-    try {
-        const d = await apiFetch('/settings/api/cap_allocation');
-        document.getElementById('conservativeSlider').value = d.conservative * 100;
-        document.getElementById('momentumSlider').value = d.momentum * 100;
-        updateAllocation();
-    } catch(e) {
-        console.error('loadAllocation error:', e);
-    }
-}
-
-function updateAllocation() {
-    const c = parseInt(document.getElementById('conservativeSlider').value);
-    const m = parseInt(document.getElementById('momentumSlider').value);
-    const total = c + m;
-    const cash = Math.max(0, 100 - total);
-    
-    document.getElementById('conservativeVal').textContent = c + '%';
-    document.getElementById('momentumVal').textContent = m + '%';
-    
-    document.getElementById('barConservative').style.width = c + '%';
-    document.getElementById('barConservative').textContent = c > 8 ? c + '%' : '';
-    document.getElementById('barMomentum').style.width = m + '%';
-    document.getElementById('barMomentum').textContent = m > 8 ? m + '%' : '';
-    document.getElementById('barCash').style.width = cash + '%';
-    document.getElementById('barCash').textContent = cash > 8 ? cash + '% 现金' : '';
-    
-    const msg = document.getElementById('allocMsg');
-    if (total > 100) {
-        msg.textContent = '⚠️ 两策略合计超过 100%';
-        msg.style.color = '#f85149';
-    } else if (cash > 0) {
-        msg.textContent = `📌 剩余 ${cash}% 留作现金缓冲`;
-        msg.style.color = '#8b949e';
-    } else {
-        msg.textContent = '✅ 全部资金已分配';
-        msg.style.color = '#3fb950';
-    }
-}
-
-async function saveAllocation() {
-    const c = parseInt(document.getElementById('conservativeSlider').value) / 100;
-    const m = parseInt(document.getElementById('momentumSlider').value) / 100;
-    
-    if (c + m > 1.0) {
-        document.getElementById('allocMsg').textContent = '❌ 合计不能超过 100%';
-        return;
-    }
-    
-    try {
-        const d = await apiFetch('/settings/api/save_cap_allocation', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({conservative: c, momentum: m})
-        });
-        document.getElementById('allocMsg').textContent = d.status === 'ok' ? '✅ ' + d.message : '❌ ' + d.message;
-    } catch(e) {
-        document.getElementById('allocMsg').textContent = '❌ ' + e.message;
-    }
-}
+loadAlloc();
+loadFactorWeights();
+loadIntradayConfig();
+loadEnvVars();
 </script>
 {% endblock %}
