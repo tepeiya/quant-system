@@ -25,6 +25,7 @@ DEFAULT_CONFIG = {
     "provider": "gemini",
     "api_key": "",
     "model": "gemini-2.0-flash-lite",
+    "api_base": "",
     "prompt_template": "",
 }
 
@@ -119,7 +120,12 @@ def _filter_with_openai(candidates: list, market_context: dict,
     try:
         import openai
 
-        client = openai.OpenAI(api_key=api_key)
+        client_kwargs = {"api_key": api_key}
+        api_base = cfg.get("api_base", "").strip()
+        if api_base:
+            client_kwargs["base_url"] = api_base
+
+        client = openai.OpenAI(**client_kwargs)
         model_name = cfg.get("model", "gpt-4o-mini")
 
         prompt = _build_prompt(candidates, market_context)

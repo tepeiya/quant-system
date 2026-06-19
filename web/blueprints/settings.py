@@ -272,6 +272,7 @@ def api_ai_config():
         "api_key_set": bool(key),
         "api_key_preview": key[:8] + "****" if len(key) > 8 else "",
         "model": cfg.get("model", "gemini-2.0-flash-lite"),
+        "api_base": cfg.get("api_base", ""),
     })
 
 
@@ -290,6 +291,8 @@ def api_save_ai_config():
         cfg["api_key"] = str(data["api_key"])
     if "model" in data:
         cfg["model"] = str(data["model"])
+    if "api_base" in data:
+        cfg["api_base"] = str(data["api_base"])
 
     save_config(cfg)
     return ok(message="AI配置已保存")
