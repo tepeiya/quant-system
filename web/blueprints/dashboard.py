@@ -147,35 +147,34 @@ def _get_intraday_info() -> dict:
         dedicated_enabled = cfg.get("enabled", False) and bool(os.environ.get(cfg.get("env_key_id", ""), ""))
 
         if dedicated_enabled:
-            # 专用账户模式
-            mode = "dedicated"
+            # 专用账户模式：直接读专用账户的全部权益
             key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
             secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
             client = TradingClient(key, secret, paper=cfg.get("paper", True))
             acct = client.get_account()
             equity = float(acct.equity)
             allocated = equity
+            ratio = 1.0
         else:
             # 共享模式：从主账户按比例分配
-            mode = "shared"
             main_broker_id = bm.get_strategy_broker_id("conservative")
             cfg = load_config().get(main_broker_id, {})
             key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
             secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+
+        positions = []
+        pos_value = 0
+        pos_pnl = 0
+        try:
             client = TradingClient(key, secret, paper=cfg.get("paper", True))
             acct = client.get_account()
             equity = float(acct.equity)
-            allocated = equity * ratio
-        client = TradingClient(key, secret, paper=cfg.get("paper", True))
-        acct = client.get_account()
-        equity = float(acct.equity)
-
-        ratio = float(os.environ.get("INTRADAY_CAP_RATIO", "0.20"))
-        allocated = equity * ratio
-
-        positions = client.get_all_positions()
-        pos_value = sum(float(p.market_value) for p in positions) if positions else 0
-        pos_pnl = sum(float(p.unrealized_pl) for p in positions) if positions else 0
+            allocated = equity * ratio if not dedicated_enabled else equity
+            positions = client.get_all_positions()
+            pos_value = sum(float(p.market_value) for p in positions) if positions else 0
+            pos_pnl = sum(float(p.unrealized_pl) for p in positions) if positions else 0
+        except:
+            pass
 
         # 今日日内交易次数
         today_trades = 0
