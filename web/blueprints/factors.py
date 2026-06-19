@@ -123,3 +123,34 @@ def api_ic_history():
 
     # 无数据时返回空
     return jsonify([])
+
+
+@bp.route("/api/ranking")
+def api_ranking():
+    """读取因子排名"""
+    import os, json
+    ranking_file = "config/factor_ranking.json"
+    if os.path.exists(ranking_file):
+        with open(ranking_file) as f:
+            data = json.load(f)
+        return jsonify(_fix(data))
+    return jsonify({"factors": [], "top_factors": [], "timestamp": ""})
+
+
+@bp.route("/api/run_ranking", methods=["POST"])
+def api_run_ranking():
+    """重新计算因子排名"""
+    import subprocess, sys
+    try:
+        result = subprocess.run(
+            [sys.executable, "factor_ranking.py"],
+            capture_output=True, text=True, timeout=120,
+            env={**os.environ}
+        )
+        output = (result.stdout + result.stderr)[-500:]
+        if result.returncode == 0:
+            return jsonify({"status": "ok", "message": "因子排名计算完成"})
+        else:
+            return jsonify({"status": "error", "message": "计算失败", "output": output})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)[:100]})

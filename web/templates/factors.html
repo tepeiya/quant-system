@@ -68,6 +68,24 @@
     </div>
 </div>
 
+<!-- 因子排名 -->
+<div class="panel">
+    <div class="flex-between mb-8">
+        <h2>🧬 因子排名</h2>
+        <div style="display:flex;gap:6px;">
+            <button class="btn" onclick="loadRanking()" style="font-size:11px;padding:4px 8px;">🔄 刷新</button>
+            <button class="btn primary" onclick="runRanking()" style="font-size:11px;padding:4px 8px;">⚡ 重新计算</button>
+        </div>
+    </div>
+    <div id="rankingContent" style="font-size:12px;color:#8b949e;">点击刷新加载因子排名...</div>
+</div>
+
+<style>
+.factor-row { display:flex;align-items:center;padding:5px 6px;border-bottom:1px solid #21262d;font-size:12px; }
+.factor-row:hover { background:#161b22; }
+.factor-bar { height:5px;border-radius:3px;margin-left:6px; }
+</style>
+
 <script>
 let currentWeights = {};
 
@@ -233,5 +251,49 @@ async function loadEvolution() {
 loadWeights();
 loadIC();
 loadEvolution();
+
+async function loadRanking() {
+    const el = document.getElementById('rankingContent');
+    try {
+        const d = await apiFetch('/factors/api/ranking');
+        const data = d.data || d;
+        if (!data || !data.factors || data.factors.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:20px;color:#8b949e;">暂无排名，点击「重新计算」生成</div>';
+            return;
+        }
+        let html = '<div style="margin-bottom:6px;font-size:11px;color:#484f58;">已计算因子: ' + data.total_factors + ' | 有效因子: ' + (data.top_factors||[]).length + ' | ' + (data.timestamp||'').slice(0,16) + '</div>';
+        if (data.top_factors && data.top_factors.length > 0) {
+            html += '<div style="margin-bottom:6px;">';
+            data.top_factors.slice(0,8).forEach(function(f) {
+                html += '<span style="display:inline-block;font-size:10px;padding:1px 5px;background:#238636;color:#fff;border-radius:8px;margin:1px;">' + f + '</span>';
+            });
+            html += '</div>';
+        }
+        var maxAbs = Math.max(...data.factors.slice(0,20).map(function(f) { return Math.abs(f.ic_rank); }));
+        html += '<div style="display:flex;font-size:11px;color:#8b949e;padding:4px 6px;border-bottom:1px solid #30363d;"><span style="width:24px;">#</span><span style="flex:1;">因子</span><span style="width:70px;text-align:right;">IC秩</span></div>';
+        data.factors.slice(0,20).forEach(function(f, i) {
+            var pct = Math.abs(f.ic_rank) / maxAbs * 100;
+            var color = f.ic_rank >= 0 ? '#3fb950' : '#f85149';
+            html += '<div class="factor-row"><span style="width:24px;color:#484f58;">' + (i+1) + '</span><span style="flex:1;">' + f.factor + '</span><span style="width:70px;text-align:right;color:' + color + ';">' + (f.ic_rank>=0?'+':'') + f.ic_rank.toFixed(4) + '</span><div style="flex:1;"><div class="factor-bar" style="width:' + pct + '%;background:' + color + ';opacity:0.5;"></div></div></div>';
+        });
+        el.innerHTML = html;
+    } catch(e) {
+        el.innerHTML = '<div style="text-align:center;padding:20px;color:#f85149;">加载失败</div>';
+    }
+}
+
+async function runRanking() {
+    const el = document.getElementById('rankingContent');
+    el.textContent = '⏳ 计算中（约1-2分钟）...';
+    try {
+        const d = await apiFetch('/factors/api/run_ranking', {method:'POST'});
+        el.textContent = '✅ 计算完成';
+        setTimeout(loadRanking, 2000);
+    } catch(e) {
+        el.textContent = '❌ ' + e.message;
+    }
+}
+
+loadRanking();
 </script>
 {% endblock %}
