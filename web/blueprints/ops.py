@@ -231,6 +231,96 @@ def api_intraday_close():
     return ok(message="日内清仓指令已发送")
 
 
+@bp.route("/api/risk_check", methods=["POST"])
+def api_risk_check():
+    """执行风控检查 — 止损+熔断+仓位"""
+    def task():
+        try:
+            from risk_manager import RiskManager
+            from system_config import load as load_cfg
+            from intraday_trader import get_alpaca as get_intraday_alpaca
+            from alpaca.trading.client import TradingClient
+            from broker_manager import load_config, get_default_broker_id
+            import json, os
+
+            cfg = load_cfg()
+            rm = RiskManager(cfg)
+            report = {"time": str(datetime.now()), "stops": [], "circuits": [], "positions": []}
+
+            # 1. 检查主账户持仓止损
+            try:
+                default_id = get_default_broker_id()
+                broker_cfg = load_config().get(default_id, {})
+                key = os.environ.get(broker_cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+                secret = os.environ.get(broker_cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+                if key and secret:
+                    client = TradingClient(key, secret, paper=broker_cfg.get("paper", True))
+                    positions = {}
+                    for p in client.get_all_positions():
+                        qty = int(float(p.qty))
+                        if qty > 0:
+                            positions[p.symbol] = {
+                                "qty": qty,
+                                "avg_entry": float(p.avg_entry_price),
+                                "current_price": float(p.current_price),
+                                "pnl_pct": float(p.unrealized_plpc) * 100,
+                            }
+                    stops = rm.check_stops(positions)
+                    report["stops"] = stops
+                    if stops:
+                        logger.warning(f"风控: {len(stops)}笔需止损")
+                    else:
+                        logger.info("风控: 无止损触发")
+            except Exception as e:
+                logger.error(f"主账户止损检查失败: {e}")
+
+            # 2. 熔断检查
+            try:
+                acct = client.get_account()
+                equity = float(acct.equity)
+                daily_pnl = equity - float(acct.last_equity)
+                daily_pnl_pct = daily_pnl / max(float(acct.last_equity), 1) * 100
+                circuits = rm.check_circuit(daily_pnl_pct, [], 0)
+                report["circuits"] = circuits
+                report["daily_pnl_pct"] = round(daily_pnl_pct, 2)
+            except:
+                pass
+
+            # 3. 仓位统计
+            try:
+                positions = client.get_all_positions()
+                report["position_count"] = len(positions)
+                total_mv = sum(float(p.market_value) for p in positions)
+                report["total_exposure"] = round(total_mv, 2)
+            except:
+                pass
+
+            # 保存报告
+            os.makedirs("config", exist_ok=True)
+            with open("/tmp/risk_check_result.json", "w") as f:
+                json.dump(report, f, indent=2)
+
+            logger.info(f"风控检查完成: {len(report['stops'])}止损, {len(report['circuits'])}熔断")
+
+        except Exception as e:
+            logger.error(f"风控检查失败: {e}")
+            with open("/tmp/risk_check_result.json", "w") as f:
+                json.dump({"error": str(e)}, f)
+
+    _run_bg(task, "risk_check")
+    return ok(message="风控检查已开始")
+
+
+@bp.route("/api/risk_check_log")
+def api_risk_check_log():
+    import json, os
+    path = "/tmp/risk_check_result.json"
+    if os.path.exists(path):
+        with open(path) as f:
+            return ok({"log": json.dumps(json.load(f), indent=2, ensure_ascii=False)})
+    return ok({"log": "(尚未运行)"})
+
+
 @bp.route("/api/git_pull", methods=["POST"])
 def api_git_pull():
     """从 GitHub 拉取最新代码并重启 daemon"""
