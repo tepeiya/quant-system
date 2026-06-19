@@ -133,3 +133,18 @@ def api_save_key():
         set_key(key, value)
         return ok(message="已保存")
     return err("参数不完整")
+
+
+@bp.route("/api/test")
+def api_test():
+    """测试所有已启用券商的连接"""
+    from broker_ext import test_connection
+    from broker_manager import list_brokers
+    results = {}
+    for b in list_brokers():
+        if not b.get("enabled"):
+            continue
+        for strategy in b.get("strategies", []):
+            result = test_connection(strategy)
+            results[strategy] = result
+    return ok(results)

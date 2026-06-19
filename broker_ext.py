@@ -197,6 +197,44 @@ def get_price(symbol: str, strategy: str = "conservative") -> float:
     return broker.get_latest_price(symbol)
 
 
+def test_connection(strategy: str = "conservative") -> dict:
+    """
+    测试指定策略绑定的券商连接
+
+    返回:
+        dict: {success, latency_ms, equity, error}
+    """
+    import time
+    start = time.time()
+    try:
+        from broker_manager import BrokerManager, load_config
+        bm = BrokerManager()
+        broker_id = bm.get_strategy_broker_id(strategy)
+        cfg = load_config().get(broker_id, {})
+
+        if not cfg.get("enabled", False):
+            return {"success": False, "error": f"券商 {broker_id} 未启用"}
+
+        # 尝试连接
+        broker = bm.use(broker_id)
+        acct = broker.get_account()
+
+        if "error" in acct:
+            return {"success": False, "error": acct["error"]}
+
+        latency = round((time.time() - start) * 1000, 0)
+        return {
+            "success": True,
+            "latency_ms": int(latency),
+            "equity": acct.get("equity", 0),
+            "cash": acct.get("cash", 0),
+            "broker_id": broker_id,
+            "paper": cfg.get("paper", True),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)[:100]}
+
+
 def compare_brokers():
     """对比所有已启用券商的状态"""
     from broker_manager import BrokerManager, load_config

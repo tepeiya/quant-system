@@ -5,6 +5,10 @@
 <div class="panel">
     <h2>🔌 券商列表</h2>
     <div id="brokerList" style="margin-top:8px;"></div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+      <button class="btn primary" onclick="testConnections()" style="padding:5px 10px;font-size:12px;">🔌 测试连接</button>
+      <span id="testResult" style="font-size:11px;color:#484f58;"></span>
+    </div>
 </div>
 
 <div class="panel">
@@ -121,5 +125,28 @@ async function saveBrokerKey(key) {
 
 loadBrokers();
 loadKeys();
+
+async function testConnections() {
+    const el = document.getElementById('testResult');
+    el.textContent = '⏳ 测试中...';
+    el.style.color = '#d29922';
+    try {
+        const d = await apiFetch('/brokers/api/test');
+        const results = d.data || {};
+        const lines = [];
+        for (const [strategy, r] of Object.entries(results)) {
+            if (r.success) {
+                lines.push(`${strategy}: ✅ ${r.latency_ms}ms $${r.equity.toFixed(0)}`);
+            } else {
+                lines.push(`${strategy}: ❌ ${r.error}`);
+            }
+        }
+        el.textContent = lines.join(' | ');
+        el.style.color = '#8b949e';
+    } catch(e) {
+        el.textContent = '❌ 测试失败: ' + e.message;
+        el.style.color = '#f85149';
+    }
+}
 </script>
 {% endblock %}
