@@ -317,10 +317,11 @@ def run_intraday_loop():
     interval = 30 * 60
     logger.info("[日内] 轮询线程启动，美东9:30-16:00 (北京21:30-05:00) 每30分钟执行")
 
-    # 启动时立即检查是否有隔夜持仓，有则清仓
+    # 启动时立即检查持仓，如果有则强制清仓
+    logger.info("[日内] 启动检查持仓...")
     try:
         r = subprocess.run(
-            [sys.executable, "intraday_trader.py", "--auto"],
+            [sys.executable, "intraday_trader.py", "--close-all"],
             capture_output=True, text=True, timeout=30,
             env={**os.environ}
         )
