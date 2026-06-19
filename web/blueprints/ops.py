@@ -167,6 +167,52 @@ def api_run_backtest():
     return ok(message="回测已开始")
 
 
+@bp.route("/api/run_event_backtest", methods=["POST"])
+def api_run_event_backtest():
+    """事件驱动回测（更真实的逐日模拟）"""
+    def task():
+        try:
+            from data_prod import load_price_cache, compute_indicators
+            from spy_source import get_spy
+            from event_backtest import run_event_backtest
+
+            cache = load_price_cache()
+            cache = {t: compute_indicators(df) for t, df in cache.items()}
+            spy = compute_indicators(get_spy()) if get_spy() else None
+
+            tickers = sorted(cache.keys())[:100]
+            prices = {t: cache[t] for t in tickers}
+
+            result = run_event_backtest(prices, spy,
+                                        start="2022-01-01", end=None)
+
+            # 保存结果
+            import json
+            from datetime import datetime
+            output = {
+                "time": str(datetime.now()),
+                "stock_count": len(tickers),
+                "total_return_pct": result["total_return"],
+                "annual_return_pct": result["annual_return"],
+                "max_drawdown_pct": result["max_drawdown"],
+                "sharpe_ratio": result["sharpe"],
+                "total_trades": len(result.get("trade_log", [])),
+            }
+
+            with open("/tmp/event_backtest_last.txt", "w") as f:
+                f.write(json.dumps(output, indent=2, ensure_ascii=False))
+
+            logger.info(f"事件回测完成: 收益{result['total_return']:+.1f}%")
+
+        except Exception as e:
+            logger.error(f"事件回测失败: {e}")
+            with open("/tmp/event_backtest_last.txt", "w") as f:
+                f.write(f"错误: {str(e)}")
+
+    _run_bg(task, "event_backtest")
+    return ok(message="事件驱动回测已开始")
+
+
 @bp.route("/api/run_signal", methods=["POST"])
 def api_run_signal():
     def task():
@@ -366,6 +412,7 @@ def api_log(task_name):
         "evolve": "/tmp/evolve_last.txt", "weekly": "/tmp/weekly_last.txt",
         "export": "/tmp/export_last.txt", "refresh": "/tmp/refresh_last.txt",
         "daemon": "logs/daemon_web_start.log",
+        "event_backtest": "/tmp/event_backtest_last.txt",
     }
     path = paths.get(task_name)
     if path and os.path.exists(path):
