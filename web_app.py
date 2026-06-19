@@ -142,17 +142,6 @@ def _set_trade_mode(mode: str):
     with open(TRADE_MODE_FILE, "w") as f:
         json.dump({"mode": mode}, f)
 
-@app.route("/api/trade_mode", methods=["GET", "POST"])
-def api_trade_mode():
-    if request.method == "GET":
-        return jsonify({"mode": _get_trade_mode()})
-    data = request.json or {}
-    mode = data.get("mode", "paper")
-    if mode not in ("paper", "live"):
-        return jsonify({"error": "无效模式"}), 400
-    _set_trade_mode(mode)
-    return jsonify({"mode": mode, "message": f"已切换到{'纸交易' if mode == 'paper' else '实盘'}"})
-
 
 @app.route("/api/warmup", methods=["POST"])
 def api_warmup():
