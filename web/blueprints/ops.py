@@ -231,7 +231,45 @@ def api_intraday_close():
     return ok(message="日内清仓指令已发送")
 
 
-@bp.route("/api/log/<task_name>")
+@bp.route("/api/git_pull", methods=["POST"])
+def api_git_pull():
+    """从 GitHub 拉取最新代码并重启 daemon"""
+    def task():
+        try:
+            r = subprocess.run(["git", "pull", "origin", "main"],
+                capture_output=True, text=True, timeout=60)
+            output = r.stdout + r.stderr
+            logger.info(f"Git pull: {output[-500:]}")
+
+            # 重新加载 blueprint
+            import importlib
+            importlib.invalidate_caches()
+            logger.info("蓝图缓存已刷新")
+
+            # 重启 daemon（如果正在运行）
+            from daemon import stop_daemon, main
+            stop_daemon()
+
+            with open("/tmp/git_pull_result.txt", "w") as f:
+                f.write(output)
+
+            logger.info("Git pull 完成，daemon 已重启")
+        except Exception as e:
+            logger.error(f"Git pull 失败: {e}")
+            with open("/tmp/git_pull_result.txt", "w") as f:
+                f.write(f"错误: {e}")
+
+    _run_bg(task, "git_pull")
+    return ok(message="正在拉取代码并重启...")
+
+
+@bp.route("/api/git_pull_log")
+def api_git_pull_log():
+    path = "/tmp/git_pull_result.txt"
+    if os.path.exists(path):
+        with open(path) as f:
+            return ok({"log": f.read()[-5000:]})
+    return ok({"log": "(尚未执行)"})
 def api_log(task_name):
     paths = {
         "backtest": "/tmp/backtest_last.txt", "signal": "/tmp/signal_last.txt",
