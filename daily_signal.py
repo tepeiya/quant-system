@@ -249,6 +249,55 @@ def generate_signals(use_cached_quality=True):
         })
     scores.sort(key=lambda x: -x["score"])
 
+    # 4.5 因子排名增强 — 用当前最有效的因子重新调整Top候选
+    try:
+        ranking_file = "config/factor_ranking.json"
+        if os.path.exists(ranking_file):
+            with open(ranking_file) as f:
+                ranking_data = json.load(f)
+            top_factors = ranking_data.get("top_factors", [])
+            if len(top_factors) >= 3:
+                from factor_miner import FactorMiner
+                # 计算增强分
+                miner = FactorMiner(cache)
+                tickers_to_enhance = [s["ticker"] for s in scores[:20]]
+                factor_df = miner.compute_all(tickers=tickers_to_enhance, spy_df=spy if spy is not None else None)
+                if not factor_df.empty:
+                    available = [f for f in top_factors if f in factor_df.columns]
+                    if len(available) >= 3:
+                        # 标准化后加权
+                        factor_df["enhance_score"] = 0
+                        count = 0
+                        for f in available:
+                            col = factor_df[f]
+                            valid = col.dropna()
+                            if len(valid) < 5:
+                                continue
+                            mean, std = valid.mean(), valid.std()
+                            if std > 0:
+                                factor_df["enhance_score"] += (col - mean) / std
+                                count += 1
+                        if count > 0:
+                            factor_df["enhance_score"] /= count
+                            # 把增强分合并到scores
+                            enhance_map = dict(zip(factor_df["ticker"], factor_df["enhance_score"]))
+                            for s in scores:
+                                es = enhance_map.get(s["ticker"])
+                                if es is not None and not pd.isna(es):
+                                    s["enhance_score"] = round(es, 2)
+                            # 重新排序：原评分占70%，增强分占30%
+                            has_enhance = [s for s in scores if "enhance_score" in s]
+                            if has_enhance:
+                                max_es = max(abs(s.get("enhance_score", 0)) for s in has_enhance)
+                                if max_es > 0:
+                                    for s in has_enhance:
+                                        normalized_es = s["enhance_score"] / max_es
+                                        s["score"] = round(s["score"] * 0.7 + normalized_es * 30, 1)
+                                scores.sort(key=lambda x: -x["score"])
+                                logger.info(f"因子排名增强: {len(available)}个有效因子")
+    except Exception as e:
+        logger.debug(f"因子排名增强跳过: {e}")
+
     # 5. 输出
     print(f"\n{'='*65}")
     print(f"  📊 Multi-Factor Momentum+ - 每日信号")
