@@ -46,81 +46,57 @@
 }
 
 <script>
-(function() {
-async function refreshData() {
+var _INTRADAY_INITED = false;
+async function refreshIntraday() {
   try {
-  var a = await apiFetch('/intraday/api/allocation');
-  document.getElementById('allocSummary').innerHTML =
-    '<div class="mini"><div class="n" style="color:'+(a.equity>0?"#e6edf3":"#8b949e")+';">$'+(a.equity||0).toFixed(0)+'</div><div class="l">总权益</div></div>'+
-    '<div class="mini"><div class="n">$'+(a.allocated||0).toFixed(0)+'</div><div class="l">日内('+(a.ratio*100||20).toFixed(0)+'%)</div></div>';
-
-  document.getElementById('todayStats').innerHTML =
-    '<div class="mini"><div class="n">'+(a.today_trades||0)+'</div><div class="l">交易</div></div>'+
-    '<div class="mini"><div class="n" style="color:'+((a.pnl||0)>=0?"#3fb950":"#f85149")+';">'+((a.pnl||0)>=0?"+":"")+'$'+(a.pnl||0).toFixed(0)+'</div><div class="l">盈亏</div></div>'+
-    '<div class="mini"><div class="n">'+(a.positions||0)+'</div><div class="l">持仓</div></div>';
+    var a = await apiFetch('/intraday/api/allocation');
+    document.getElementById('allocSummary').innerHTML =
+      '<div class="mini"><div class="n" style="color:#e6edf3;">$'+(a.equity||0).toFixed(0)+'</div><div class="l">总权益</div></div>'+
+      '<div class="mini"><div class="n">$'+(a.allocated||0).toFixed(0)+'</div><div class="l">日内('+(a.ratio*100||20).toFixed(0)+'%)</div></div>';
+    document.getElementById('todayStats').innerHTML =
+      '<div class="mini"><div class="n">'+(a.today_trades||0)+'</div><div class="l">交易</div></div>'+
+      '<div class="mini"><div class="n" style="color:'+((a.pnl||0)>=0?'#3fb950':'#f85149')+';">'+((a.pnl||0)>=0?'+':'')+'$'+(a.pnl||0).toFixed(0)+'</div><div class="l">盈亏</div></div>'+
+      '<div class="mini"><div class="n">'+(a.positions||0)+'</div><div class="l">持仓</div></div>';
   } catch(e) {}
 
   try {
-  var p = await apiFetch('/intraday/api/positions');
-  var pos = p.positions||[];
-  document.getElementById('intradayPositions').innerHTML = pos.length==0 ?
-    '<div style="text-align:center;padding:20px;color:#8b949e;font-size:12px;">无日内持仓</div>' :
-    pos.map(function(p){
-      var c=p.pnl_pct>=0?"#3fb950":"#f85149";
-      return '<div class="r"><span class="s">'+p.symbol+'</span><span style="font-size:10px;color:#484f58;">x'+p.qty+'</span><span style="font-size:10px;color:#484f58;">$'+p.avg_entry.toFixed(0)+'</span><span class="v" style="color:'+c+';">$'+p.current_price.toFixed(0)+'</span><span class="x" style="color:'+c+';">'+(p.pnl_pct>=0?"+":"")+p.pnl_pct.toFixed(2)+'%</span></div>';
-    }).join('');
+    var p = await apiFetch('/intraday/api/positions');
+    var ps = p.positions||[];
+    document.getElementById('intradayPositions').innerHTML = ps.length===0?
+      '<div style="text-align:center;padding:20px;color:#8b949e;font-size:12px;">无日内持仓</div>':
+      ps.map(function(p){var c=p.pnl_pct>=0?'#3fb950':'#f85149';return '<div class="r"><span class="s">'+p.symbol+'</span><span style="font-size:10px;color:#484f58;">x'+p.qty+'</span><span style="font-size:10px;color:#484f58;">$'+p.avg_entry.toFixed(0)+'</span><span class="v" style="color:'+c+';">$'+p.current_price.toFixed(0)+'</span><span class="x" style="color:'+c+';">'+(p.pnl_pct>=0?'+':'')+p.pnl_pct.toFixed(2)+'%</span></div>';}).join('');
   } catch(e) {}
 
   try {
-  var s = await apiFetch('/intraday/api/signals');
-  var cands = s.candidates||[];
-  document.getElementById('signalList').innerHTML = cands.length==0 ?
-    '<div style="text-align:center;padding:20px;color:#8b949e;font-size:12px;">暂无信号</div>' :
-    cands.map(function(c,i){
-      var cl=c.today_chg>=0?"#3fb950":"#f85149";
-      return '<div class="r"><span style="font-size:10px;color:#484f58;min-width:18px;">#'+(i+1)+'</span><span class="s">'+c.ticker+'</span><span class="v" style="color:'+cl+';">'+(c.today_chg>0?"+":"")+(c.today_chg||0).toFixed(2)+'%</span><span class="x">$'+(c.price||0).toFixed(0)+'</span></div>';
-    }).join('');
+    var s = await apiFetch('/intraday/api/signals');
+    var cs = s.candidates||[];
+    document.getElementById('signalList').innerHTML = cs.length===0?
+      '<div style="text-align:center;padding:20px;color:#8b949e;font-size:12px;">暂无信号</div>':
+      cs.map(function(c,i){var cl=c.today_chg>=0?'#3fb950':'#f85149';return '<div class="r"><span style="font-size:10px;color:#484f58;min-width:18px;">#'+(i+1)+'</span><span class="s">'+c.ticker+'</span><span class="v" style="color:'+cl+';">'+(c.today_chg>0?'+':'')+(c.today_chg||0).toFixed(2)+'%</span><span class="x">$'+(c.price||0).toFixed(0)+'</span></div>';}).join('');
   } catch(e) {}
 
   try {
-  var c = await apiFetch('/settings/api/intraday_config');
-  document.getElementById('configInfo').innerHTML =
-    '<div style="padding:7px;background:#0d1117;border:1px solid #21262d;border-radius:6px;">'+
-    '<span class="tag">'+(c.enabled?"运行":"停用")+'</span>'+
-    '<span class="tag">持仓'+(c.max_positions||3)+'只</span>'+
-    '<span class="tag">止损'+(c.stop_loss_pct||2).toFixed(1)+'%</span>'+
-    '<span class="tag">止盈'+(c.take_profit_pct||3).toFixed(1)+'%</span>'+
-    '<span class="tag">间隔'+(c.scan_interval_minutes||30)+'分</span></div>';
+    var cf = await apiFetch('/settings/api/intraday_config');
+    document.getElementById('configInfo').innerHTML = '<div style="padding:7px;background:#0d1117;border:1px solid #21262d;border-radius:6px;"><span class="tag">'+(cf.enabled?'运行':'停用')+'</span><span class="tag">持仓'+(cf.max_positions||3)+'只</span><span class="tag">止损'+(cf.stop_loss_pct||2).toFixed(1)+'%</span><span class="tag">止盈'+(cf.take_profit_pct||3).toFixed(1)+'%</span><span class="tag">间隔'+(cf.scan_interval_minutes||30)+'分</span></div>';
   } catch(e) {}
 
   try {
-    var b = await apiFetch('/intraday/api/backtest');
-    document.getElementById('backtestResult').innerHTML =
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'+
-      '<div class="mini"><div class="n" style="color:'+((b.total_return_pct||0)>=0?"#3fb950":"#f85149")+';">'+(b.total_return_pct||0).toFixed(1)+'%</div><div class="l">收益</div></div>'+
-      '<div class="mini"><div class="n">'+(b.total_trades||0)+'</div><div class="l">交易</div></div>'+
-      '<div class="mini"><div class="n" style="color:'+((b.win_rate_pct||0)>=50?"#3fb950":"#d29922")+';">'+(b.win_rate_pct||0).toFixed(0)+'%</div><div class="l">胜率</div></div>'+
-      '<div class="mini"><div class="n" style="color:#f85149;">'+(b.max_drawdown_pct||0).toFixed(1)+'%</div><div class="l">回撤</div></div></div>';
-  } catch(e) {
-    document.getElementById('backtestResult').innerHTML = '<div style="text-align:center;padding:16px;color:#8b949e;font-size:12px;">暂无回测数据</div>';
-  }
+    var bt = await apiFetch('/intraday/api/backtest');
+    document.getElementById('backtestResult').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"><div class="mini"><div class="n" style="color:'+((bt.total_return_pct||0)>=0?'#3fb950':'#f85149')+';">'+(bt.total_return_pct||0).toFixed(1)+'%</div><div class="l">收益</div></div><div class="mini"><div class="n">'+(bt.total_trades||0)+'</div><div class="l">交易</div></div><div class="mini"><div class="n" style="color:'+((bt.win_rate_pct||0)>=50?'#3fb950':'#d29922')+';">'+(bt.win_rate_pct||0).toFixed(0)+'%</div><div class="l">胜率</div></div><div class="mini"><div class="n" style="color:#f85149;">'+(bt.max_drawdown_pct||0).toFixed(1)+'%</div><div class="l">回撤</div></div></div>';
+  } catch(e) { document.getElementById('backtestResult').innerHTML = '<div style="text-align:center;padding:16px;color:#8b949e;font-size:12px;">暂无回测数据</div>'; }
 }
 
 async function executeScan() {
-  try { var d = await apiFetch('/intraday/api/scan',{method:"POST"}); showToast("扫描完成:"+(d.candidates||[]).length+"只","success"); refreshData(); }
+  try { var d = await apiFetch('/intraday/api/scan',{method:"POST"}); showToast("扫描完成:"+(d.candidates||[]).length+"只","success"); refreshIntraday(); }
   catch(e) { showToast("扫描失败","error"); }
 }
 async function closeAllIntraday() {
   if(!confirm("确认清仓?")) return;
-  try { var d = await apiFetch('/intraday/api/close_all',{method:"POST"}); showToast(d.message,"success"); refreshData(); }
+  try { var d = await apiFetch('/intraday/api/close_all',{method:"POST"}); showToast(d.message,"success"); refreshIntraday(); }
   catch(e) { showToast("清仓失败","error"); }
 }
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', refreshData);
-} else {
-  refreshData();
-}
-setInterval(refreshData,60000);
-})();
+
+refreshIntraday();
+setInterval(refreshIntraday,60000);
 </script>
 {% endblock %}
