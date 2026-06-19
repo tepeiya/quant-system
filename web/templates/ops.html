@@ -35,6 +35,21 @@
 
 <div id="taskList"></div>
 
+<!-- 回测结果对比面板 -->
+<div id="btComparePanel" style="display:none;margin-top:12px;background:#0d1117;border:1px solid #30363d;border-radius:10px;padding:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <strong style="font-size:13px;color:#e6edf3;">📊 回测结果对比</strong>
+        <button class="btn-sm btn-log" onclick="document.getElementById('btComparePanel').style.display='none'">✕ 关闭</button>
+    </div>
+    <!-- 对比卡片 -->
+    <div id="btCompareContent"></div>
+    <!-- 净值曲线 -->
+    <div style="margin-top:10px;">
+        <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">📈 净值曲线</div>
+        <canvas id="equityChart" style="width:100%;height:200px;"></canvas>
+    </div>
+</div>
+
 <div id="logPanel" style="display:none;margin-top:12px;background:#0d1117;border:1px solid #30363d;border-radius:10px;padding:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <strong id="logTitle" style="font-size:13px;color:#e6edf3;">日志</strong>
@@ -108,10 +123,14 @@ async function runTask(id) {
     try { const d = await apiFetch('/ops/api/'+id,{method:'POST'}); showToast(d.message||'已启动',d.status==='ok'?'success':'error'); }
     catch(e) { showToast('失败: '+e.message,'error'); }
     setTimeout(loadStatus, id.startsWith('daemon')?5000:1000);
+    // 回测任务完成2秒后自动加载对比结果
+    if (id === 'run_backtest' || id === 'run_event_backtest') {
+        setTimeout(loadBtCompare, 3000);
+    }
 }
 
 async function showLog(id) {
-    const map={daemon_start:'daemon',daemon_stop:'daemon',refresh_now:'refresh',data_warmup:'backtest',run_backtest:'backtest',run_signal:'signal',evolve_factors:'evolve',export_report:'export'};
+    const map={daemon_start:'daemon',daemon_stop:'daemon',refresh_now:'refresh',data_warmup:'backtest',run_backtest:'backtest',run_signal:'signal',evolve_factors:'evolve',export_report:'export',run_event_backtest:'event_backtest'};
     const key=map[id]||id, task=TASKS.find(t=>t.id===id);
     document.getElementById('logPanel').style.display='block';
     document.getElementById('logTitle').textContent=(task?task.name:id)+' — 日志';
@@ -120,6 +139,79 @@ async function showLog(id) {
     catch(e) { document.getElementById('logContent').textContent='获取失败: '+e.message; }
 }
 function closeLog(){document.getElementById('logPanel').style.display='none';}
+
+// ===== 回测对比 =====
+async function loadBtCompare() {
+    try {
+        var vec, evt;
+        try { vec = await apiFetch('/ops/api/backtest_result'); } catch(e) {}
+        try { evt = await apiFetch('/ops/api/event_backtest_result'); } catch(e) {}
+
+        if (!vec && !evt) return;
+
+        var panel = document.getElementById('btComparePanel');
+        panel.style.display = 'block';
+
+        var content = document.getElementById('btCompareContent');
+        var html = '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+
+        if (vec) {
+            var v = vec.data || vec;
+            html += '<div style="flex:1;min-width:130px;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px;">';
+            html += '<div style="font-size:11px;color:#8b949e;margin-bottom:6px;">📊 向量化回测</div>';
+            html += metricRow('总收益', (v.total_return_pct||0).toFixed(1)+'%', (v.total_return_pct||0)>=0);
+            html += metricRow('年化收益', (v.annual_return_pct||0).toFixed(1)+'%', (v.annual_return_pct||0)>=0);
+            html += metricRow('最大回撤', (v.max_drawdown_pct||0).toFixed(1)+'%', false);
+            html += metricRow('夏普比率', (v.sharpe_ratio||0).toFixed(2), (v.sharpe_ratio||0)>=1);
+            html += metricRow('Alpha', (v.alpha||0).toFixed(2)+'%', (v.alpha||0)>=0);
+            html += '</div>';
+        }
+
+        if (evt) {
+            var e = evt.data || evt;
+            html += '<div style="flex:1;min-width:130px;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px;">';
+            html += '<div style="font-size:11px;color:#8b949e;margin-bottom:6px;">🎯 事件驱动回测</div>';
+            html += metricRow('总收益', (e.total_return_pct||0).toFixed(1)+'%', (e.total_return_pct||0)>=0);
+            html += metricRow('年化收益', (e.annual_return_pct||0).toFixed(1)+'%', (e.annual_return_pct||0)>=0);
+            html += metricRow('最大回撤', (e.max_drawdown_pct||0).toFixed(1)+'%', false);
+            html += metricRow('夏普比率', (e.sharpe_ratio||0).toFixed(2), (e.sharpe_ratio||0)>=1);
+            html += metricRow('交易笔数', e.total_trades||0, true);
+            html += '</div>';
+        }
+
+        html += '</div>';
+        content.innerHTML = html;
+
+        // 净值曲线
+        drawEquityChart(vec, evt);
+
+    } catch(e) {}
+}
+
+function metricRow(label, value, positive) {
+    var color = positive ? '#3fb950' : (value.indexOf('-')>=0 ? '#f85149' : '#8b949e');
+    return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;border-bottom:1px solid #21262d;"><span style="color:#8b949e;">'+label+'</span><span style="color:'+color+';font-weight:600;">'+value+'</span></div>';
+}
+
+function drawEquityChart(vec, evt) {
+    var canvas = document.getElementById('equityChart');
+    if (!canvas || !window.Chart) return;
+    if (window.eqChart) { window.eqChart.destroy(); }
+
+    var labels = [];
+    var vecData = [];
+    var evtData = [];
+    var hasVec = false, hasEvt = false;
+
+    // 从evt取净值（如果有存的话）
+    // 目前后端返回的event_backtest_result没有净值序列，只展示两个指标对比
+
+    // 如果没有净值数据，隐藏图表
+    canvas.style.display = 'none';
+}
+
+// 自动加载对比
+setTimeout(loadBtCompare, 1000);
 loadStatus();
 setInterval(loadStatus,30000);
 </script>

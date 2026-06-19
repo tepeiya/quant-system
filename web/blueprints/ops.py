@@ -423,3 +423,44 @@ def api_log(task_name):
         with open("logs/daemon.log") as f:
             return ok({"log": f.read()[-5000:]})
     return ok({"log": "(暂无日志)"})
+
+
+@bp.route("/api/backtest_result")
+def api_backtest_result():
+    """读取向量化回测结果"""
+    import json
+    path = "signals/backtest_report.json"
+    if os.path.exists(path):
+        with open(path) as f:
+            data = json.load(f)
+        s = data.get("strategy", {})
+        b = data.get("benchmark", {})
+        return ok({
+            "total_return_pct": s.get("total_return_pct", 0),
+            "annual_return_pct": s.get("annual_return_pct", 0),
+            "max_drawdown_pct": s.get("max_drawdown_pct", 0),
+            "sharpe_ratio": s.get("sharpe_ratio", 0),
+            "sortino_ratio": s.get("sortino_ratio", 0),
+            "calmar_ratio": s.get("calmar_ratio", 0),
+            "win_rate_pct": s.get("win_rate_pct", 0),
+            "total_trades": s.get("total_trades", 0),
+            "alpha": b.get("alpha", 0),
+            "time": data.get("time", ""),
+        })
+    return ok({})
+
+
+@bp.route("/api/event_backtest_result")
+def api_event_backtest_result():
+    """读取事件驱动回测结果"""
+    import json
+    path = "/tmp/event_backtest_last.txt"
+    if os.path.exists(path):
+        with open(path) as f:
+            raw = f.read()
+        try:
+            data = json.loads(raw)
+        except:
+            return ok({"log": raw})
+        return ok(data)
+    return ok({})
