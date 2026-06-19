@@ -5,10 +5,12 @@
 <div class="panel">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
     <h2 style="margin:0;font-size:16px;">⚡ 日内</h2>
-    <div style="display:flex;gap:6px;">
-      <button class="btn" onclick="irRefresh()" style="font-size:11px;padding:5px 8px;">🔄</button>
-      <button class="btn primary" onclick="irScan()" style="font-size:11px;padding:5px 8px;">📡 扫描</button>
-      <button class="btn danger" onclick="irClose()" style="font-size:11px;padding:5px 8px;">🗑️ 清仓</button>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;">
+      <button class="btn" onclick="irRefresh()" style="font-size:11px;padding:5px 7px;">🔄</button>
+      <button class="btn primary" onclick="irScan()" style="font-size:11px;padding:5px 7px;">📡 扫描</button>
+      <button class="btn" onclick="irExecute()" style="font-size:11px;padding:5px 7px;">🚀 执行</button>
+      <button class="btn" onclick="irCheckStop()" style="font-size:11px;padding:5px 7px;">🛡️ 止损</button>
+      <button class="btn danger" onclick="irClose()" style="font-size:11px;padding:5px 7px;">🗑️ 清仓</button>
     </div>
   </div>
 
@@ -110,6 +112,16 @@ async function irRefresh() {
 async function irScan() {
   try { var d = await apiFetch('/intraday/api/scan',{method:"POST"}); showToast("扫描完成:"+(d.candidates||[]).length+"只","success"); irRefresh(); }
   catch(e) { showToast("扫描失败","error"); }
+}
+
+async function irExecute() {
+  try { var d = await apiFetch('/intraday/api/execute',{method:"POST"}); showToast(d.message,"success"); irRefresh(); }
+  catch(e) { showToast("执行失败","error"); }
+}
+
+async function irCheckStop() {
+  try { var d = await apiFetch('/intraday/api/check_stop',{method:"POST"}); showToast(d.message,"success"); irRefresh(); }
+  catch(e) { showToast("止损检查失败","error"); }
 }
 
 async function irClose() {

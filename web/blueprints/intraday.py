@@ -4,10 +4,23 @@
 from flask import Blueprint, jsonify, render_template, make_response
 import os, json, logging
 from api_response import ok, err
-import numpy as np
 
 logger = logging.getLogger("quant.intraday_web")
 bp = Blueprint("intraday", __name__, url_prefix="/intraday")
+
+
+def _get_intraday_client():
+    """获取日内专用Alpaca客户端"""
+    from alpaca.trading.client import TradingClient
+    from broker_manager import BrokerManager, load_config
+    bm = BrokerManager()
+    broker_id = bm.get_strategy_broker_id("intraday")
+    cfg = load_config().get(broker_id, {})
+    key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+    secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+    if not key or not secret:
+        return None, None
+    return TradingClient(key, secret, paper=cfg.get("paper", True)), broker_id
 
 
 @bp.route("/")
@@ -21,55 +34,43 @@ def page():
 @bp.route("/api/allocation")
 def api_allocation():
     """资金分配状态"""
-    try:
-        from alpaca.trading.client import TradingClient
-        from broker_manager import BrokerManager, load_config
-        bm = BrokerManager()
-        ratio = float(os.environ.get("INTRADAY_CAP_RATIO", "0.20"))
-
-        # 检查是否有启用的日内专用券商
-        intraday_broker_id = bm.get_strategy_broker_id("intraday")
-        cfg = load_config().get(intraday_broker_id, {})
-        dedicated_enabled = cfg.get("enabled", False) and bool(os.environ.get(cfg.get("env_key_id", ""), ""))
-
-        if dedicated_enabled:
-            key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
-            secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
-            client = TradingClient(key, secret, paper=cfg.get("paper", True))
-            acct = client.get_account()
-            equity = float(acct.equity)
-            allocated = equity
-        else:
-            main_broker_id = bm.get_strategy_broker_id("conservative")
-            cfg = load_config().get(main_broker_id, {})
-            key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
-            secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
-            client = TradingClient(key, secret, paper=cfg.get("paper", True))
-            acct = client.get_account()
-            equity = float(acct.equity)
-            allocated = equity * ratio
-        client = TradingClient(key, secret, paper=cfg.get("paper", True))
-        acct = client.get_account()
-        equity = float(acct.equity)
-        cash = float(acct.cash)
-    except:
-        equity, cash = 0, 0
-
+    equity = 0
+    cash = 0
+    allocated = 0
     ratio = float(os.environ.get("INTRADAY_CAP_RATIO", "0.20"))
-    allocated = equity * ratio
     used = 0
-    pos_list = []
+    position_count = 0
+
     try:
-        from alpaca.trading.client import TradingClient
-        client = TradingClient(
-            os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), ""),
-            os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), ""),
-            paper=True)
-        for p in client.get_all_positions():
-            pos_list.append(p.symbol)
-            used += float(p.market_value)
-    except:
-        pass
+        client, broker_id = _get_intraday_client()
+        if client:
+            acct = client.get_account()
+            equity = float(acct.equity)
+            cash = float(acct.cash)
+            allocated = equity
+
+            total_pnl = 0
+            for p in client.get_all_positions():
+                qty = int(float(p.qty))
+                if qty > 0:
+                    position_count += 1
+                    used += float(p.market_value)
+                    total_pnl += float(p.unrealized_pl)
+        else:
+            ratio = float(os.environ.get("INTRADAY_CAP_RATIO", "0.20"))
+            from alpaca.trading.client import TradingClient
+            from broker_manager import load_config, get_default_broker_id
+            cfg = load_config().get(get_default_broker_id(), {})
+            key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+            secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+            if key and secret:
+                client2 = TradingClient(key, secret, paper=True)
+                acct = client2.get_account()
+                equity = float(acct.equity)
+                cash = float(acct.cash)
+                allocated = equity * ratio
+    except Exception as e:
+        logger.error(f"获取分配信息失败: {e}")
 
     return jsonify({
         "equity": round(equity, 2),
@@ -78,7 +79,9 @@ def api_allocation():
         "ratio": ratio,
         "used": round(used, 2),
         "available": round(max(allocated - used, 0), 2),
-        "positions": len(pos_list),
+        "positions": position_count,
+        "today_trades": 0,
+        "pnl": round(total_pnl, 2) if 'total_pnl' in dir() else 0,
     })
 
 
@@ -105,24 +108,11 @@ def api_backtest():
 @bp.route("/api/scan", methods=["POST"])
 def api_scan():
     """扫描日内信号"""
-    import subprocess, sys, json
+    from intraday import generate_signal, run_backtest
     try:
-        # 用 subprocess 调用策略模块，避免导入冲突
-        r = subprocess.run(
-            [sys.executable, "-c", 
-             "import sys, json; sys.path.insert(0, '.'); "
-             "from intraday import generate_signal, run_backtest; "
-             "sig = generate_signal(); "
-             "bt = run_backtest(days=365); "
-             "import os; os.makedirs('signals', exist_ok=True); "
-             "json.dump(sig, open('signals/intraday_signal.json','w')); "
-             "json.dump(bt, open('signals/intraday_backtest.json','w')); "
-             "print(json.dumps(sig))"],
-            capture_output=True, text=True, timeout=120)
-        if r.returncode == 0:
-            return jsonify(json.loads(r.stdout))
-        else:
-            return err(r.stderr[:200])
+        sig = generate_signal()
+        bt = run_backtest(days=252)
+        return ok({"candidates": sig.get("candidates", []), "backtest": bt})
     except Exception as e:
         return err(str(e))
 
@@ -156,17 +146,32 @@ def api_positions():
         from intraday_trader import get_alpaca
         client = get_alpaca()
         positions = []
+        total_pnl = 0
         for p in client.get_all_positions():
             qty = int(float(p.qty))
             if qty > 0:
+                pnl = float(p.unrealized_pl)
+                total_pnl += pnl
                 positions.append({
                     "symbol": p.symbol,
                     "qty": qty,
                     "current_price": round(float(p.current_price), 2),
                     "avg_entry": round(float(p.avg_entry_price), 2),
                     "pnl_pct": round(float(p.unrealized_plpc) * 100, 2),
+                    "pnl": round(pnl, 2),
                     "market_value": round(float(p.market_value), 2),
                 })
-        return jsonify({"positions": positions})
+        return jsonify({"positions": positions, "total_pnl": round(total_pnl, 2)})
     except Exception as e:
         return jsonify({"positions": [], "error": str(e)})
+
+
+@bp.route("/api/check_stop", methods=["POST"])
+def api_check_stop():
+    """手动触发止盈止损检查"""
+    from intraday_trader import check_stop_loss
+    try:
+        check_stop_loss()
+        return ok(message="止盈止损检查完成")
+    except Exception as e:
+        return err(str(e))

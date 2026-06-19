@@ -317,6 +317,13 @@ def run_intraday_loop():
         except Exception as e:
             logger.warning(f"  [日内] 扫描异常: {e}")
 
+        # 先检查止盈止损
+        try:
+            from intraday_trader import check_stop_loss
+            check_stop_loss()
+        except Exception as e:
+            logger.debug(f"  [日内] 止盈止损检查跳过: {e}")
+
         # 执行日内交易（买入信号股）
         try:
             from intraday_trader import execute_intraday
