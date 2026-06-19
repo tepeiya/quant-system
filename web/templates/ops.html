@@ -182,8 +182,14 @@ async function loadBtCompare() {
         html += '</div>';
         content.innerHTML = html;
 
-        // 净值曲线
-        drawEquityChart(vec, evt);
+        // 净值曲线（取事件驱动的净值点）
+        if (evt) {
+            var e2 = evt.data || evt;
+            var points = e2.equity_points || [];
+            if (points.length > 0) {
+                drawEquityChart(points, e2.total_return_pct);
+            }
+        }
 
     } catch(e) {}
 }
@@ -193,21 +199,57 @@ function metricRow(label, value, positive) {
     return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;border-bottom:1px solid #21262d;"><span style="color:#8b949e;">'+label+'</span><span style="color:'+color+';font-weight:600;">'+value+'</span></div>';
 }
 
-function drawEquityChart(vec, evt) {
+function drawEquityChart(points, totalReturn) {
     var canvas = document.getElementById('equityChart');
     if (!canvas || !window.Chart) return;
     if (window.eqChart) { window.eqChart.destroy(); }
 
-    var labels = [];
-    var vecData = [];
-    var evtData = [];
-    var hasVec = false, hasEvt = false;
+    canvas.style.display = 'block';
 
-    // 从evt取净值（如果有存的话）
-    // 目前后端返回的event_backtest_result没有净值序列，只展示两个指标对比
+    var labels = points.map(function(p){ return p.date; });
+    var values = points.map(function(p){ return p.value; });
+    var color = (totalReturn||0) >= 0 ? 'rgba(63,185,80,' : 'rgba(248,81,73,';
 
-    // 如果没有净值数据，隐藏图表
-    canvas.style.display = 'none';
+    window.eqChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '净值',
+                data: values,
+                borderColor: color + '0.8)',
+                backgroundColor: color + '0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return '$' + ctx.parsed.y.toFixed(0);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { 
+                    grid: { display: false },
+                    ticks: { color: '#8b949e', font: { size: 9 }, maxTicksLimit: 8 }
+                },
+                y: {
+                    grid: { color: '#21262d' },
+                    ticks: { color: '#8b949e', font: { size: 9 }, callback: function(v) { return '$' + v.toFixed(0); } }
+                }
+            }
+        }
+    });
 }
 
 // 自动加载对比

@@ -251,12 +251,22 @@ class EventBacktest:
         logger.info(f"回测完成: 总收益{total_ret:+.1f}% 年化{ann_ret*100:+.1f}%  "
                      f"回撤{max_dd:.1f}% 夏普{sharpe:.2f} 交易{len(trade_log)}笔")
 
+        # 净值曲线采样（最多200点，用于前端绘图）
+        eq_sampled = eq.iloc[::max(1, len(eq)//200)].reset_index()
+        equity_points = []
+        for _, row in eq_sampled.iterrows():
+            equity_points.append({
+                "date": str(row["index"])[:10],
+                "value": round(float(row["equity"]), 0),
+            })
+
         return {
             "total_return": round(total_ret, 1),
             "annual_return": round(ann_ret * 100, 1),
             "max_drawdown": round(max_dd, 1),
             "sharpe": round(sharpe, 2),
             "equity_curve": eq,
+            "equity_points": equity_points,
             "drawdown_curve": dd,
             "trade_log": trade_log,
         }
