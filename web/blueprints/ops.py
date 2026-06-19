@@ -178,7 +178,8 @@ def api_run_event_backtest():
 
             cache = load_price_cache()
             cache = {t: compute_indicators(df) for t, df in cache.items()}
-            spy = compute_indicators(get_spy()) if get_spy() else None
+            spy_data = get_spy()
+            spy = compute_indicators(spy_data) if spy_data is not None else None
 
             tickers = sorted(cache.keys())[:100]
             prices = {t: cache[t] for t in tickers}
