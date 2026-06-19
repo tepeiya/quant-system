@@ -317,6 +317,19 @@ def run_intraday_loop():
     interval = 30 * 60
     logger.info("[日内] 轮询线程启动，美东9:30-16:00 (北京21:30-05:00) 每30分钟执行")
 
+    # 启动时立即检查是否有隔夜持仓，有则清仓
+    try:
+        r = subprocess.run(
+            [sys.executable, "intraday_trader.py", "--auto"],
+            capture_output=True, text=True, timeout=30,
+            env={**os.environ}
+        )
+        for line in r.stdout.strip().split("\n"):
+            if line.strip():
+                logger.info(f"  [日内] {line.strip()}")
+    except Exception as e:
+        logger.warning(f"  [日内] 启动检查: {e}")
+
     while not shutdown_event.is_set():
         now = datetime.now()
         if now.weekday() >= 5:
