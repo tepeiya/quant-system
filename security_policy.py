@@ -2,7 +2,7 @@
 PUBLIC_PATHS = [
     "/login", "/register", "/logout",
     "/auth/login", "/auth/register", "/auth/logout",
-    "/static/", "/api/csrf_token", "/api/trade_mode", "/api/warmup",
+    "/static/", "/api/csrf_token", "/api/warmup",
     "/api/health/full",
     "/brokers/",
 ]
