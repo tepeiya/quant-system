@@ -114,7 +114,11 @@ async function closeAllIntraday() {
   try { var d = await apiFetch('/intraday/api/close_all',{method:"POST"}); showToast(d.message,"success"); refreshData(); }
   catch(e) { showToast("清仓失败","error"); }
 }
-refreshData();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', refreshData);
+} else {
+  refreshData();
+}
 setInterval(refreshData,60000);
 </script>
 {% endblock %}
