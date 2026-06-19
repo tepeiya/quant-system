@@ -275,6 +275,19 @@ def rebalance(auto: bool = False):
     if not target_symbols:
         print("\n无可买入候选（可能都超出价格上限）")
         return
+
+    # 获取激进策略持仓，避免重复买入
+    try:
+        from paper_trader_momentum import get_alpaca as get_momentum_alpaca, get_current_positions as get_mom_positions
+        mom_client = get_momentum_alpaca(strategy="momentum")
+        if mom_client:
+            mom_held = set(get_mom_positions(mom_client).keys())
+            if mom_held:
+                logger.info(f"激进策略已有持仓: {mom_held}")
+                target_symbols = [s for s in target_symbols if s not in mom_held]
+                logger.info(f"去重后保守目标: {len(target_symbols)}只: {', '.join(target_symbols)}")
+    except Exception as e:
+        logger.debug(f"获取激进持仓失败: {e}")
     
     # 5. 计算等权目标仓位
     acct = client.get_account()

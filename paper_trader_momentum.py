@@ -90,6 +90,18 @@ def execute_rebalance(auto: bool = False, context_equity: float = 0):
     target_count = len(target_tickers)
     logger.info(f"目标持仓: {target_count}只: {', '.join(target_tickers)}")
 
+    # 获取保守策略的持仓，避免重复买入
+    try:
+        from paper_trader import get_alpaca as get_conservative_alpaca
+        cons_client = get_conservative_alpaca(strategy="conservative")
+        cons_positions = {p.symbol for p in cons_client.get_all_positions() if int(float(p.qty)) > 0}
+        if cons_positions:
+            logger.info(f"保守策略已有持仓: {cons_positions}")
+            target_tickers = [t for t in target_tickers if t not in cons_positions]
+            logger.info(f"去重后动量目标: {len(target_tickers)}只: {', '.join(target_tickers)}")
+    except Exception as e:
+        logger.debug(f"获取保守持仓失败（可能共用账户）: {e}")
+
     client = get_alpaca()
     from alpaca.trading.requests import MarketOrderRequest
     from alpaca.trading.enums import OrderSide, TimeInForce

@@ -181,15 +181,17 @@ def run_daily_cycle():
         # ===== 动量激进策略：独立信号生成 =====
         logger.info("[激进策略] 生成动量信号...")
         try:
-            from strategy_momentum import run_momentum_strategy
-            from data_prod import load_price_cache
-            from spy_source import get_spy
+            from strategy_momentum import generate_signals
+            from data_prod import load_price_cache, compute_indicators
             cache = load_price_cache()
-            spy = get_spy()
-            result = run_momentum_strategy(cache, spy)
+            for tkr in list(cache.keys()):
+                df = cache[tkr]
+                if df is not None and "Momentum_12M" not in df.columns:
+                    cache[tkr] = compute_indicators(df)
+            result = generate_signals(cache, top_n=15)
             if result:
                 save_status(last_momentum_signal=str(datetime.now()))
-                logger.info("  ✅ 动量信号生成完成")
+                logger.info(f"  ✅ 动量信号生成完成: {len(result)}只")
             else:
                 logger.warning("  动量信号生成无结果")
         except Exception as e:
