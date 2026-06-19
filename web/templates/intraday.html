@@ -46,6 +46,7 @@
 }
 
 <script>
+(function() {
 async function refreshData() {
   try {
   var a = await apiFetch('/intraday/api/allocation');
@@ -120,5 +121,6 @@ if (document.readyState === 'loading') {
   refreshData();
 }
 setInterval(refreshData,60000);
+})();
 </script>
 {% endblock %}
