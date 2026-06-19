@@ -56,6 +56,39 @@
     </div>
 </div>
 
+<!-- AI 辅助 -->
+<div class="panel mt-12">
+    <h2>🤖 AI 辅助选股</h2>
+    <div style="margin-bottom:12px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="aiEnabled" onchange="saveAIConfig()">
+            <span style="font-size:13px;">启用 AI 辅助</span>
+        </label>
+        <div style="font-size:11px;color:#484f58;margin-top:4px;">启用后每日信号将用 AI 分析候选股票，过滤风险高的</div>
+    </div>
+    <div style="margin-bottom:10px;">
+        <label style="font-size:12px;color:#8b949e;">AI 提供商</label>
+        <select id="aiProvider" onchange="saveAIConfig()" style="width:100%;padding:6px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;margin-top:4px;">
+            <option value="gemini">Gemini (推荐·免费)</option>
+            <option value="openai">OpenAI 兼容</option>
+        </select>
+    </div>
+    <div style="margin-bottom:10px;">
+        <label style="font-size:12px;color:#8b949e;">模型</label>
+        <input type="text" id="aiModel" placeholder="gemini-2.0-flash-lite" style="width:100%;padding:6px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;margin-top:4px;">
+    </div>
+    <div style="margin-bottom:10px;">
+        <label style="font-size:12px;color:#8b949e;">API Key</label>
+        <input type="password" id="aiApiKey" placeholder="输入 API Key" style="width:100%;padding:6px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;margin-top:4px;">
+        <div style="font-size:10px;color:#484f58;margin-top:4px;">已设置: <span id="aiKeyStatus" style="color:#3fb950;">未设置</span></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn primary" onclick="saveAIConfig()">💾 保存 AI 配置</button>
+        <span id="aiConfigMsg" style="font-size:12px;color:#8b949e;">&nbsp;</span>
+    </div>
+    <div style="margin-top:8px;font-size:10px;color:#484f58;">Gemini 免费额度每天 1500 次请求。Key 存在服务器，不会泄露。</div>
+</div>
+
 <!-- 环境变量 -->
 <div class="panel mt-12">
     <h2>🔐 环境变量</h2>
@@ -187,6 +220,40 @@ async function saveIntradayConfig() {
     document.getElementById('intradayMsg').textContent = d.status==='ok'?'✅ 已保存':'❌ 失败';
 }
 
+// ===== AI 配置 =====
+async function loadAIConfig() {
+    try {
+        const d = await apiFetch('/settings/api/ai_config');
+        const c = d.data || d;
+        document.getElementById('aiEnabled').checked = c.enabled || false;
+        document.getElementById('aiProvider').value = c.provider || 'gemini';
+        document.getElementById('aiModel').value = c.model || 'gemini-2.0-flash-lite';
+        document.getElementById('aiKeyStatus').textContent = c.api_key_set ? '已设置' : '未设置';
+        document.getElementById('aiKeyStatus').style.color = c.api_key_set ? '#3fb950' : '#f85149';
+    } catch(e) {}
+}
+
+async function saveAIConfig() {
+    const data = {
+        enabled: document.getElementById('aiEnabled').checked,
+        provider: document.getElementById('aiProvider').value,
+        model: document.getElementById('aiModel').value.trim(),
+    };
+    const key = document.getElementById('aiApiKey').value.trim();
+    if (key) data.api_key = key;
+
+    try {
+        const d = await apiFetch('/settings/api/save_ai_config', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(data)
+        });
+        document.getElementById('aiConfigMsg').textContent = d.status === 'ok' ? '✅ 已保存' : '❌ 失败';
+        loadAIConfig();
+    } catch(e) {
+        document.getElementById('aiConfigMsg').textContent = '❌ ' + e.message;
+    }
+}
+
 // ===== 环境变量 =====
 async function loadEnvVars() {
     const d = await apiFetch('/settings/api/env_vars');
@@ -215,6 +282,7 @@ loadConfig();
 loadAlloc();
 loadFactorWeights();
 loadIntradayConfig();
+loadAIConfig();
 loadEnvVars();
 </script>
 {% endblock %}

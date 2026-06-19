@@ -257,6 +257,44 @@ def page():
     return render_template("settings.html")
 
 
+# ===== AI 辅助配置 =====
+
+@bp.route("/api/ai_config")
+def api_ai_config():
+    """获取 AI 配置（不返回 API Key 原文）"""
+    from ai_assist import load_config
+    cfg = load_config()
+    # 不暴露完整 Key
+    key = cfg.get("api_key", "")
+    return jsonify({
+        "enabled": cfg.get("enabled", False),
+        "provider": cfg.get("provider", "gemini"),
+        "api_key_set": bool(key),
+        "api_key_preview": key[:8] + "****" if len(key) > 8 else "",
+        "model": cfg.get("model", "gemini-2.0-flash-lite"),
+    })
+
+
+@bp.route("/api/save_ai_config", methods=["POST"])
+def api_save_ai_config():
+    """保存 AI 配置"""
+    from ai_assist import load_config, save_config
+    data = __import__("flask").request.json or {}
+    cfg = load_config()
+
+    if "enabled" in data:
+        cfg["enabled"] = bool(data["enabled"])
+    if "provider" in data:
+        cfg["provider"] = str(data["provider"])
+    if "api_key" in data and data["api_key"]:
+        cfg["api_key"] = str(data["api_key"])
+    if "model" in data:
+        cfg["model"] = str(data["model"])
+
+    save_config(cfg)
+    return ok(message="AI配置已保存")
+
+
 # ===== 因子权重 =====
 
 @bp.route("/api/factor_weights")

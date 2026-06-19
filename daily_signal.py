@@ -342,6 +342,19 @@ def generate_signals(use_cached_quality=True):
         except Exception as e:
             logger.warning(f"财报过滤失败: {str(e)[:80]}")
 
+        # AI 辅助分析（如果启用）
+        try:
+            from ai_assist import ai_filter_candidates
+            before = len(cand)
+            market_ctx = {"spy_price": float(spy_price), "rsi": float(rsi),
+                          "trend": ml, "action": ma}
+            cand = ai_filter_candidates(cand, market_ctx)
+            ai_filtered = before - len(cand)
+            if ai_filtered > 0:
+                print(f"\n🤖 AI分析: 过滤了 {ai_filtered} 只")
+        except Exception as e:
+            logger.debug(f"AI分析跳过: {e}")
+
         print(f"\n🟢 买入候选 Top 5")
         print(f"  {'股票':>6} {'评分':>6} {'价格':>8} {'动量%':>7} {'质量分':>6}")
         for s in cand:
