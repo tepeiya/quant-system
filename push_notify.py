@@ -11,6 +11,7 @@ PushPlus 微信推送 — 信号通知/风控告警
 import os, json, logging
 from datetime import datetime
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [NOTIFY] %(message)s")
 logger = logging.getLogger("quant.notify")
 
 CACHE_FILE = "data_cache/notify_cache.json"

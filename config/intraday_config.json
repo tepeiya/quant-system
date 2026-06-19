@@ -1,0 +1,20 @@
+{
+  "enabled": true,
+  "max_positions": 3,
+  "per_position_pct": 0.15,
+  "capital_pct": 0.20,
+  "stop_loss_pct": 2.0,
+  "take_profit_pct": 3.0,
+  "scan_interval_minutes": 30,
+  "close_time": "15:50",
+  "momentum_windows": [15, 30, 60],
+  "min_price": 10,
+  "max_price": 500,
+  "min_volume_ratio": 1.2,
+  "backtest_result": {
+    "total_return_pct": 0,
+    "max_drawdown": 0,
+    "win_rate": 0,
+    "total_trades": 0
+  }
+}

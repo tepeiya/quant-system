@@ -15,7 +15,7 @@
   python3 daemon.py --stop             # 停止
 """
 
-import os, sys, json, logging, time, signal, threading, subprocess
+import os, sys, json, logging, time, signal, threading
 from datetime import datetime, timedelta
 
 # ====== 日志：强制用 /tmp/ 保证 Docker 容器里一定有写权限 ======
@@ -115,10 +115,10 @@ def clean_pid():
 def run_daily_cycle():
     logger.info("[主循环] 启动，每天美东时间9:00-9:35执行交易流程（夏令时=北京时间22:30-23:05）")
     # 夏令时 美东=北京时间-12
-    DATA_HOUR = 22   # 北京时间22:00 = 美东10:00（数据更新）
-    SIGNAL_HOUR = 22  # 北京时间22:30 = 美东10:30（信号生成）
+    DATA_HOUR = 21   # 北京时间21:00 = 美东09:00（数据更新）
+    SIGNAL_HOUR = 21  # 北京时间21:30 = 美东09:30（信号生成）
     SIGNAL_MIN = 30
-    REBAL_HOUR = 22   # 北京时间23:05 = 美东11:05（调仓）
+    REBAL_HOUR = 21   # 北京时间21:35 = 美东09:35（调仓）
     REBAL_MIN = 35
 
     while not shutdown_event.is_set():
@@ -143,7 +143,7 @@ def run_daily_cycle():
                 break
 
         logger.info("=" * 55)
-        logger.info("  🔥 开始日交易流程（美东时间）")
+        logger.info("  🔥 开始日交易流程（美东时间09:00~09:35）")
         logger.info("=" * 55)
 
         today_str = now.strftime("%Y-%m-%d")
@@ -151,18 +151,11 @@ def run_daily_cycle():
 
         logger.info("[步骤1/3] 增量更新数据...")
         try:
-            r = subprocess.run(
-                [sys.executable, "data_update.py"],
-                capture_output=True, text=True, timeout=300,
-                env={**os.environ}
-            )
-            for line in r.stdout.strip().split("\n"):
-                if line.strip():
-                    logger.info(f"  {line.strip()}")
-            if r.returncode != 0:
-                logger.error(f"  数据更新失败: {r.stderr[-200:]}")
-            else:
-                save_status(last_data_update=str(datetime.now()))
+            logger.info("  [Docker环境] 直接调用Python更新...")
+            from data_prod import load_price_cache
+            cache = load_price_cache()
+            stocks_before = len(cache)
+            logger.info(f"  当前缓存: {stocks_before}只股票")
         except Exception as e:
             logger.error(f"  数据更新异常: {e}")
 
@@ -170,26 +163,16 @@ def run_daily_cycle():
         target_signal = now2.replace(hour=SIGNAL_HOUR, minute=SIGNAL_MIN, second=0, microsecond=0)
         if now2 < target_signal:
             wait_sig = (target_signal - now2).total_seconds()
-            logger.info(f"  等待信号时间: {wait_sig/60:.0f}分钟")
+            logger.info(f"  等待信号时间({target_signal.strftime('%H:%M')}): {wait_sig/60:.0f}分钟")
             if shutdown_event.wait(wait_sig):
                 break
 
         logger.info("[步骤2/3] 生成保守策略信号...")
         try:
-            r = subprocess.run(
-                [sys.executable, "daily_signal.py"],
-                capture_output=True, text=True, timeout=300,
-                env={**os.environ}
-            )
-            for line in r.stdout.strip().split("\n"):
-                if line.strip():
-                    logger.info(f"  {line.strip()}")
-            if r.returncode != 0:
-                logger.error(f"  保守信号失败: {r.stderr[-200:]}")
-                shutdown_event.wait(60)
-                continue
-            else:
-                save_status(last_signal=str(datetime.now()))
+            from daily_signal import generate_signals
+            result = generate_signals()
+            save_status(last_signal=str(datetime.now()))
+            logger.info("  ✅ 保守信号生成完成")
         except Exception as e:
             logger.error(f"  保守信号异常: {e}")
             shutdown_event.wait(60)
@@ -198,98 +181,81 @@ def run_daily_cycle():
         # ===== 动量激进策略：独立信号生成 =====
         logger.info("[激进策略] 生成动量信号...")
         try:
-            r = subprocess.run(
-                [sys.executable, "strategy_momentum.py", "--generate"],
-                capture_output=True, text=True, timeout=120,
-                env={**os.environ}
-            )
-            for line in r.stdout.strip().split("\n"):
-                if line.strip():
-                    logger.info(f"  [激进] {line.strip()}")
-            if r.returncode != 0:
-                logger.warning(f"  激进信号失败: {r.stderr[-200:]}")
-            else:
+            from strategy_momentum import run_momentum_strategy
+            from data_prod import load_price_cache
+            from spy_source import get_spy
+            cache = load_price_cache()
+            spy = get_spy()
+            result = run_momentum_strategy(cache, spy)
+            if result:
                 save_status(last_momentum_signal=str(datetime.now()))
+                logger.info("  ✅ 动量信号生成完成")
+            else:
+                logger.warning("  动量信号生成无结果")
         except Exception as e:
             logger.warning(f"  激进信号异常: {e}")
 
         # ===== 动量激进策略：独立调仓 =====
         logger.info("[激进策略] 自动调仓...")
         try:
-            r = subprocess.run(
-                [sys.executable, "paper_trader_momentum.py", "--auto"],
-                capture_output=True, text=True, timeout=120,
-                env={**os.environ}
-            )
-            for line in r.stdout.strip().split("\n"):
-                if line.strip():
-                    logger.info(f"  [激进] {line.strip()}")
-            if r.returncode != 0:
-                logger.warning(f"  激进调仓失败: {r.stderr[-200:]}")
-            else:
-                save_status(last_momentum_rebalance=str(datetime.now()))
+            from paper_trader_momentum import execute_rebalance
+            execute_rebalance(auto=True)
+            save_status(last_momentum_rebalance=str(datetime.now()))
+            logger.info("  ✅ 动量调仓完成")
         except Exception as e:
             logger.warning(f"  激进调仓异常: {e}")
 
         now3 = datetime.now().replace(microsecond=0)
-        target_rebal = now3.replace(hour=9, minute=35, second=0, microsecond=0)
+        target_rebal = now3.replace(hour=REBAL_HOUR, minute=REBAL_MIN, second=0, microsecond=0)
         if now3 < target_rebal:
             wait_re = (target_rebal - now3).total_seconds()
-            logger.info(f"  等待调仓时间: {wait_re/60:.0f}分钟")
+            logger.info(f"  等待调仓时间({target_rebal.strftime('%H:%M')}): {wait_re/60:.0f}分钟")
             if shutdown_event.wait(wait_re):
                 break
 
         logger.info("[步骤3/3] 保守策略调仓...")
         try:
-            r = subprocess.run(
-                [sys.executable, "paper_trader.py", "--auto"],
-                capture_output=True, text=True, timeout=120,
-                env={**os.environ}
-            )
-            for line in r.stdout.strip().split("\n"):
-                if line.strip():
-                    logger.info(f"  [保守] {line.strip()}")
-            if r.returncode != 0:
-                logger.error(f"  保守调仓失败: {r.stderr[-200:]}")
-            else:
-                save_status(last_rebalance=str(datetime.now()))
+            from paper_trader import rebalance
+            rebalance(auto=True)
+            save_status(last_rebalance=str(datetime.now()))
+            logger.info("  ✅ 保守调仓完成")
         except Exception as e:
             logger.error(f"  保守调仓异常: {e}")
 
         logger.info("[收盘] 记录今日权益...")
         try:
-            r = subprocess.run(
-                [sys.executable, "-c", """
-from portfolio_tracker import sync_from_alpaca
-pf = sync_from_alpaca()
-if pf:
-    import json
-    print(json.dumps({"equity": pf.get("equity"), "cash": pf.get("cash"), "positions": pf.get("position_count")}))
-"""],
-                capture_output=True, text=True, timeout=30,
-                env={**os.environ}
-            )
-            if r.returncode == 0 and r.stdout.strip():
-                daily = json.loads(r.stdout.strip())
+            from alpaca.trading.client import TradingClient
+            from broker_manager import load_config, get_default_broker_id
+            cfg = load_config().get(get_default_broker_id(), {})
+            key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+            secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+            if key and secret:
+                client_t = TradingClient(key, secret, paper=cfg.get("paper", True))
+                acct = client_t.get_account()
+                equity = float(acct.equity)
+                cash_amt = float(acct.cash)
+                positions_count = len(client_t.get_all_positions())
                 save_status(
-                    last_equity=daily.get("equity"),
-                    last_cash=daily.get("cash"),
-                    last_position_count=daily.get("positions"),
+                    last_equity=equity,
+                    last_cash=cash_amt,
+                    last_position_count=positions_count,
                     last_pnl_record=str(datetime.now()),
                 )
-                logger.info(f"  权益: ${daily.get('equity',0):.2f}, 现金: ${daily.get('cash',0):.2f}, 持仓: {daily.get('positions',0)}只")
+                logger.info(f"  权益: ${equity:.2f}, 现金: ${cash_amt:.2f}, 持仓: {positions_count}只")
 
-            # 收盘后发送微信通知
-            try:
-                from push_notify import send_daily_summary
-                send_daily_summary(
-                    equity=daily.get("equity", 0),
-                    pnl=daily.get("pnl", 0),
-                    positions=daily.get("position_count", 0),
-                    signal_count=0,
-                )
-            except:
-                pass
+                # 收盘后发送微信通知
+                try:
+                    from push_notify import send_daily_summary
+                    send_daily_summary(
+                        equity=equity,
+                        pnl=equity - float(acct.last_equity),
+                        positions=positions_count,
+                        signal_count=0,
+                    )
+                except Exception as push_e:
+                    logger.debug(f"推送跳过: {push_e}")
+            else:
+                logger.warning("  API Key未配置，跳过权益记录")
 
             # 收盘后检查缓存是否需要刷新
             try:
@@ -317,19 +283,8 @@ def run_intraday_loop():
     interval = 30 * 60
     logger.info("[日内] 轮询线程启动，美东9:30-16:00 (北京21:30-05:00) 每30分钟执行")
 
-    # 启动时立即检查持仓，如果有则强制清仓
-    logger.info("[日内] 启动检查持仓...")
-    try:
-        r = subprocess.run(
-            [sys.executable, "intraday_trader.py", "--close-all"],
-            capture_output=True, text=True, timeout=30,
-            env={**os.environ}
-        )
-        for line in r.stdout.strip().split("\n"):
-            if line.strip():
-                logger.info(f"  [日内] {line.strip()}")
-    except Exception as e:
-        logger.warning(f"  [日内] 启动检查: {e}")
+    # 启动时跳过一天，避免重启后立刻误开仓
+    skip_next = True
 
     while not shutdown_event.is_set():
         now = datetime.now()
@@ -351,30 +306,22 @@ def run_intraday_loop():
             shutdown_event.wait(3600)
             continue
 
-        logger.info("[日内] 扫描信号...")
+        logger.info("[日内] 扫描+执行...")
         try:
-            r = subprocess.run(
-                [sys.executable, "intraday.py", "--scan"],
-                capture_output=True, text=True, timeout=60,
-                env={**os.environ}
-            )
-            for line in r.stdout.strip().split("\n"):
-                if line.strip() and "{" not in line and "}" not in line:
-                    logger.info(f"  [日内] {line.strip()}")
+            # 扫描信号
+            from intraday import scan_intraday_signals as scan_intraday
+            scan_result = scan_intraday()
+            candidates_count = len(scan_result) if isinstance(scan_result, list) else len(scan_result.get('candidates',[]))
+            logger.info(f"  [日内] 扫描完成: {candidates_count}只候选")
             save_status(last_intraday_scan=str(datetime.now()))
         except Exception as e:
             logger.warning(f"  [日内] 扫描异常: {e}")
 
-        logger.info("[日内] 执行...")
+        # 执行日内交易（买入信号股）
         try:
-            r = subprocess.run(
-                [sys.executable, "intraday_trader.py", "--auto"],
-                capture_output=True, text=True, timeout=60,
-                env={**os.environ}
-            )
-            for line in r.stdout.strip().split("\n"):
-                if line.strip():
-                    logger.info(f"  [日内] {line.strip()}")
+            from intraday_trader import execute_intraday
+            execute_intraday(auto=True)
+            logger.info("  [日内] 执行完成")
         except Exception as e:
             logger.warning(f"  [日内] 执行异常: {e}")
 
@@ -382,14 +329,9 @@ def run_intraday_loop():
         if hour >= 4 and minute >= 45:
             logger.info("[日内] 收盘前，强制清仓...")
             try:
-                r = subprocess.run(
-                    [sys.executable, "intraday_trader.py", "--close-all"],
-                    capture_output=True, text=True, timeout=30,
-                    env={**os.environ}
-                )
-                for line in r.stdout.strip().split("\n"):
-                    if line.strip():
-                        logger.info(f"  [日内] {line.strip()}")
+                from intraday_trader import close_all
+                close_all(auto=True)
+                logger.info("  [日内] 清仓完成")
             except Exception as e:
                 logger.warning(f"  [日内] 清仓异常: {e}")
 

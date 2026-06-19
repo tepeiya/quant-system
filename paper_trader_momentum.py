@@ -17,9 +17,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [MOMENTUM] %(message
 logger = logging.getLogger("quant.momentum")
 
 SIGNAL_FILE = "signals/signal_momentum.json"
-# ===== 资金分配配置 =====
-# 激进策略占用总资金的比例（剩余留给保守策略）
-MOMENTUM_CAP_RATIO = float(os.environ.get("MOMENTUM_CAP_RATIO", "0.5"))
+TRADE_LOG = "signals/trade_log_momentum.json"
 
 
 def get_alpaca(strategy: str = "momentum"):
@@ -81,7 +79,7 @@ def get_account_cash(client) -> float:
         return 0
 
 
-def execute_rebalance(auto: bool = False):
+def execute_rebalance(auto: bool = False, context_equity: float = 0):
     """执行动量策略调仓"""
     signal = load_signal()
     if not signal or not signal.get("tickers"):
@@ -96,24 +94,24 @@ def execute_rebalance(auto: bool = False):
     from alpaca.trading.requests import MarketOrderRequest
     from alpaca.trading.enums import OrderSide, TimeInForce
 
-    # 当前持仓
+    # 获取当前持仓
     current_pos = get_current_positions(client)
-    cash = get_account_cash(client)
-    logger.info(f"当前持仓: {len(current_pos)}只, 现金: ${cash:.2f}")
+    logger.info(f"当前持仓: {len(current_pos)}只")
 
-    # 计算总资产
-    total_equity = cash
-    for sym, qty in current_pos.items():
-        try:
-            p = client.get_latest_trade(sym)
-            total_equity += qty * p.price
-        except:
-            pass
+    # 获取账户权益
+    try:
+        acct = client.get_account()
+        acct_equity = float(acct.equity)
+        acct_cash = float(acct.cash)
+    except Exception as e:
+        logger.error(f"获取账户信息失败: {e}")
+        return
 
-    # 激进策略只使用总资金的 MOMENTUM_CAP_RATIO
-    allocated = total_equity * MOMENTUM_CAP_RATIO
-    target_per = allocated / target_count
-    logger.info(f"总资产: ${total_equity:.2f}, 激进分配: ${allocated:.2f} ({MOMENTUM_CAP_RATIO*100:.0f}%), 每只目标: ${target_per:.2f}")
+    # 如果传入了总资产限制则使用，否则使用账户全部资金
+    total_equity = context_equity if context_equity else acct_equity
+    cash = acct_cash
+    target_per = total_equity / target_count
+    logger.info(f"账户权益: ${total_equity:.2f}, 现金: ${cash:.2f}, 每只目标: ${target_per:.2f}")
 
     trades = []
     trade_log = load_trade_log()
@@ -139,8 +137,15 @@ def execute_rebalance(auto: bool = False):
         current_value = 0
         if current_qty > 0:
             try:
-                p = client.get_latest_trade(sym)
-                current_value = current_qty * p.price
+                import requests as _req
+                from broker_manager import load_config, get_default_broker_id
+                _cfg = load_config().get(get_default_broker_id(), {})
+                _key = os.environ.get(_cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+                _secret = os.environ.get(_cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+                r = _req.get(f"https://data.alpaca.markets/v2/stocks/{sym}/trades/latest",
+                            auth=(_key, _secret), timeout=5)
+                if r.status_code == 200:
+                    current_value = current_qty * float(r.json().get("trade", {}).get("p", 0))
             except:
                 pass
 
@@ -150,7 +155,13 @@ def execute_rebalance(auto: bool = False):
 
         if auto:
             try:
-                price = client.get_latest_trade(sym).price
+                import requests as _req
+                _cfg2 = load_config().get(get_default_broker_id(), {})
+                _key2 = os.environ.get(_cfg2.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+                _secret2 = os.environ.get(_cfg2.get("env_secret", "ALPACA_SECRET_KEY"), "")
+                r = _req.get(f"https://data.alpaca.markets/v2/stocks/{sym}/trades/latest",
+                            auth=(_key2, _secret2), timeout=5)
+                price = float(r.json().get("trade", {}).get("p", 0)) if r.status_code == 200 else 0
                 qty = int(abs(diff) / price)
                 if qty <= 0:
                     continue
@@ -225,8 +236,15 @@ def show_status():
         print(f"  现金:      ${cash:.2f}")
         for sym, qty in sorted(positions.items())[:10]:
             try:
-                p = client.get_latest_trade(sym)
-                value = qty * p.price
+                from broker_manager import load_config, get_default_broker_id
+                import requests as _req
+                _cfg3 = load_config().get(get_default_broker_id(), {})
+                _key3 = os.environ.get(_cfg3.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+                _secret3 = os.environ.get(_cfg3.get("env_secret", "ALPACA_SECRET_KEY"), "")
+                r = _req.get(f"https://data.alpaca.markets/v2/stocks/{sym}/trades/latest",
+                            auth=(_key3, _secret3), timeout=5)
+                price = float(r.json().get("trade", {}).get("p", 0)) if r.status_code == 200 else 0
+                value = qty * price if price > 0 else 0
                 print(f"    {sym:6s} x{qty:4.0f}  ${value:.2f}")
             except:
                 print(f"    {sym:6s} x{qty:4.0f}")

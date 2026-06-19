@@ -273,7 +273,11 @@ function updateTradeModeUI() {
 }
 
 async function toggleTradeMode() {
-    tradeMode = tradeMode === 'paper' ? 'live' : 'paper';
+    const targetMode = tradeMode === 'paper' ? 'live' : 'paper';
+    const isLive = targetMode === 'live';
+    if (isLive && !confirm('⚠️ 确认切换到实盘模式？\n\n切换后交易将使用真实资金。\n请确认：\n1. 券商已切换到实盘\n2. API Key 为实盘 Key\n3. 资金账户正确')) return;
+    if (!isLive && !confirm('切换为纸交易模式？')) return;
+    tradeMode = targetMode;
     localStorage.setItem('trade_mode', tradeMode);
     updateTradeModeUI();
     try {
