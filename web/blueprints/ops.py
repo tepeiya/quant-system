@@ -172,6 +172,10 @@ def api_run_event_backtest():
     """事件驱动回测（更真实的逐日模拟）"""
     def task():
         try:
+            # 如果 spy_source.py 权限不对，从内存重建
+            if not os.access("spy_source.py", os.R_OK):
+                _fix_perms()
+            
             from data_prod import load_price_cache, compute_indicators
             from spy_source import get_spy
             from event_backtest import run_event_backtest
