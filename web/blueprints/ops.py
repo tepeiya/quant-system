@@ -197,10 +197,11 @@ def api_run_event_backtest():
                 "max_drawdown_pct": result["max_drawdown"],
                 "sharpe_ratio": result["sharpe"],
                 "total_trades": len(result.get("trade_log", [])),
+                "equity_points": result.get("equity_points", []),
             }
 
             with open("/tmp/event_backtest_last.txt", "w") as f:
-                f.write(json.dumps(output, indent=2, ensure_ascii=False))
+                json.dump(output, f, indent=2, ensure_ascii=False, default=str)
 
             logger.info(f"事件回测完成: 收益{result['total_return']:+.1f}%")
 
