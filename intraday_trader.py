@@ -90,21 +90,6 @@ def execute_intraday(auto: bool = False):
     logger.info(f"总权益: ${equity:.2f}, 日内分配: ${allocated:.2f} ({CAPITAL_RATIO*100:.0f}%)")
     logger.info(f"当前持仓: {len(positions)} 只")
 
-    # 收盘前强制清仓
-    now = datetime.now()
-    if now.hour >= 15 or (now.hour == 15 and now.minute >= 50):
-        logger.info("收盘时间，强制清仓日内持仓")
-        for sym, pos in positions.items():
-            if auto:
-                order = MarketOrderRequest(
-                    symbol=sym, qty=pos["qty"], side=OrderSide.SELL,
-                    time_in_force=TimeInForce.DAY)
-                client.submit_order(order)
-            trades.append({"symbol": sym, "side": "SELL_CLOSE", "qty": pos["qty"], "auto": auto})
-        if trades:
-            trade_log["trades"].append({"time": str(datetime.now()), "action": "force_close", "trades": trades})
-            save_trade_log(trade_log)
-        return
 
     # 买入信号股
     per_target = allocated / len(candidates)
