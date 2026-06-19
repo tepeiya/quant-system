@@ -252,11 +252,13 @@ class EventBacktest:
                      f"回撤{max_dd:.1f}% 夏普{sharpe:.2f} 交易{len(trade_log)}笔")
 
         # 净值曲线采样（最多200点，用于前端绘图）
-        eq_sampled = eq.iloc[::max(1, len(eq)//200)].reset_index()
+        eq_sampled = eq.reset_index()
+        eq_sampled.columns = ["date", "equity"]
+        eq_sampled = eq_sampled.iloc[::max(1, len(eq_sampled)//200)]
         equity_points = []
         for _, row in eq_sampled.iterrows():
             equity_points.append({
-                "date": str(row["index"])[:10],
+                "date": str(row["date"])[:10] if hasattr(row["date"], 'strftime') else str(row["date"])[:10],
                 "value": round(float(row["equity"]), 0),
             })
 
