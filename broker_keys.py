@@ -28,6 +28,13 @@ BROKER_KEY_MAP = {
             {"key": "ALPACA_LIVE_SECRET", "label": "Secret Key", "secret": True},
         ]
     },
+    "alpaca_paper_intraday": {
+        "name": "Alpaca 日内专用",
+        "fields": [
+            {"key": "ALPACA_INTRADAY_KEY_ID", "label": "日内 Key ID", "secret": False},
+            {"key": "ALPACA_INTRADAY_SECRET", "label": "日内 Secret", "secret": True},
+        ]
+    },
     "ibkr": {
         "name": "盈透证券",
         "fields": [
@@ -115,6 +122,18 @@ def get_broker_keys_status() -> list:
             "fields": fields,
         })
     return result
+
+
+def get_key_unified(key_name: str) -> str:
+    """统一获取Key：broker_keys.json优先 -> 环境变量备选
+    所有券商模块都应该用这个函数，而不是直接 os.environ.get()
+    """
+    # 先查 broker_keys.json（Web面板保存的）
+    keys = load_keys()
+    if key_name in keys and keys[key_name]:
+        return keys[key_name]
+    # 备选：环境变量
+    return os.environ.get(key_name, "")
 
 
 def broker_from_alpaca_key(key_id: str, secret: str, paper: bool = True):

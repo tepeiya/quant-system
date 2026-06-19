@@ -28,8 +28,13 @@ def get_alpaca(strategy: str = "momentum"):
     from alpaca.trading.client import TradingClient
     key_name = cfg.get("env_key_id", "ALPACA_API_KEY_ID")
     sec_name = cfg.get("env_secret", "ALPACA_SECRET_KEY")
-    key = os.environ.get(key_name, "")
-    secret = os.environ.get(sec_name, "")
+    try:
+        from broker_keys import get_key_unified
+        key = get_key_unified(key_name)
+        secret = get_key_unified(sec_name)
+    except:
+        key = os.environ.get(key_name, "")
+        secret = os.environ.get(sec_name, "")
     if not key or not secret:
         logger.error(f"请设置 {key_name} 和 {sec_name}")
         sys.exit(1)

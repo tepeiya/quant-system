@@ -167,8 +167,14 @@ class AlpacaBroker(BrokerInterface):
         import requests
         self._requests = requests
         self.base = config.get("base_url", "https://paper-api.alpaca.markets")
-        self.key = os.environ.get(config.get("env_key_id", "ALPACA_API_KEY_ID"), "")
-        self.secret = os.environ.get(config.get("env_secret", "ALPACA_SECRET_KEY"), "")
+        # 先从 broker_keys.json 读取，再回退到环境变量
+        try:
+            from broker_keys import get_key_unified
+            self.key = get_key_unified(config.get("env_key_id", "ALPACA_API_KEY_ID"))
+            self.secret = get_key_unified(config.get("env_secret", "ALPACA_SECRET_KEY"))
+        except:
+            self.key = os.environ.get(config.get("env_key_id", "ALPACA_API_KEY_ID"), "")
+            self.secret = os.environ.get(config.get("env_secret", "ALPACA_SECRET_KEY"), "")
         self._auth = (self.key, self.secret)
     
     def _get(self, path):

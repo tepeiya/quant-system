@@ -189,11 +189,21 @@ def api_reset_config():
 
 @bp.route("/api/cap_allocation")
 def api_cap_allocation():
-    """获取当前资金分配比例"""
+    """获取当前资金分配比例（仅展示用，实际由各策略独立使用券商账户）"""
     import os
+    env_file = ".env"
+    env_values = {}
+    if os.path.exists(env_file):
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    env_values[k.strip()] = v.strip()
+
     return jsonify({
-        "conservative": float(os.environ.get("CONSERVATIVE_CAP_RATIO", "0.5")),
-        "momentum": float(os.environ.get("MOMENTUM_CAP_RATIO", "0.5")),
+        "conservative": float(env_values.get("CONSERVATIVE_CAP_RATIO", "0.5")),
+        "momentum": float(env_values.get("MOMENTUM_CAP_RATIO", "0.5")),
     })
 
 

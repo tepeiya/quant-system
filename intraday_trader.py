@@ -35,8 +35,15 @@ def get_alpaca(strategy: str = "intraday"):
         logger.error(f"策略 {strategy} 绑定的券商 {broker_id} 未启用")
         return None
     from alpaca.trading.client import TradingClient
-    key = os.environ.get(cfg.get("env_key_id", "ALPACA_API_KEY_ID"), "")
-    secret = os.environ.get(cfg.get("env_secret", "ALPACA_SECRET_KEY"), "")
+    key_name = cfg.get("env_key_id", "ALPACA_API_KEY_ID")
+    sec_name = cfg.get("env_secret", "ALPACA_SECRET_KEY")
+    try:
+        from broker_keys import get_key_unified
+        key = get_key_unified(key_name)
+        secret = get_key_unified(sec_name)
+    except:
+        key = os.environ.get(key_name, "")
+        secret = os.environ.get(sec_name, "")
     if not key or not secret:
         logger.error(f"环境变量未设置: {cfg.get('env_key_id')} / {cfg.get('env_secret')}")
         return None
