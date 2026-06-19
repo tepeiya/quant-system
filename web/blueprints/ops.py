@@ -412,6 +412,9 @@ def api_git_pull_log():
         with open(path) as f:
             return ok({"log": f.read()[-5000:]})
     return ok({"log": "(尚未执行)"})
+
+
+@bp.route("/api/log/<task_name>")
 def api_log(task_name):
     paths = {
         "backtest": "/tmp/backtest_last.txt", "signal": "/tmp/signal_last.txt",
