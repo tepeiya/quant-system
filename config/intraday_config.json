@@ -6,7 +6,7 @@
   "stop_loss_pct": 1.5,
   "take_profit_pct": 2.5,
   "trailing_stop_pct": 1.0,
-  "scan_interval_minutes": 30,
+  "scan_interval_minutes": 15,
   "close_time": "15:50",
   "momentum_windows": [5, 15, 30],
   "min_price": 5,
