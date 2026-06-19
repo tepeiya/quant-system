@@ -2,87 +2,123 @@
 {% block title %}日内 - 量化系统{% endblock %}
 {% block content %}
 
-<div style="padding:12px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-  <h2 style="margin:0;font-size:16px;">⚡ 日内</h2>
-  <div style="display:flex;gap:6px;">
-    <button class="btn" onclick="refreshData()" style="font-size:11px;padding:5px 8px;">🔄</button>
-    <button class="btn primary" onclick="executeScan()" style="font-size:11px;padding:5px 8px;">📡 扫描</button>
-    <button class="btn danger" onclick="closeAllIntraday()" style="font-size:11px;padding:5px 8px;">🗑️ 清仓</button>
+<div class="panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <h2 style="margin:0;font-size:16px;">⚡ 日内</h2>
+    <div style="display:flex;gap:6px;">
+      <button class="btn" onclick="irRefresh()" style="font-size:11px;padding:5px 8px;">🔄</button>
+      <button class="btn primary" onclick="irScan()" style="font-size:11px;padding:5px 8px;">📡 扫描</button>
+      <button class="btn danger" onclick="irClose()" style="font-size:11px;padding:5px 8px;">🗑️ 清仓</button>
+    </div>
+  </div>
+
+  <div id="irContent">
+    <div style="text-align:center;padding:30px;color:#8b949e;font-size:13px;">加载中...</div>
   </div>
 </div>
 
-<div id="allocSummary" class="g2" style="margin-bottom:8px;"></div>
-<div id="todayStats" class="g3" style="margin-bottom:8px;"></div>
-
-<div style="font-size:11px;color:#8b949e;margin-bottom:4px;">📋 持仓</div>
-<div id="intradayPositions" style="margin-bottom:8px;"></div>
-
-<div style="font-size:11px;color:#8b949e;margin-bottom:4px;">📡 信号</div>
-<div id="signalList" style="margin-bottom:8px;"></div>
-
-<div style="font-size:11px;color:#8b949e;margin-bottom:4px;">⚙️ 配置</div>
-<div id="configInfo" style="margin-bottom:8px;"></div>
-
-<div style="font-size:11px;color:#8b949e;margin-bottom:4px;">📊 回测</div>
-<div id="backtestResult"></div>
-</div>
-
-<style>
-.g2 {display:grid;grid-template-columns:repeat(2,1fr);gap:6px;}
-.g3 {display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
-.mini {background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;}
-.mini .n {font-size:15px;font-weight:600;}
-.mini .l {font-size:10px;color:#484f58;margin-top:1px;}
-.r {display:flex;align-items:center;gap:6px;padding:7px 10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;margin-bottom:4px;font-size:12px;}
-.r .s {font-weight:600;min-width:40px;}
-.r .v {margin-left:auto;text-align:right;}
-.r .x {font-size:10px;color:#484f58;min-width:34px;text-align:right;}
-.tag {display:inline-block;font-size:10px;padding:2px 5px;background:#161b22;border-radius:3px;margin:2px;color:#8b949e;}
-@media (min-width:600px){
-  .g2 {grid-template-columns:repeat(4,1fr);}
-  .g3 {grid-template-columns:repeat(3,1fr);}
-  .r {gap:8px;padding:8px 14px;}
-}
-
 <script>
-async function refreshIntraday(){
-try {
-  var a = await apiFetch('/intraday/api/allocation');
-  document.getElementById('allocSummary').innerHTML =
-    '<div class="mini"><div class="n" style="color:#e6edf3;">$'+(a.equity||0).toFixed(0)+'</div><div class="l">总权益</div></div>'+
-    '<div class="mini"><div class="n">$'+(a.allocated||0).toFixed(0)+'</div><div class="l">日内('+(a.ratio*100||20).toFixed(0)+'%)</div></div>';
-  document.getElementById('todayStats').innerHTML =
-    '<div class="mini"><div class="n">'+(a.today_trades||0)+'</div><div class="l">交易</div></div>'+
-    '<div class="mini"><div class="n" style="color:'+((a.pnl||0)>=0?'#3fb950':'#f85149')+';">'+((a.pnl||0)>=0?'+':'')+'$'+(a.pnl||0).toFixed(0)+'</div><div class="l">盈亏</div></div>'+
-    '<div class="mini"><div class="n">'+(a.positions||0)+'</div><div class="l">持仓</div></div>';
-} catch(e) {}
-try {
-  var p = await apiFetch('/intraday/api/positions');
-  var ps = p.positions||[];
-  document.getElementById('intradayPositions').innerHTML = ps.length===0?
-    '<div style="text-align:center;padding:20px;color:#8b949e;font-size:12px;">无日内持仓</div>':
-    ps.map(function(p){var c=p.pnl_pct>=0?'#3fb950':'#f85149';return '<div class="r"><span class="s">'+p.symbol+'</span><span style="font-size:10px;color:#484f58;">x'+p.qty+'</span><span style="font-size:10px;color:#484f58;">$'+p.avg_entry.toFixed(0)+'</span><span class="v" style="color:'+c+';">$'+p.current_price.toFixed(0)+'</span><span class="x" style="color:'+c+';">'+(p.pnl_pct>=0?'+':'')+p.pnl_pct.toFixed(2)+'%</span></div>';}).join('');
-} catch(e) {}
-try {
-  var s = await apiFetch('/intraday/api/signals');
-  var cs = s.candidates||[];
-  document.getElementById('signalList').innerHTML = cs.length===0?
-    '<div style="text-align:center;padding:20px;color:#8b949e;font-size:12px;">暂无信号</div>':
-    cs.map(function(c,i){var cl=c.today_chg>=0?'#3fb950':'#f85149';return '<div class="r"><span style="font-size:10px;color:#484f58;min-width:18px;">#'+(i+1)+'</span><span class="s">'+c.ticker+'</span><span class="v" style="color:'+cl+';">'+(c.today_chg>0?'+':'')+(c.today_chg||0).toFixed(2)+'%</span><span class="x">$'+(c.price||0).toFixed(0)+'</span></div>';}).join('');
-} catch(e) {}
-try {
-  var cf = await apiFetch('/settings/api/intraday_config');
-  document.getElementById('configInfo').innerHTML = '<div style="padding:7px;background:#0d1117;border:1px solid #21262d;border-radius:6px;"><span class="tag">'+(cf.enabled?'运行':'停用')+'</span><span class="tag">持仓'+(cf.max_positions||3)+'只</span><span class="tag">止损'+(cf.stop_loss_pct||2).toFixed(1)+'%</span><span class="tag">止盈'+(cf.take_profit_pct||3).toFixed(1)+'%</span><span class="tag">间隔'+(cf.scan_interval_minutes||30)+'分</span></div>';
-} catch(e) {}
-try {
-  var bt = await apiFetch('/intraday/api/backtest');
-  document.getElementById('backtestResult').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"><div class="mini"><div class="n" style="color:'+((bt.total_return_pct||0)>=0?'#3fb950':'#f85149')+';">'+(bt.total_return_pct||0).toFixed(1)+'%</div><div class="l">收益</div></div><div class="mini"><div class="n">'+(bt.total_trades||0)+'</div><div class="l">交易</div></div><div class="mini"><div class="n" style="color:'+((bt.win_rate_pct||0)>=50?'#3fb950':'#d29922')+';">'+(bt.win_rate_pct||0).toFixed(0)+'%</div><div class="l">胜率</div></div><div class="mini"><div class="n" style="color:#f85149;">'+(bt.max_drawdown_pct||0).toFixed(1)+'%</div><div class="l">回撤</div></div></div>';
-} catch(e) { document.getElementById('backtestResult').innerHTML = '<div style="text-align:center;padding:16px;color:#8b949e;font-size:12px;">暂无回测数据</div>'; }
+async function irRefresh() {
+  try {
+    var a = await apiFetch('/intraday/api/allocation');
+    var p = await apiFetch('/intraday/api/positions');
+    var s = await apiFetch('/intraday/api/signals');
+    var c = await apiFetch('/settings/api/intraday_config');
+    var b = null;
+    try { b = await apiFetch('/intraday/api/backtest'); } catch(e) {}
+
+    var html = '';
+
+    // 资金行
+    html += '<div style="display:flex;gap:8px;margin-bottom:10px;">';
+    html += '<div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:600;">$' + (a.equity||0).toFixed(0) + '</div><div style="font-size:10px;color:#484f58;">总权益</div></div>';
+    html += '<div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:600;">$' + (a.allocated||0).toFixed(0) + '</div><div style="font-size:10px;color:#484f58;">日内(' + (a.ratio*100||20).toFixed(0) + '%)</div></div>';
+    html += '<div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:600;">$' + (a.used||0).toFixed(0) + '</div><div style="font-size:10px;color:#484f58;">已用</div></div>';
+    html += '<div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:600;">$' + (a.available||0).toFixed(0) + '</div><div style="font-size:10px;color:#484f58;">可用</div></div>';
+    html += '</div>';
+
+    // 统计行
+    html += '<div style="display:flex;gap:8px;margin-bottom:10px;">';
+    html += '<div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:600;">' + (a.today_trades||0) + '</div><div style="font-size:10px;color:#484f58;">交易</div></div>';
+    html += '<div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:600;color:' + ((a.pnl||0)>=0?'#3fb950':'#f85149') + ';">' + ((a.pnl||0)>=0?'+':'') + '$' + (a.pnl||0).toFixed(0) + '</div><div style="font-size:10px;color:#484f58;">盈亏</div></div>';
+    html += '<div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:600;">' + (a.positions||0) + '</div><div style="font-size:10px;color:#484f58;">持仓</div></div>';
+    html += '</div>';
+
+    // 持仓
+    var ps = p.positions || [];
+    html += '<div style="font-size:11px;color:#8b949e;margin-bottom:4px;">📋 持仓</div>';
+    if (ps.length === 0) {
+      html += '<div style="text-align:center;padding:16px;color:#8b949e;font-size:12px;">无持仓</div>';
+    } else {
+      for (var i = 0; i < ps.length; i++) {
+        var px = ps[i];
+        var cl = px.pnl_pct >= 0 ? '#3fb950' : '#f85149';
+        html += '<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;margin-bottom:4px;font-size:12px;">';
+        html += '<span style="font-weight:600;min-width:42px;">' + px.symbol + '</span>';
+        html += '<span style="font-size:10px;color:#484f58;">x' + px.qty + '</span>';
+        html += '<span style="font-size:10px;color:#484f58;">$' + px.avg_entry.toFixed(0) + '</span>';
+        html += '<span style="margin-left:auto;text-align:right;color:' + cl + ';">$' + px.current_price.toFixed(0) + '</span>';
+        html += '<span style="font-size:10px;text-align:right;color:' + cl + ';min-width:40px;">' + (px.pnl_pct>=0?'+':'') + px.pnl_pct.toFixed(2) + '%</span>';
+        html += '</div>';
+      }
+    }
+
+    // 信号
+    var cs = s.candidates || [];
+    html += '<div style="font-size:11px;color:#8b949e;margin:10px 0 4px;">📡 信号</div>';
+    if (cs.length === 0) {
+      html += '<div style="text-align:center;padding:16px;color:#8b949e;font-size:12px;">暂无信号</div>';
+    } else {
+      for (var i = 0; i < cs.length; i++) {
+        var cx = cs[i];
+        var cl = cx.today_chg >= 0 ? '#3fb950' : '#f85149';
+        html += '<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;margin-bottom:4px;font-size:12px;">';
+        html += '<span style="font-size:10px;color:#484f58;min-width:18px;">#' + (i+1) + '</span>';
+        html += '<span style="font-weight:600;min-width:42px;">' + cx.ticker + '</span>';
+        html += '<span style="margin-left:auto;text-align:right;color:' + cl + ';">' + (cx.today_chg>0?'+':'') + (cx.today_chg||0).toFixed(2) + '%</span>';
+        html += '<span style="font-size:10px;text-align:right;color:#484f58;min-width:40px;">$' + (cx.price||0).toFixed(0) + '</span>';
+        html += '</div>';
+      }
+    }
+
+    // 配置
+    html += '<div style="font-size:11px;color:#8b949e;margin:10px 0 4px;">⚙️ 配置</div>';
+    html += '<div style="padding:7px;background:#0d1117;border:1px solid #21262d;border-radius:6px;">';
+    if (c.enabled) { html += '<span style="display:inline-block;font-size:10px;padding:2px 5px;background:#161b22;border-radius:3px;margin:2px;color:#3fb950;">运行</span>'; }
+    html += '<span style="display:inline-block;font-size:10px;padding:2px 5px;background:#161b22;border-radius:3px;margin:2px;color:#8b949e;">持仓' + (c.max_positions||3) + '只</span>';
+    html += '<span style="display:inline-block;font-size:10px;padding:2px 5px;background:#161b22;border-radius:3px;margin:2px;color:#8b949e;">止损' + (c.stop_loss_pct||2).toFixed(1) + '%</span>';
+    html += '<span style="display:inline-block;font-size:10px;padding:2px 5px;background:#161b22;border-radius:3px;margin:2px;color:#8b949e;">止盈' + (c.take_profit_pct||3).toFixed(1) + '%</span>';
+    html += '</div>';
+
+    // 回测
+    if (b) {
+      html += '<div style="font-size:11px;color:#8b949e;margin:10px 0 4px;">📊 回测</div>';
+      html += '<div style="display:flex;gap:6px;">';
+      html += '<div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:14px;font-weight:600;color:' + ((b.total_return_pct||0)>=0?'#3fb950':'#f85149') + ';">' + (b.total_return_pct||0).toFixed(1) + '%</div><div style="font-size:10px;color:#484f58;">收益</div></div>';
+      html += '<div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:14px;font-weight:600;">' + (b.total_trades||0) + '</div><div style="font-size:10px;color:#484f58;">交易</div></div>';
+      html += '<div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:14px;font-weight:600;color:' + ((b.win_rate_pct||0)>=50?'#3fb950':'#d29922') + ';">' + (b.win_rate_pct||0).toFixed(0) + '%</div><div style="font-size:10px;color:#484f58;">胜率</div></div>';
+      html += '<div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:14px;font-weight:600;color:#f85149;">' + (b.max_drawdown_pct||0).toFixed(1) + '%</div><div style="font-size:10px;color:#484f58;">回撤</div></div>';
+      html += '</div>';
+    }
+
+    document.getElementById('irContent').innerHTML = html;
+  } catch(e) {
+    document.getElementById('irContent').innerHTML = '<div style="text-align:center;padding:30px;color:#f85149;">加载失败</div>';
+  }
 }
-async function executeScan(){try{var d=await apiFetch('/intraday/api/scan',{method:"POST"});showToast("扫描完成:"+(d.candidates||[]).length+"只","success");refreshIntraday();}catch(e){showToast("扫描失败","error");}}
-async function closeAllIntraday(){if(!confirm("确认清仓?"))return;try{var d=await apiFetch('/intraday/api/close_all',{method:"POST"});showToast(d.message,"success");refreshIntraday();}catch(e){showToast("清仓失败","error");}}
-refreshIntraday();
-setInterval(refreshIntraday,60000);
+
+async function irScan() {
+  try { var d = await apiFetch('/intraday/api/scan',{method:"POST"}); showToast("扫描完成:"+(d.candidates||[]).length+"只","success"); irRefresh(); }
+  catch(e) { showToast("扫描失败","error"); }
+}
+
+async function irClose() {
+  if(!confirm("确认清仓?")) return;
+  try { var d = await apiFetch('/intraday/api/close_all',{method:"POST"}); showToast(d.message,"success"); irRefresh(); }
+  catch(e) { showToast("清仓失败","error"); }
+}
+
+irRefresh();
+setInterval(irRefresh,60000);
 </script>
 {% endblock %}
