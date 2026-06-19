@@ -83,7 +83,7 @@ def api_daemon_start():
     if running:
         return ok(message=f"守护进程已在运行 (PID: {pid})")
     try:
-        log_file = open("/tmp/daemon_web_start.log", "w")
+        log_file = open("logs/daemon_web_start.log", "w")
         proc = subprocess.Popen(
             [sys.executable, "daemon.py"],
             stdout=log_file, stderr=subprocess.STDOUT,
@@ -418,10 +418,12 @@ def api_log(task_name):
     if path and os.path.exists(path):
         with open(path) as f:
             return ok({"log": f.read()[-5000:]})
-    # daemon 日志还可能写在 logs/daemon.log
-    if task_name == "daemon" and os.path.exists("logs/daemon.log"):
-        with open("logs/daemon.log") as f:
-            return ok({"log": f.read()[-5000:]})
+    # daemon 日志回退路径
+    if task_name == "daemon":
+        for p in ["logs/daemon.log", "/tmp/quant_daemon_logs/daemon.log"]:
+            if os.path.exists(p):
+                with open(p) as f:
+                    return ok({"log": f.read()[-5000:]})
     return ok({"log": "(暂无日志)"})
 
 

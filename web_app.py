@@ -233,6 +233,80 @@ def api_health_full():
     return jsonify(report)
 
 
+# ====== 一键切换纸交易/实盘 ======
+@app.route("/api/switch_mode", methods=["POST"])
+def api_switch_mode():
+    """一键切换所有券商到纸交易或实盘模式"""
+    data = request.json or {}
+    target = data.get("mode", "paper")
+    if target not in ("paper", "live"):
+        return jsonify({"status": "error", "message": "无效模式"}), 400
+
+    try:
+        from broker_manager import load_config, save_config
+        cfg = load_config()
+
+        # 纸交易券商和实盘券商的映射
+        paper_to_live = {
+            "alpaca_paper": "alpaca_live",
+            "alpaca_paper_intraday": "alpaca_live_intraday",
+        }
+
+        changes = []
+        if target == "live":
+            # 切到实盘：启用实盘券商，禁用纸交易券商
+            for paper_id, live_id in paper_to_live.items():
+                if paper_id in cfg:
+                    cfg[paper_id]["enabled"] = False
+                    changes.append(f"禁用{paper_id}")
+                if live_id in cfg:
+                    cfg[live_id]["enabled"] = True
+                    changes.append(f"启用{live_id}")
+        else:
+            # 切回纸交易：启用纸交易券商，禁用实盘券商
+            for paper_id, live_id in paper_to_live.items():
+                if paper_id in cfg:
+                    cfg[paper_id]["enabled"] = True
+                    changes.append(f"启用{paper_id}")
+                if live_id in cfg:
+                    cfg[live_id]["enabled"] = False
+                    changes.append(f"禁用{live_id}")
+
+        save_config(cfg)
+        _set_trade_mode(target)
+        _log_audit("switch_mode", session.get("user", "?"), f"{target}: {'; '.join(changes)}")
+        return jsonify({"status": "ok", "message": f"已切换到{'🔴 实盘' if target == 'live' else '📄 纸交易'}", "changes": changes})
+    except Exception as e:
+        logger.error(f"切换失败: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ====== 操作审计日志持久化 ======
+AUDIT_LOG_FILE = "logs/operation.log"
+
+def _log_audit(action: str, user: str, detail: str = ""):
+    """记录操作日志到持久化文件"""
+    try:
+        from datetime import datetime
+        os.makedirs("logs", exist_ok=True)
+        with open(AUDIT_LOG_FILE, "a") as f:
+            f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | {user:20s} | {action:30s} | {detail}\n")
+    except:
+        pass
+
+
+@app.route("/api/audit_log")
+def api_audit_log():
+    """查看操作审计日志"""
+    import os
+    path = "logs/operation.log"
+    if os.path.exists(path):
+        with open(path) as f:
+            lines = f.readlines()
+        return jsonify({"logs": lines[-100:]})
+    return jsonify({"logs": []})
+
+
 # ====== 启动 ======
 # 自动注册所有blueprint
 register_blueprints()

@@ -18,8 +18,8 @@
 import os, sys, json, logging, time, signal, threading
 from datetime import datetime, timedelta
 
-# ====== 日志：强制用 /tmp/ 保证 Docker 容器里一定有写权限 ======
-LOG_DIR = "/tmp/quant_daemon_logs"
+# ====== 日志：写入 logs/ 目录（Docker卷挂载，重启不丢失） ======
+LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 
 logging.basicConfig(

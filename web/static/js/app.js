@@ -275,17 +275,30 @@ function updateTradeModeUI() {
 async function toggleTradeMode() {
     const targetMode = tradeMode === 'paper' ? 'live' : 'paper';
     const isLive = targetMode === 'live';
-    if (isLive && !confirm('⚠️ 确认切换到实盘模式？\n\n切换后交易将使用真实资金。\n请确认：\n1. 券商已切换到实盘\n2. API Key 为实盘 Key\n3. 资金账户正确')) return;
-    if (!isLive && !confirm('切换为纸交易模式？')) return;
+    const modeName = isLive ? '🔴 实盘' : '📄 纸交易';
+    if (isLive) {
+        if (!confirm('⚠️ 确认切换到实盘模式？\n\n切换后所有交易将使用真实资金执行！\n\n请确认：\n1. 实盘API Key已配置在环境变量\n2. 实盘券商已在券商页面启用\n3. 账户资金充足')) return;
+        if (!confirm('再次确认：真的要切换到实盘吗？\n\n这个操作将禁用纸交易券商，启用实盘券商。')) return;
+    } else {
+        if (!confirm('切换为纸交易模式？')) return;
+    }
     tradeMode = targetMode;
     localStorage.setItem('trade_mode', tradeMode);
     updateTradeModeUI();
     try {
-        await fetch('/api/trade_mode', {
+        const resp = await fetch('/api/switch_mode', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({mode: tradeMode})
+            body: JSON.stringify({mode: targetMode})
         });
-    } catch(e) {}
+        const d = await resp.json();
+        if (d.status === 'ok') {
+            showToast(d.message, 'success');
+        } else {
+            showToast('切换失败: ' + (d.message || d.error), 'error');
+        }
+    } catch(e) {
+        showToast('切换失败: ' + e.message, 'error');
+    }
 }
 updateTradeModeUI();
