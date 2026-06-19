@@ -11,8 +11,11 @@ bp = Blueprint("intraday", __name__, url_prefix="/intraday")
 
 
 @bp.route("/")
+@bp.route("/page")
 def page():
-    return render_template("intraday.html")
+    resp = make_response(render_template("intraday.html"))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return resp
 
 
 @bp.route("/api/allocation")
