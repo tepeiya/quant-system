@@ -12,32 +12,38 @@
   </div>
 </div>
 
-<div id="allocSummary" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:10px;"></div>
-<div id="todayStats" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;"></div>
+<div id="allocSummary" class="g2" style="margin-bottom:8px;"></div>
+<div id="todayStats" class="g3" style="margin-bottom:8px;"></div>
 
 <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">📋 持仓</div>
-<div id="intradayPositions" style="margin-bottom:10px;"></div>
+<div id="intradayPositions" style="margin-bottom:8px;"></div>
 
 <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">📡 信号</div>
-<div id="signalList" style="margin-bottom:10px;"></div>
+<div id="signalList" style="margin-bottom:8px;"></div>
 
 <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">⚙️ 配置</div>
-<div id="configInfo" style="margin-bottom:10px;"></div>
+<div id="configInfo" style="margin-bottom:8px;"></div>
 
 <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">📊 回测</div>
 <div id="backtestResult"></div>
 </div>
 
 <style>
+.g2 {display:grid;grid-template-columns:repeat(2,1fr);gap:6px;}
+.g3 {display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
 .mini {background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px;}
-.mini .n {font-size:16px;font-weight:600;}
-.mini .l {font-size:10px;color:#484f58;margin-top:2px;}
+.mini .n {font-size:15px;font-weight:600;}
+.mini .l {font-size:10px;color:#484f58;margin-top:1px;}
 .r {display:flex;align-items:center;gap:6px;padding:7px 10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;margin-bottom:4px;font-size:12px;}
-.r .s {font-weight:600;min-width:42px;}
+.r .s {font-weight:600;min-width:40px;}
 .r .v {margin-left:auto;text-align:right;}
-.r .x {font-size:10px;color:#484f58;min-width:36px;text-align:right;}
+.r .x {font-size:10px;color:#484f58;min-width:34px;text-align:right;}
 .tag {display:inline-block;font-size:10px;padding:2px 5px;background:#161b22;border-radius:3px;margin:2px;color:#8b949e;}
-</style>
+@media (min-width:600px){
+  .g2 {grid-template-columns:repeat(4,1fr);}
+  .g3 {grid-template-columns:repeat(3,1fr);}
+  .r {gap:8px;padding:8px 14px;}
+}
 
 <script>
 async function refreshData() {
