@@ -280,8 +280,19 @@ def run_intraday_loop():
     """每15分钟扫描并执行日内交易
     美股夏令时 美东9:30-16:00 = 北京时间21:30-05:00
     """
-    interval = 15 * 60
-    logger.info("[日内] 轮询线程启动，美东9:30-16:00 (北京21:30-05:00) 每15分钟执行")
+    # 从配置文件读取扫描间隔，默认15分钟
+    try:
+        cfg_path = "config/intraday_config.json"
+        if os.path.exists(cfg_path):
+            with open(cfg_path) as f:
+                _cfg = json.load(f)
+                interval_min = int(_cfg.get("scan_interval_minutes", 15))
+        else:
+            interval_min = 15
+    except:
+        interval_min = 15
+    interval = max(interval_min, 5) * 60  # 最小5分钟
+    logger.info(f"[日内] 轮询线程启动，美东9:30-16:00 (北京21:30-05:00) 每{interval_min}分钟执行")
 
     # 启动时跳过一天，避免重启后立刻误开仓
     skip_next = True
