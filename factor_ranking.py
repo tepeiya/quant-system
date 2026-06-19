@@ -57,6 +57,7 @@ def compute_forward_returns(cache: dict, tickers: list,
 
 def run_factor_ranking(cache: dict = None, spy_df=None,
                        top_n: int = 10) -> dict:
+    import os
     """
     运行因子排名，找出最近最有效的因子
 
