@@ -228,6 +228,82 @@ class FactorMiner:
 
         return result
 
+    # ===== 资金流因子 =====
+    def fund_flow_factor(self, ticker: str) -> dict:
+        """从东财获取主力资金流向"""
+        try:
+            from data_global import fund_flow_daily
+            flow = fund_flow_daily(ticker, days=5)
+            if not flow:
+                return {}
+            result = {}
+            net_inflows = [f.get("net_inflow", 0) for f in flow if isinstance(f, dict)]
+            if net_inflows:
+                result["fund_flow_net"] = float(sum(net_inflows) / max(abs(sum(net_inflows)), 1))
+                result["fund_flow_latest"] = float(net_inflows[0]) if net_inflows else 0
+                result["fund_flow_trend"] = float(net_inflows[0] - net_inflows[-1]) if len(net_inflows) > 1 else 0
+            return result
+        except:
+            return {}
+
+    # ===== 期权因子 =====
+    def options_factor(self, ticker: str) -> dict:
+        """从 Yahoo 获取期权链计算 Put/Call Ratio"""
+        try:
+            from data_global import options_chain
+            chain = options_chain(ticker)
+            if not chain:
+                return {}
+            calls = chain.get("calls", [])
+            puts = chain.get("puts", [])
+            if not calls or not puts:
+                return {}
+            call_vol = sum(float(c.get("volume", 0)) for c in calls)
+            put_vol = sum(float(p.get("volume", 0)) for p in puts)
+            call_oi = sum(float(c.get("openInterest", 0)) for c in calls)
+            put_oi = sum(float(p.get("openInterest", 0)) for p in puts)
+            result = {}
+            if put_vol + call_vol > 0:
+                result["put_call_vol_ratio"] = float(put_vol / max(call_vol, 1))
+            if put_oi + call_oi > 0:
+                result["put_call_oi_ratio"] = float(put_oi / max(call_oi, 1))
+            ivs = [float(c.get("impliedVolatility", 0)) for c in calls + puts if c.get("impliedVolatility")]
+            if ivs:
+                result["options_iv_mean"] = float(np.mean(ivs))
+            return result
+        except:
+            return {}
+
+    # ===== 基本面因子 =====
+    def fundamental_factor(self, ticker: str) -> dict:
+        """从东财获取基本面数据"""
+        try:
+            from data_global import financial_statements, get_secid
+            secid = get_secid(ticker)
+            if not secid:
+                return {}
+            result = {}
+            income = financial_statements(secid, "income")
+            if income and len(income) >= 2:
+                rev_new = income[0].get("revenue", 0) or 0
+                rev_old = income[1].get("revenue", 0) or 0
+                if rev_old > 0:
+                    result["fundamental_rev_growth"] = float((rev_new - rev_old) / rev_old)
+            if income and income[0]:
+                rev = income[0].get("revenue", 0) or 0
+                profit = income[0].get("netProfit", 0) or 0
+                if rev > 0:
+                    result["fundamental_profit_margin"] = float(profit / rev)
+            balance = financial_statements(secid, "balance")
+            if balance and balance[0]:
+                total_liab = balance[0].get("totalLiabilities", 0) or 0
+                total_assets = balance[0].get("totalAssets", 0) or 0
+                if total_assets > 0:
+                    result["fundamental_debt_ratio"] = float(total_liab / total_assets)
+            return result
+        except:
+            return {}
+
     def compute_stock_factors(self, ticker: str, df: pd.DataFrame,
                                spy_df: pd.DataFrame = None) -> dict:
         """计算单只股票的所有因子"""
@@ -259,6 +335,26 @@ class FactorMiner:
         # ATR
         if "ATR_Pct" in df.columns:
             factors["atr_pct"] = float(df["ATR_Pct"].values[-1])
+
+        # ===== 新增因子 =====
+
+        # 1️⃣ 资金流因子
+        try:
+            factors.update(self.fund_flow_factor(ticker))
+        except Exception as e:
+            logger.debug(f"{ticker} 资金流因子失败: {e}")
+
+        # 2️⃣ 期权因子
+        try:
+            factors.update(self.options_factor(ticker))
+        except Exception as e:
+            logger.debug(f"{ticker} 期权因子失败: {e}")
+
+        # 3️⃣ 基本面因子
+        try:
+            factors.update(self.fundamental_factor(ticker))
+        except Exception as e:
+            logger.debug(f"{ticker} 基本面因子失败: {e}")
 
         return factors
 
