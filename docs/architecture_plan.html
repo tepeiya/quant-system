@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>M+ 模块化架构方案</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px}
+  h1{font-size:20px;color:#58a6ff;margin-bottom:4px}
+  h2{font-size:15px;color:#d29922;margin:20px 0 10px}
+  h3{font-size:13px;color:#e6edf3;margin:12px 0 6px}
+  .sub{font-size:12px;color:#484f58;margin-bottom:16px}
+  .arch{display:flex;flex-direction:column;gap:4px;margin:10px 0}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}
+  .module{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;min-width:140px;flex:1}
+  .module .name{font-weight:600;font-size:13px}
+  .module .name.blue{color:#58a6ff}
+  .module .name.green{color:#3fb950}
+  .module .name.yellow{color:#d29922}
+  .module .name.red{color:#f85149}
+  .module .name.purple{color:#a371f7}
+  .module .desc{font-size:10px;color:#8b949e;margin-top:3px}
+  .module .tag{font-size:9px;padding:1px 5px;border-radius:3px;background:#21262d;color:#8b949e;margin-left:4px}
+  .bus{background:#1f6feb;color:#fff;padding:8px 16px;border-radius:8px;font-weight:600;font-size:13px;text-align:center;margin:4px 0}
+  .arrow{color:#484f58;font-size:20px;text-align:center;padding:0}
+  .note{background:#1c3a5e;border:1px solid #58a6ff33;border-radius:6px;padding:8px 12px;font-size:11px;color:#8b949e;margin:6px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin:10px 0}
+  .card{background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:12px}
+  .card .title{font-size:12px;font-weight:600;color:#e6edf3;margin-bottom:4px}
+  .card .body{font-size:11px;color:#8b949e}
+  hr{border:none;border-top:1px solid #21262d;margin:20px 0}
+</style>
+</head>
+<body>
+
+<h1>🧩 M+ 模块化架构方案</h1>
+<div class="sub">独立模块 + 消息总线 · 一个坏了不影响其他</div>
+
+<div class="bus">📨 消息总线 (Message Bus) — SQLite / Redis / ZeroMQ</div>
+
+<div class="row" style="margin-bottom:2px;margin-top:10px">
+  <div class="module">
+    <div class="name yellow">📡 数据模块</div>
+    <div class="desc">data_global + data_prod + cache_manager</div>
+    <div class="tag">独立进程</div>
+    <div class="desc">行情采集→技术指标→写入缓存</div>
+    <div style="font-size:10px;color:#484f58;margin-top:2px">挂了→其他模块用缓存数据继续跑</div>
+  </div>
+  <div class="module">
+    <div class="name purple">🧮 策略模块</div>
+    <div class="desc">矢量/动量/日内/配对/期权</div>
+    <div class="tag">可热插拔</div>
+    <div class="desc">从总线上取数据→计算→写回信号</div>
+    <div style="font-size:10px;color:#484f58;margin-top:2px">任何一个策略挂了→其他照常</div>
+  </div>
+  <div class="module">
+    <div class="name red">🛡️ 风控模块</div>
+    <div class="desc">止损+熔断+对冲+换手率</div>
+    <div class="tag">独立进程</div>
+    <div class="desc">监听订单总线→超限拦截</div>
+    <div style="font-size:10px;color:#484f58;margin-top:2px">挂了→交易继续但无保护</div>
+  </div>
+  <div class="module">
+    <div class="name green">💹 执行模块</div>
+    <div class="desc">订单队列 + 券商接口</div>
+    <div class="tag">统一入口</div>
+    <div class="desc">从总线取信号→走风控→下券商单</div>
+    <div style="font-size:10px;color:#484f58;margin-top:2px">挂了→不交易，信号堆积在总线</div>
+  </div>
+  <div class="module">
+    <div class="name blue">🔔 通知模块</div>
+    <div class="desc">推送+日报+周报</div>
+    <div class="tag">纯消费</div>
+    <div class="desc">监听总线事件→推送微信</div>
+    <div style="font-size:10px;color:#484f58;margin-top:2px">挂了→不影响交易</div>
+  </div>
+</div>
+
+<hr>
+
+<h2>📦 每个模块内部结构</h2>
+
+<div class="grid">
+  <div class="card">
+    <div class="title">📡 数据模块 (data_service)</div>
+    <div class="body">
+      <b>职责：</b>只管"把行情变成指标"<br>
+      <b>输入：</b>定时器 tick / 手动触发<br>
+      <b>输出：</b>写入 data_cache/<br>
+      <b>不关心：</b>策略怎么用这些数据、有没有交易信号<br>
+      <b>挂了→：</b>其他模块读缓存，等它恢复
+    </div>
+  </div>
+  <div class="card">
+    <div class="title">🧮 策略模块 (strategy_*)</div>
+    <div class="body">
+      <b>职责：</b>只管"算信号"，不交易<br>
+      <b>输入：</b>从 data_cache 读价格/指标<br>
+      <b>输出：</b>写入 signal_queue (消息总线)<br>
+      <b>不关心：</b>Alpaca是什么、钱够不够<br>
+      <b>策略间：</b>彼此无依赖，独立计算
+    </div>
+  </div>
+  <div class="card">
+    <div class="title">🛡️ 风控模块 (risk_service)</div>
+    <div class="body">
+      <b>职责：</b>从总线读"准备下单"的消息→检查→通过/拦截<br>
+      <b>输入：</b>持仓数据 + 市场数据 + 订单意图<br>
+      <b>输出：</b>允许/拒绝 + 风控日志<br>
+      <b>边界：</b>只判断"能不能做"，不做"做什么"
+    </div>
+  </div>
+  <div class="card">
+    <div class="title">💹 执行模块 (executor)</div>
+    <div class="body">
+      <b>职责：</b>从总线读信号→问风控→下单→写成交回报<br>
+      <b>输入：</b>信号消息 + 风控审批<br>
+      <b>输出：</b>成交记录 + 订单状态更新<br>
+      <b>抽象：</b>不关心信号来源，不关心是哪个策略
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<h2>🔗 消息总线：模块之间的"那条线"</h2>
+
+<div class="note">
+  <b>什么是消息总线？</b> 每个模块不直接调另一个模块的函数，而是往总线上"发消息"，其他模块从总线上订阅自己感兴趣的消息。模块之间完全解耦。
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="title">🗄️ 选项A: SQLite + 状态表 (轻量，推荐先做)</div>
+    <div class="body">
+      <b>signal_queue 表：</b>策略写入信号，执行器扫描处理<br>
+      <b>order_queue 表：</b>执行器写入订单状态<br>
+      <b>risk_events 表：</b>风控事件日志<br>
+      <b>优点：</b>不需要额外服务，现有代码改动最小<br>
+      <b>缺点：</b>多个进程需要轮询，不是实时推送
+    </div>
+  </div>
+  <div class="card">
+    <div class="title">📨 选项B: ZeroMQ (专业，后续升级)</div>
+    <div class="body">
+      <b>PUB-SUB 模式：</b>数据模块发布行情→策略订阅→发布信号→执行器订阅<br>
+      <b>优点：</b>实时推送、多语言支持、高可靠<br>
+      <b>缺点：</b>多一个服务要管理，部署复杂一点
+    </div>
+  </div>
+  <div class="card">
+    <div class="title">📡 选项C: Redis Streams (最推荐终版)</div>
+    <div class="body">
+      <b>Stream：</b>类似 Kafka 但轻量，每个消费组独立 offset<br>
+      <b>优点：</b>实时推送、消息持久化、消费者挂了恢复后不漏消息<br>
+      <b>缺点：</b>要跑 Redis，多一个依赖
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<h2>⚡ 分步实施方案（不改停现有系统）</h2>
+
+<h3>阶段一：统一信号格式 + 订单总线（SQLite）</h3>
+<div class="note">
+  <span style="color:#3fb950;font-weight:600">1-2天，不动交易逻辑</span><br>
+  创建一个 signal_bus.py，定义统一的消息格式。三个策略各自改成"计算结果→写入 signal_queue 表"而不是直接调 Alpaca。执行器改成"从 signal_queue 读→下单"。现有代码不动，只加新模块。
+</div>
+
+<h3>阶段二：风控管道化</h3>
+<div class="note">
+  <span style="color:#3fb950;font-weight:600">0.5天</span><br>
+  在 executor 调 Alpaca 之前统一过 risk_manager.check()，不再依赖每个交易器自己记得加风控。
+</div>
+
+<h3>阶段三：数据模块独立</h3>
+<div class="note">
+  <span style="color:#d29922;font-weight:600">1天</span><br>
+  把 data_prod / data_global / cache_manager 抽成 data_service 独立进程。其他模块通过 cache 文件或 Redis 读数据。
+</div>
+
+<h3>阶段四：策略热插拔</h3>
+<div class="note">
+  <span style="color:#d29922;font-weight:600">按需</span><br>
+  每个策略变成 plugins/ 下的独立目录（strategy_vector / strategy_momentum / intraday / futures_pairs / wheel），系统启动时自动扫描加载。停用一个策略=从 plugins 目录移走，不会影响其他策略。
+</div>
+
+<hr>
+
+<h2>🎯 建议从哪开始</h2>
+
+<div class="row" style="font-size:12px">
+  <div style="background:#143d1f;border:1px solid #3fb950;border-radius:6px;padding:10px;flex:1">
+    <b style="color:#3fb950">第一步（今天就能做）</b><br>
+    <span style="color:#8b949e">定义 signal_bus.py → 统一消息格式 → 执行器从总线读信号<br>现有三路交易不改，并行运行，验证后再切换。</span>
+  </div>
+  <div style="background:#1c3a5e;border:1px solid #58a6ff;border-radius:6px;padding:10px;flex:1">
+    <b style="color:#58a6ff">第二步</b><br>
+    <span style="color:#8b949e">executor 统一过风控 → 统一 broker_manager<br>三个交易器的 get_alpaca / save_trade_log 收拢</span>
+  </div>
+  <div style="background:#3d3314;border:1px solid #d29922;border-radius:6px;padding:10px;flex:1">
+    <b style="color:#d29922">第三步</b><br>
+    <span style="color:#8b949e">数据模块独立 → 策略插件化<br>做到"加策略=拖个文件夹"</span>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>M+ 量化系统 - 架构思维导图</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px}
+  h1{font-size:20px;color:#58a6ff;margin-bottom:5px}
+  .sub{font-size:12px;color:#484f58;margin-bottom:20px}
+  .mindmap{display:flex;flex-direction:column;gap:0;position:relative;padding-left:20px}
+  .root{background:#1f6feb;color:#fff;padding:10px 18px;border-radius:8px;display:inline-block;font-weight:700;font-size:15px;margin-bottom:8px}
+  .branch{margin:2px 0;padding-left:24px;border-left:2px solid #30363d}
+  .node{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:10px 14px;margin:3px 0;display:inline-block;font-size:13px;font-weight:600;cursor:default}
+  .node.sub1{background:#0d1117;border-color:#30363d;margin-left:16px;display:block;width:fit-content}
+  .node.sub1 .title{color:#58a6ff}
+  .node.sub1 .desc{font-size:11px;color:#8b949e;font-weight:400}
+  .node.sub2{background:transparent;border:none;margin-left:20px;display:block;font-size:11px;color:#8b949e;font-weight:400;padding:2px 8px}
+  .node.sub2::before{content:"• ";color:#484f58}
+  .tag{display:inline-block;font-size:9px;padding:1px 6px;border-radius:4px;margin-left:6px;font-weight:500}
+  .tag.red{background:#3d1a1a;color:#f85149}
+  .tag.green{background:#143d1f;color:#3fb950}
+  .tag.blue{background:#1c3a5e;color:#58a6ff}
+  .tag.yellow{background:#3d3314;color:#d29922}
+  .tag.purple{background:#2d1b4e;color:#a371f7}
+  .row{display:flex;flex-wrap:wrap;gap:6px;margin:3px 0}
+  .col{flex:1;min-width:280px}
+  hr{border:none;border-top:1px solid #21262d;margin:16px 0}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#8b949e;margin-bottom:16px}
+</style>
+</head>
+<body>
+
+<h1>🧠 M+ 量化系统架构思维导图</h1>
+<div class="sub">制作日期: 2026-06-21 · 基于主分支 main (0100718)</div>
+
+<div class="legend">
+  <span><span class="tag blue">核心</span></span>
+  <span><span class="tag green">数据</span></span>
+  <span><span class="tag yellow">策略</span></span>
+  <span><span class="tag red">风控</span></span>
+  <span><span class="tag purple">交易执行</span></span>
+</div>
+
+<div class="mindmap">
+  <div class="root">📊 M+ 量化交易系统</div>
+
+  <div class="branch">
+    <div class="node sub1"><span class="title">🌐 Web 面板</span> <span class="desc">Flask + 15个蓝图</span> <span class="tag blue">入口</span></div>
+    <div class="row">
+      <div class="col">
+        <div class="node sub2"><b>📈 dashboard</b> — 大盘仪表盘 (SPY/VX/板块)</div>
+        <div class="node sub2"><b>📋 positions</b> — 持仓看板</div>
+        <div class="node sub2"><b>📊 signals</b> — 信号看板</div>
+        <div class="node sub2"><b>📜 trades</b> — 交易记录</div>
+        <div class="node sub2"><b>⏳ history</b> — 信号历史</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>⚙️ settings</b> — 全部设置</div>
+        <div class="node sub2"><b>🏢 brokers</b> — 券商管理</div>
+        <div class="node sub2"><b>🔑 auth</b> — 登录/注册/用户</div>
+        <div class="node sub2"><b>🔧 ops</b> — 运维中心</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>⚡ intraday</b> — 日内交易面板</div>
+        <div class="node sub2"><b>📈 factors</b> — 因子追踪</div>
+        <div class="node sub2"><b>🔗 pairs</b> — 配对交易</div>
+        <div class="node sub2"><b>🎡 wheel</b> — 轮式期权</div>
+        <div class="node sub2"><b>🌍 macro</b> — 宏观仪表盘</div>
+        <div class="node sub2"><b>🔥 heatmap</b> — 股票热图</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>📝 trading</b> — 手动下单</div>
+        <div class="node sub2"><b>📊 allocator</b> — 策略分配</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="branch">
+    <div class="node sub1"><span class="title">🗄️ 数据层</span> <span class="tag green">Data</span></div>
+    <div class="row">
+      <div class="col">
+        <div class="node sub2"><b>data_global</b> — 多数据源聚合 (新浪/Yahoo/东财)</div>
+        <div class="node sub2"><b>data_prod</b> — 行情缓存 + 技术指标 + 实时数据</div>
+        <div class="node sub2"><b>data_update</b> — SPY基准数据更新</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>cache_manager</b> — 缓存健康检查 + 过期刷新</div>
+        <div class="node sub2"><b>spy_source</b> — SPY价格获取 (Tiingo/Yahoo)</div>
+        <div class="node sub2"><b>data_filler</b> — 缺失数据补全</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>fundamentals_finnhub</b> — Finnhub基本面</div>
+        <div class="node sub2"><b>fetch_value_factors</b> — 价值因子数据</div>
+        <div class="node sub2"><b>earnings_filter</b> — 财报风险过滤</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="branch">
+    <div class="node sub1"><span class="title">🧮 策略引擎</span> <span class="tag yellow">策略</span></div>
+    <div class="row">
+      <div class="col">
+        <div class="node sub2"><b>stratrgy_vector</b> — 🛡️ 保守策略 (综合评分: 动量+质量+趋势+低波+成交量)</div>
+        <div class="node sub2"><b>strategy_momentum</b> — 🚀 激进策略 (纯动量排名)</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>daily_signal</b> — 每日信号生成 (评分→排序→过滤→输出)</div>
+        <div class="node sub2"><b>quality_factor</b> — 质量因子计算 (PE/资金流/EMA趋势)</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>factor_learner</b> — 因子学习进化 (IC分析 + 权重自适应调整)</div>
+        <div class="node sub2"><b>factor_miner</b> — 因子挖掘 (新因子发现)</div>
+        <div class="node sub2"><b>factor_ranking</b> — 因子排名系统 (前向收益排序)</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>⚡ intraday_trader</b> — 日内交易 (扫描→信号→云止损→移动止损)</div>
+        <div class="node sub2"><b>intraday_rebalance</b> — 日内再平衡</div>
+        <div class="node sub2"><b>intraday</b> — 日内策略核心扫描逻辑</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="branch">
+    <div class="node sub1"><span class="title">🛡️ 风控系统</span> <span class="tag red">风控</span></div>
+    <div class="row">
+      <div class="col">
+        <div class="node sub2"><b>risk_manager.PositionRisk</b> — 单票风控 (ATR仓位/金字塔加仓/止盈止损)</div>
+        <div class="node sub2"><b>risk_manager.StopLossManager</b> — 止损管理 (动态/固定/跟踪)</div>
+        <div class="node sub2"><b>risk_manager.CircuitBreaker</b> — 熔断器 (日亏损/连续亏损/最大回撤)</div>
+        <div class="node sub2"><b>risk_manager.RiskManager</b> — 统一风控入口</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>circuit_breaker</b> — 独立熔断模块 (冷却期)</div>
+        <div class="node sub2"><b>stop_loss_monitor</b> — 盘中止损监控进程 (ATR+近期高点)</div>
+        <div class="node sub2"><b>risk_alerts</b> — 风险告警通知</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>hedge_module</b> — 对冲管理 (SPY MA200/VIX触发)</div>
+        <div class="node sub2"><b>churn_reducer</b> — 换手率控制</div>
+        <div class="node sub2"><b>order_splitter</b> — 订单拆分 (分批买卖降低冲击)</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="branch">
+    <div class="node sub1"><span class="title">💹 交易执行</span> <span class="tag purple">执行</span></div>
+    <div class="row">
+      <div class="col">
+        <div class="node sub2"><b>paper_trader</b> — 🛡️ 保守策略交易 (Alpaca接入)</div>
+        <div class="node sub2"><b>paper_trader_momentum</b> — 🚀 激进策略交易 (独立调仓)</div>
+        <div class="node sub2"><b>intraday_trader</b> — ⚡ 日内交易执行</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>broker_manager</b> — 券商管理 (Alpaca/IB/长桥 统一接口)</div>
+        <div class="node sub2"><b>broker_ext</b> — 券商扩展接口</div>
+        <div class="node sub2"><b>broker_keys</b> — 券商密钥管理</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>order_manager</b> — 订单队列 (意图→提交→重试→填单)</div>
+        <div class="node sub2"><b>strategy_allocator</b> — 双策略资金分配</div>
+        <div class="node sub2"><b>portfolio_tracker</b> — 投资组合追踪</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="branch">
+    <div class="node sub1"><span class="title">🔁 后台守护进程</span> <span class="tag blue">入口</span></div>
+    <div class="row">
+      <div class="col">
+        <div class="node sub2"><b>美东09:00</b> 数据增量更新</div>
+        <div class="node sub2"><b>美东09:30</b> 生成保守策略信号</div>
+        <div class="node sub2"><b>美东09:30</b> 生成激进动量信号</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>美东09:35</b> 激进策略调仓</div>
+        <div class="node sub2"><b>美东09:35</b> 保守策略调仓</div>
+        <div class="node sub2"><b>盘中每15min</b> 日内交易扫描</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>盘中持续</b> 止损监控 (ATR+移动止损)</div>
+        <div class="node sub2"><b>收盘</b> 记录权益 + 推送每日总结</div>
+        <div class="node sub2"><b>收盘</b> 缓存健康检查 + 后台刷新</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="branch">
+    <div class="node sub1"><span class="title">📦 回测 & 分析</span></div>
+    <div class="row">
+      <div class="col">
+        <div class="node sub2"><b>backtest_report</b> — 回测报告 (全面指标: 夏普/Sortino/Calmar/索提诺)</div>
+        <div class="node sub2"><b>event_backtest</b> — 事件驱动回测引擎</div>
+        <div class="node sub2"><b>walkforward</b> — 滚动回测 (Walk-Forward Analysis)</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>performance_analyzer</b> — 绩效分析器</div>
+        <div class="node sub2"><b>performance_attribution</b> — 绩效归因</div>
+        <div class="node sub2"><b>futures_pairs</b> — 期货跨品种套利 (螺纹/热卷/原油/甲醇等12品种)</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>pairs_trading</b> — 股票配对交易</div>
+        <div class="node sub2"><b>wheel_strategy</b> — 轮式期权策略 (Cash-Secured Put + Covered Call)</div>
+        <div class="node sub2"><b>multi_asset</b> — 多资产配置</div>
+        <div class="node sub2"><b>macro_monitor</b> — 宏观因子监测</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="branch">
+    <div class="node sub1"><span class="title">🔌 基础设施</span></div>
+    <div class="row">
+      <div class="col">
+        <div class="node sub2"><b>config_db</b> — 配置数据库 (SQLite+JSON双写+自动每日备份)</div>
+        <div class="node sub2"><b>system_config</b> — 系统配置管理 (80+参数)</div>
+        <div class="node sub2"><b>security</b> — 安全加固 (CSRF/XSS/Session)</div>
+        <div class="node sub2"><b>security_policy</b> — 安全策略</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>push_notify</b> — 推送通知 (信号/交易/告警/日报)</div>
+        <div class="node sub2"><b>daily_report</b> — 日报生成</div>
+        <div class="node sub2"><b>weekly_report</b> — 周报生成</div>
+        <div class="node sub2"><b>ai_assist</b> — AI辅助选股 (Gemini/OpenAI)</div>
+      </div>
+      <div class="col">
+        <div class="node sub2"><b>log_archiver</b> — 日志归档</div>
+        <div class="node sub2"><b>version_manager</b> — 版本管理</div>
+        <div class="node sub2"><b>export_tool</b> — 数据导出工具</div>
+        <div class="node sub2"><b>scripts_patch_apifetch</b> — API补丁脚本</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="branch">
+    <div class="node sub1"><span class="title">🔄 数据流 (交易时段)</span></div>
+    <div class="node sub2" style="color:#58a6ff;font-weight:500">
+      ① 数据层(data_global/data_prod) → ② 策略引擎(daily_signal/向量/动量) → ③ 风控(risk_manager/止损) → ④ 交易执行(paper_trader/Alpaca)
+    </div>
+    <div class="node sub2" style="color:#58a6ff;font-weight:500;margin-top:4px">
+      日内独立流: intraday(扫描信号) → intraday_trader(风控) → Alpaca(下单)
+    </div>
+    <div class="node sub2" style="color:#8b949e;margin-top:4px">
+      盘中: daemon守护进程每15分钟循环 + 止损监控持续运行 → push_notify推送通知
+    </div>
+    <div class="node sub2" style="color:#8b949e">
+      收盘后: 权益记录 → 推送日报 → config_db自动备份 → 缓存检查
+    </div>
+  </div>
+
+</div>
+
+<hr style="margin-top:24px;">
+
+<h2 style="font-size:14px;color:#8b949e;margin:12px 0 8px">📂 配置文件 (config_db 保护)</h2>
+<div class="row" style="font-size:11px;color:#8b949e">
+  <span style="background:#161b22;padding:3px 8px;border-radius:4px;border:1px solid #21262d">users.json 用户</span>
+  <span style="background:#161b22;padding:3px 8px;border-radius:4px;border:1px solid #21262d">broker_config.json 券商</span>
+  <span style="background:#161b22;padding:3px 8px;border-radius:4px;border:1px solid #21262d">intraday_config.json 日内</span>
+  <span style="background:#161b22;padding:3px 8px;border-radius:4px;border:1px solid #21262d">system_config.json 策略参数</span>
+  <span style="background:#161b22;padding:3px 8px;border-radius:4px;border:1px solid #21262d">factor_weights.json 因子</span>
+  <span style="background:#161b22;padding:3px 8px;border-radius:4px;border:1px solid #21262d">trade_mode.json 模式</span>
+  <span style="background:#161b22;padding:3px 8px;border-radius:4px;border:1px solid #21262d">circuit_breaker.json 熔断</span>
+  <span style="background:#161b22;padding:3px 8px;border-radius:4px;border:1px solid #21262d">factor_ranking.json 排名</span>
+  <span style="background:#161b22;padding:3px 8px;border-radius:4px;border:1px solid #21262d">broker_keys.json 密钥</span>
+</div>
+
+</body>
+</html>

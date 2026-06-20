@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}信号总线 - M+{% endblock %}
+{% block content %}
+
+<div class="panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <h2 style="margin:0;font-size:16px;">📨 信号总线</h2>
+    <div style="display:flex;gap:6px;">
+      <button class="btn primary" onclick="refreshAll()" style="font-size:11px;padding:5px 10px;">🔄 刷新</button>
+    </div>
+  </div>
+
+  <!-- 总线概览 -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:12px;">
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;text-align:center;">
+      <div style="font-size:24px;font-weight:700;color:#58a6ff;" id="pendingCount">-</div>
+      <div style="font-size:11px;color:#8b949e;">待处理消息</div>
+    </div>
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;text-align:center;">
+      <div style="font-size:24px;font-weight:700;color:#3fb950;" id="strategyCount">-</div>
+      <div style="font-size:11px;color:#8b949e;">策略模块</div>
+    </div>
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;text-align:center;">
+      <div style="font-size:24px;font-weight:700;color:#d29922;" id="consumerCount">-</div>
+      <div style="font-size:11px;color:#8b949e;">消费者</div>
+    </div>
+  </div>
+
+  <!-- 策略心跳 -->
+  <div style="font-size:12px;color:#8b949e;margin-bottom:6px;">🧩 策略模块状态</div>
+  <div id="strategyList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;"></div>
+
+  <!-- 消息列表 -->
+  <div style="font-size:12px;color:#8b949e;margin-bottom:6px;">📋 最近消息</div>
+  <div id="messageList" style="display:flex;flex-direction:column;gap:3px;"></div>
+</div>
+
+<script>
+async function refreshAll() {
+  await loadStatus();
+  await loadMessages();
+}
+
+async function loadStatus() {
+  const d = await apiFetch('/bus/api/status');
+  document.getElementById('pendingCount').textContent = d.pending ?? '0';
+  document.getElementById('strategyCount').textContent = (d.strategies||[]).length;
+  document.getElementById('consumerCount').textContent = (d.consumers||[]).length;
+
+  const sl = document.getElementById('strategyList');
+  sl.innerHTML = '';
+  for (const s of (d.strategies||[])) {
+    const statusColor = s.status === 'ok' ? '#3fb950' : s.status === 'error' ? '#f85149' : '#8b949e';
+    const statusIcon = s.status === 'ok' ? '🟢' : s.status === 'error' ? '🔴' : '⚪';
+    sl.innerHTML += `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#161b22;border:1px solid #21262d;border-radius:6px;font-size:12px;">
+        <span>${statusIcon}</span>
+        <span style="font-weight:600;min-width:100px;">${s.strategy}</span>
+        <span style="color:${statusColor};font-size:11px;">${s.status}</span>
+        <span style="color:#484f58;font-size:10px;">消息 ${s.message_count} 条</span>
+        <span style="color:#484f58;font-size:10px;margin-left:auto;">${s.last_run ? s.last_run.substring(5,16) : '-'}</span>
+      </div>
+    `;
+  }
+}
+
+async function loadMessages() {
+  const msgs = await apiFetch('/bus/api/messages');
+  const ml = document.getElementById('messageList');
+  ml.innerHTML = '';
+  
+  if (!msgs || msgs.length === 0) {
+    ml.innerHTML = '<div style="padding:20px;text-align:center;color:#484f58;font-size:12px;">暂无消息</div>';
+    return;
+  }
+
+  const typeLabels = {signal:'信号', order:'订单', risk_event:'风控', data_update:'数据'};
+  const statusColors = {pending:'#d29922', consumed:'#484f58', failed:'#f85149'};
+  
+  for (const m of msgs) {
+    const p = m.payload || {};
+    const typeLabel = typeLabels[m.msg_type] || m.msg_type;
+    const statusColor = statusColors[m.status] || '#8b949e';
+    
+    let detail = '';
+    if (m.msg_type === 'signal' && p.candidates) {
+      detail = `📊 ${p.candidates.length}只候选`;
+      if (p.buy_list && p.buy_list.length) detail += ` · 买入 ${p.buy_list.length}只`;
+    } else if (m.msg_type === 'order' && p.ticker) {
+      const sideIcon = p.side === 'buy' ? '🟢' : '🔴';
+      detail = `${sideIcon} ${p.ticker} ${p.side==='buy'?'买入':'卖出'} ${p.qty}股 @ $${p.price}`;
+      if (p.reason) detail += ` (${p.reason})`;
+    } else if (m.msg_type === 'risk_event') {
+      detail = `⚠️ ${p.message || p.event_type || ''}`;
+    }
+
+    ml.innerHTML += `
+      <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:11px;">
+        <span style="color:#484f58;min-width:24px;">#${m.id}</span>
+        <span style="color:#58a6ff;min-width:80px;font-weight:500;">${m.strategy}</span>
+        <span style="color:#8b949e;min-width:40px;">${typeLabel}</span>
+        <span style="flex:1;color:#e6edf3;">${detail || '(空)'}</span>
+        <span style="color:${statusColor};font-size:10px;">${m.status}</span>
+        <span style="color:#484f58;font-size:9px;">${m.timestamp ? m.timestamp.substring(11,19) : ''}</span>
+      </div>
+    `;
+  }
+}
+
+refreshAll();
+// 每15秒自动刷新
+setInterval(refreshAll, 15000);
+</script>
+{% endblock %}
