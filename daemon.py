@@ -167,62 +167,71 @@ def run_daily_cycle():
             if shutdown_event.wait(wait_sig):
                 break
 
-        logger.info("[步骤2/3] 生成保守策略信号...")
+        logger.info("[步骤2/3] === 通过插件系统生成信号 ===")
         try:
-            from daily_signal import generate_signals
-            result = generate_signals()
-            save_status(last_signal=str(datetime.now()))
-            logger.info("  ✅ 保守信号生成完成")
+            from plugin_loader import load_all, run_all
+            # 确保插件已加载
+            if not load_all():
+                logger.warning("  插件加载为空，重试...")
+                load_all()
+
+            results = run_all()
+            total_signals = sum(len(v) for v in results.values())
+            save_status(last_signal=str(datetime.now()), plugin_results=str({k: len(v) for k, v in results.items()}))
+            logger.info(f"  ✅ 插件全部执行完成，共 {total_signals} 条信号")
+            for name, signals in results.items():
+                logger.info(f"    {name}: {len(signals)} 条")
         except Exception as e:
-            logger.error(f"  保守信号异常: {e}")
+            logger.error(f"  插件系统执行异常: {e}")
+            logger.info("  [回退] 直接调用策略...")
+            # 回退到旧逻辑
+            try:
+                from daily_signal import generate_signals
+                generate_signals()
+            except Exception as e2:
+                logger.error(f"  回退保守信号失败: {e2}")
+            try:
+                from strategy_momentum import generate_signals
+                from data_prod import load_price_cache, compute_indicators
+                cache = load_price_cache()
+                for tkr in list(cache.keys()):
+                    df = cache[tkr]
+                    if df is not None and "Momentum_12M" not in df.columns:
+                        cache[tkr] = compute_indicators(df)
+                generate_signals(cache, top_n=15)
+            except Exception as e2:
+                logger.error(f"  回退动量信号失败: {e2}")
             shutdown_event.wait(60)
             continue
 
-        # ===== 动量激进策略：独立信号生成 =====
-        logger.info("[激进策略] 生成动量信号...")
+        # ===== 通过执行器自动调仓 =====
+        logger.info("[步骤3/3] 通过执行器自动下单...")
         try:
-            from strategy_momentum import generate_signals
-            from data_prod import load_price_cache, compute_indicators
-            cache = load_price_cache()
-            for tkr in list(cache.keys()):
-                df = cache[tkr]
-                if df is not None and "Momentum_12M" not in df.columns:
-                    cache[tkr] = compute_indicators(df)
-            result = generate_signals(cache, top_n=15)
-            if result:
-                save_status(last_momentum_signal=str(datetime.now()))
-                logger.info(f"  ✅ 动量信号生成完成: {len(result)}只")
-            else:
-                logger.warning("  动量信号生成无结果")
+            from trade_executor import TradeExecutor
+            ex = TradeExecutor()
+            results = ex.run_once(dry_run=False)
+            save_status(last_rebalance=str(datetime.now()), executor_results=str(len(results)))
+            logger.info(f"  ✅ 执行器自动处理 {len(results)} 笔交易意图")
+            if results:
+                for r in results:
+                    logger.info(f"    [{r['status']}] {r.get('side','')} {r.get('ticker','')} x{r.get('qty',0)}")
         except Exception as e:
-            logger.warning(f"  激进信号异常: {e}")
-
-        # ===== 动量激进策略：独立调仓 =====
-        logger.info("[激进策略] 自动调仓...")
-        try:
-            from paper_trader_momentum import execute_rebalance
-            execute_rebalance(auto=True)
-            save_status(last_momentum_rebalance=str(datetime.now()))
-            logger.info("  ✅ 动量调仓完成")
-        except Exception as e:
-            logger.warning(f"  激进调仓异常: {e}")
-
-        now3 = datetime.now().replace(microsecond=0)
-        target_rebal = now3.replace(hour=REBAL_HOUR, minute=REBAL_MIN, second=0, microsecond=0)
-        if now3 < target_rebal:
-            wait_re = (target_rebal - now3).total_seconds()
-            logger.info(f"  等待调仓时间({target_rebal.strftime('%H:%M')}): {wait_re/60:.0f}分钟")
-            if shutdown_event.wait(wait_re):
-                break
-
-        logger.info("[步骤3/3] 保守策略调仓...")
-        try:
-            from paper_trader import rebalance
-            rebalance(auto=True)
-            save_status(last_rebalance=str(datetime.now()))
-            logger.info("  ✅ 保守调仓完成")
-        except Exception as e:
-            logger.error(f"  保守调仓异常: {e}")
+            logger.warning(f"  执行器自动交易异常: {e}")
+            logger.info("  [回退] 使用旧调仓逻辑...")
+            try:
+                from paper_trader_momentum import execute_rebalance
+                execute_rebalance(auto=True)
+                save_status(last_momentum_rebalance=str(datetime.now()))
+                logger.info("  ✅ 动量调仓完成(回退)")
+            except Exception as e2:
+                logger.warning(f"  动量调仓(回退)失败: {e2}")
+            try:
+                from paper_trader import rebalance
+                rebalance(auto=True)
+                save_status(last_rebalance=str(datetime.now()))
+                logger.info("  ✅ 保守调仓完成(回退)")
+            except Exception as e2:
+                logger.warning(f"  保守调仓(回退)失败: {e2}")
 
         logger.info("[收盘] 记录今日权益...")
         try:
@@ -319,31 +328,48 @@ def run_intraday_loop():
             shutdown_event.wait(3600)
             continue
 
-        logger.info("[日内] 扫描+执行...")
+        logger.info("[日内] 插件扫描+执行器下单...")
         try:
-            # 扫描信号
-            from intraday import scan_intraday_signals as scan_intraday
-            scan_result = scan_intraday()
-            candidates_count = len(scan_result) if isinstance(scan_result, list) else len(scan_result.get('candidates',[]))
-            logger.info(f"  [日内] 扫描完成: {candidates_count}只候选")
-            save_status(last_intraday_scan=str(datetime.now()))
+            # 通过插件系统运行日内策略
+            from plugin_loader import get_loader
+            loader = get_loader()
+            intraday_plugin = loader.get_plugin("intraday")
+            if intraday_plugin and intraday_plugin.enabled:
+                signals = intraday_plugin.generate_signals()
+                logger.info(f"  [日内] 插件执行完成: {len(signals or [])}只候选")
+                save_status(last_intraday_scan=str(datetime.now()))
+            else:
+                logger.warning("  [日内] 插件未启用，跳过")
         except Exception as e:
-            logger.warning(f"  [日内] 扫描异常: {e}")
+            logger.warning(f"  [日内] 插件扫描异常: {e}")
+            # 回退旧逻辑
+            try:
+                from intraday import scan_intraday_signals as scan_intraday
+                scan_intraday()
+                save_status(last_intraday_scan=str(datetime.now()))
+            except Exception as e2:
+                logger.debug(f"  [日内] 回退扫描跳过: {e2}")
 
-        # 先检查止盈止损
+        # 通过执行器处理总线上的日内信号
         try:
-            from intraday_trader import check_stop_loss
-            check_stop_loss()
+            from trade_executor import TradeExecutor
+            ex = TradeExecutor()
+            results = ex.run_once(dry_run=False)
+            logger.info(f"  [日内] 执行器处理 {len(results)} 笔")
         except Exception as e:
-            logger.debug(f"  [日内] 止盈止损检查跳过: {e}")
-
-        # 执行日内交易（买入信号股）
-        try:
-            from intraday_trader import execute_intraday
-            execute_intraday(auto=True)
-            logger.info("  [日内] 执行完成")
-        except Exception as e:
-            logger.warning(f"  [日内] 执行异常: {e}")
+            logger.debug(f"  [日内] 执行器交易跳过: {e}")
+            # 回退旧逻辑
+            try:
+                from intraday_trader import check_stop_loss
+                check_stop_loss()
+            except:
+                pass
+            try:
+                from intraday_trader import execute_intraday
+                execute_intraday(auto=True)
+                logger.info("  [日内] (回退)执行完成")
+            except:
+                pass
 
         # 收盘前强制清仓（美东15:45 = 北京04:45）
         if hour >= 4 and minute >= 45:
