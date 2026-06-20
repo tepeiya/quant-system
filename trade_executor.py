@@ -25,6 +25,7 @@ logger = logging.getLogger("quant.executor")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import signal_bus
+import order_manager as om
 from broker_manager import BrokerManager
 from risk_manager import RiskManager
 
@@ -175,6 +176,9 @@ class TradeExecutor:
             ok_risk, risk_msg = self.risk.check_signal(signal_info, {})
             if not ok_risk:
                 logger.warning(f"  ⛔ [{ticker}] 风控拦截: {risk_msg}")
+                # 记录被拦截的订单
+                om.new_intent(ticker, side, qty, reason=reason, strategy=strategy,
+                              broker=self.broker_id, price=price)
                 results.append({
                     "ticker": ticker, "side": side, "qty": qty,
                     "status": "rejected", "reason": risk_msg,
@@ -184,6 +188,8 @@ class TradeExecutor:
 
             if dry_run:
                 logger.info(f"  [模拟] {side.upper()} {ticker} x{qty} @ ${price}")
+                om.new_intent(ticker, side, qty, reason=reason, strategy=strategy,
+                              broker=self.broker_id, price=price)
                 results.append({
                     "ticker": ticker, "side": side, "qty": qty,
                     "status": "dry_run", "reason": reason,
@@ -193,9 +199,14 @@ class TradeExecutor:
 
             # ===== 执行下单 =====
             try:
+                # 先创建订单意图
+                intent = om.new_intent(ticker, side, qty, reason=reason,
+                                       strategy=strategy, broker=self.broker_id,
+                                       price=price)
                 order = self._place_order(client, ticker, side, qty)
                 if order:
-                    order_id = getattr(order, "id", str(order))
+                    order_id = order.get("order_id", str(order))
+                    om.mark_submitted(intent["intent_id"], broker_order_id=order_id)
                     logger.info(f"  ✅ {side.upper()} {ticker} x{qty} → 订单#{order_id}")
 
                     # 写入成交回报到总线

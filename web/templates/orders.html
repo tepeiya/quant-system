@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}订单记录 - M+{% endblock %}
+{% block content %}
+
+<div class="panel" style="padding:14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <h2 style="margin:0;font-size:16px;">📝 订单记录</h2>
+    <div style="display:flex;gap:6px;">
+      <select id="filterStrategy" onchange="loadOrders()" style="font-size:10px;padding:4px 6px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;">
+        <option value="">全部策略</option>
+        <option value="conservative">保守</option>
+        <option value="momentum">动量</option>
+        <option value="intraday">日内</option>
+      </select>
+      <button class="btn" onclick="loadOrders()" style="font-size:11px;padding:5px 8px;">🔄 刷新</button>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px;">
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 6px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#58a6ff;" id="totalOrders">-</div>
+      <div style="font-size:10px;color:#8b949e;margin-top:2px;">总订单</div>
+    </div>
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 6px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#3fb950;" id="todayOrders">-</div>
+      <div style="font-size:10px;color:#8b949e;margin-top:2px;">今日</div>
+    </div>
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 6px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#d29922;" id="pendingOrders">-</div>
+      <div style="font-size:10px;color:#8b949e;margin-top:2px;">待处理</div>
+    </div>
+  </div>
+
+  <div id="orderList" style="display:flex;flex-direction:column;gap:4px;"></div>
+</div>
+
+<script>
+async function loadOrders() {
+  const strategy = document.getElementById('filterStrategy').value;
+  let url = '/orders/api/list?limit=100';
+  if (strategy) url += '&strategy=' + strategy;
+
+  const [orders, stats, today] = await Promise.all([
+    apiFetch(url),
+    apiFetch('/orders/api/stats'),
+    apiFetch('/orders/api/today'),
+  ]);
+
+  document.getElementById('totalOrders').textContent = stats.total || 0;
+  document.getElementById('todayOrders').textContent = stats.today || 0;
+  document.getElementById('pendingOrders').textContent = (stats.by_status?.NEW || 0) + (stats.by_status?.SUBMITTED || 0);
+
+  const ol = document.getElementById('orderList');
+  if (!orders || orders.length === 0) {
+    ol.innerHTML = '<div style="padding:20px;text-align:center;color:#484f58;font-size:12px;">暂无订单记录</div>';
+    return;
+  }
+  const statusIcons = {
+    NEW: '🆕', SUBMITTED: '📤', PARTIAL: '🔶', FILLED: '✅',
+    REJECTED: '❌', CANCELED: '🚫', DRY_RUN: '🧪'
+  };
+  ol.innerHTML = orders.map(o => {
+    const icon = statusIcons[o.status] || '📋';
+    const sideIcon = o.side === 'buy' ? '🟢' : '🔴';
+    const statusColor = o.status === 'FILLED' ? '#3fb950' : o.status === 'REJECTED' ? '#f85149' : '#8b949e';
+    return `
+      <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;font-size:11px;">
+        <span>${icon}</span>
+        <span style="font-weight:600;min-width:55px;">${sideIcon} ${o.symbol}</span>
+        <span style="color:#e6edf3;">x${o.qty}</span>
+        <span style="color:#8b949e;font-size:10px;">${o.strategy || '-'}</span>
+        <span style="color:#484f58;font-size:10px;">${o.reason || ''}</span>
+        <span style="margin-left:auto;color:${statusColor};font-size:10px;">${o.status}</span>
+        <span style="color:#484f58;font-size:9px;">${o.created_at ? o.created_at.substring(11,19) : ''}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+loadOrders();
+setInterval(loadOrders, 30000);
+</script>
+{% endblock %}
