@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message
 logger = logging.getLogger("quant.backtest")
 
 
-def run_backtest(start: str = "2025-01-01", end: str = None) -> dict:
+def run_backtest(start: str = "2023-01-01", end: str = None) -> dict:
     """运行回测并生成专业报告"""
     cache = load_price_cache()
     if len(cache) < 30:
@@ -54,8 +54,8 @@ def run_backtest(start: str = "2025-01-01", end: str = None) -> dict:
 
     # 用 performance_analyzer 计算所有专业指标
     metrics = calculate_all_metrics(
-        daily_returns=daily_returns if daily_returns else None,
-        equity_curve=equity_curve if equity_curve else None,
+        daily_returns=daily_returns if daily_returns is not None and len(daily_returns) > 0 else None,
+        equity_curve=equity_curve if equity_curve is not None and not equity_curve.empty else None,
         trades=trades_raw if trades_raw else None,
         initial_capital=res.get('initial_capital', 100000),
     )
