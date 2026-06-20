@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}执行器 - M+{% endblock %}
+{% block content %}
+
+<div class="panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <h2 style="margin:0;font-size:16px;">💹 统一交易执行器</h2>
+    <div style="display:flex;gap:6px;">
+      <button class="btn" onclick="dryRun()" style="font-size:11px;padding:5px 10px;">🧪 模拟执行</button>
+      <button class="btn primary" onclick="runOnce()" style="font-size:11px;padding:5px 10px;">🚀 执行一次</button>
+      <button class="btn" onclick="refreshAll()" style="font-size:11px;padding:5px 10px;">🔄 刷新</button>
+    </div>
+  </div>
+
+  <!-- 状态概览 -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:12px;">
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;text-align:center;">
+      <div style="font-size:22px;font-weight:700;color:#58a6ff;" id="pendingCount">-</div>
+      <div style="font-size:11px;color:#8b949e;">待处理信号</div>
+    </div>
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;text-align:center;">
+      <div style="font-size:22px;font-weight:700;color:#3fb950;" id="strategyCount">-</div>
+      <div style="font-size:11px;color:#8b949e;">策略活跃</div>
+    </div>
+  </div>
+
+  <!-- 策略心跳 -->
+  <div style="font-size:12px;color:#8b949e;margin-bottom:6px;">🧩 策略状态</div>
+  <div id="strategyList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;"></div>
+
+  <!-- 执行结果 -->
+  <div style="font-size:12px;color:#8b949e;margin-bottom:6px;">📋 执行结果</div>
+  <div id="execResult" style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;min-height:40px;font-size:11px;color:#8b949e;">
+    点击「模拟执行」或「执行一次」
+  </div>
+
+  <!-- 最近消息 -->
+  <div style="margin-top:12px;font-size:12px;color:#8b949e;margin-bottom:6px;">📨 总线最近消息</div>
+  <div id="recentMessages" style="display:flex;flex-direction:column;gap:3px;"></div>
+</div>
+
+<script>
+async function refreshAll() {
+  await loadStatus();
+  await loadMessages();
+}
+
+async function loadStatus() {
+  const d = await apiFetch('/executor/api/status');
+  document.getElementById('pendingCount').textContent = d.pending ?? '0';
+  document.getElementById('strategyCount').textContent = (d.strategies||[]).length;
+
+  const sl = document.getElementById('strategyList');
+  sl.innerHTML = '';
+  for (const s of (d.strategies||[])) {
+    const color = s.status === 'ok' ? '#3fb950' : s.status === 'error' ? '#f85149' : '#8b949e';
+    const icon = s.status === 'ok' ? '🟢' : s.status === 'error' ? '🔴' : '⚪';
+    sl.innerHTML += `
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#161b22;border:1px solid #21262d;border-radius:6px;font-size:11px;">
+        <span>${icon}</span>
+        <span style="font-weight:600;min-width:100px;">${s.strategy}</span>
+        <span style="color:${color};">${s.status}</span>
+        <span style="color:#484f58;font-size:10px;">消息${s.message_count}条</span>
+        <span style="color:#484f58;font-size:10px;margin-left:auto;">${s.last_run ? s.last_run.substring(5,16) : '-'}</span>
+      </div>
+    `;
+  }
+}
+
+async function loadMessages() {
+  const msgs = await apiFetch('/executor/api/bus_messages');
+  const ml = document.getElementById('recentMessages');
+  ml.innerHTML = '';
+  if (!msgs || msgs.length === 0) {
+    ml.innerHTML = '<div style="padding:12px;text-align:center;color:#484f58;font-size:11px;">暂无消息</div>';
+    return;
+  }
+  const typeL = {signal:'信号', order:'订单', risk_event:'风控'};
+  for (const m of msgs.slice(0,8)) {
+    const p = m.payload || {};
+    let detail = '';
+    if (m.msg_type === 'signal' && p.candidates) detail = `${p.candidates.length}只候选`;
+    else if (m.msg_type === 'order' && p.ticker) detail = `${p.side==='buy'?'🟢买入':'🔴卖出'} ${p.ticker} x${p.qty}`;
+    ml.innerHTML += `
+      <div style="display:flex;gap:6px;padding:5px 8px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:10px;">
+        <span style="color:#484f58;">#${m.id}</span>
+        <span style="color:#58a6ff;font-weight:500;">${m.strategy}</span>
+        <span style="color:#8b949e;">${typeL[m.msg_type]||m.msg_type}</span>
+        <span style="flex:1;color:#e6edf3;">${detail || '(空)'}</span>
+        <span style="color:${m.status==='pending'?'#d29922':'#484f58'}">${m.status}</span>
+      </div>`;
+  }
+}
+
+async function runOnce() {
+  const btn = event.target;
+  btn.textContent = '⏳ 执行中...';
+  btn.disabled = true;
+  try {
+    const r = await apiFetch('/executor/api/run_once', {method:'POST'});
+    showResult(r, '🚀');
+  } catch(e) {
+    document.getElementById('execResult').innerHTML = `<span style="color:#f85149;">❌ ${e.message}</span>`;
+  }
+  btn.textContent = '🚀 执行一次';
+  btn.disabled = false;
+  loadMessages();
+}
+
+async function dryRun() {
+  const btn = event.target;
+  btn.textContent = '⏳ 模拟中...';
+  btn.disabled = true;
+  try {
+    const r = await apiFetch('/executor/api/dry_run', {method:'POST'});
+    showResult(r, '🧪');
+  } catch(e) {
+    document.getElementById('execResult').innerHTML = `<span style="color:#f85149;">❌ ${e.message}</span>`;
+  }
+  btn.textContent = '🧪 模拟执行';
+  btn.disabled = false;
+}
+
+function showResult(r, icon) {
+  const el = document.getElementById('execResult');
+  if (r.status !== 'ok' || !r.results) {
+    el.innerHTML = `<span style="color:#f85149;">${icon} 执行异常</span>`;
+    return;
+  }
+  const results = r.results;
+  if (results.length === 0) {
+    el.innerHTML = `<span style="color:#8b949e;">${icon} 无待处理信号</span>`;
+    return;
+  }
+  let html = `<div style="margin-bottom:6px;font-weight:600;color:#e6edf3;">${icon} 执行 ${results.length} 笔</div>`;
+  for (const r2 of results.slice(0,15)) {
+    const col = r2.status === 'submitted' ? '#3fb950' : r2.status === 'dry_run' ? '#d29922' : r2.status === 'rejected' ? '#f85149' : '#8b949e';
+    html += `<div style="display:flex;gap:6px;padding:3px 0;font-size:11px;">
+      <span style="color:${col};min-width:60px;">[${r2.status}]</span>
+      <span style="color:#e6edf3;">${r2.side?.toUpperCase() || ''} ${r2.ticker || ''} x${r2.qty || 0}</span>
+      <span style="color:#484f58;">${r2.reason || r2.error || ''}</span>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+refreshAll();
+setInterval(refreshAll, 15000);
+</script>
+{% endblock %}
