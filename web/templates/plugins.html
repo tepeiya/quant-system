@@ -2,44 +2,45 @@
 {% block title %}插件管理 - M+{% endblock %}
 {% block content %}
 
-<div class="panel">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-    <h2 style="margin:0;font-size:16px;">🧩 策略插件管理</h2>
+<div class="panel" style="padding:14px;">
+  <!-- 头部 -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <h2 style="margin:0;font-size:16px;">🧩 策略插件</h2>
     <div style="display:flex;gap:6px;">
-      <button class="btn" onclick="runAll()" style="font-size:11px;padding:5px 10px;">▶️ 全部执行</button>
-      <button class="btn primary" onclick="refreshAll()" style="font-size:11px;padding:5px 10px;">🔄 刷新</button>
+      <button class="btn primary" onclick="runAll()" style="font-size:11px;padding:5px 10px;">▶️ 全部执行</button>
+      <button class="btn" onclick="refreshAll()" style="font-size:11px;padding:5px 10px;">🔄 刷新</button>
     </div>
   </div>
 
-  <!-- 概览 -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:12px;">
-    <div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;text-align:center;">
-      <div style="font-size:22px;font-weight:700;color:#58a6ff;" id="pluginCount">-</div>
-      <div style="font-size:11px;color:#8b949e;">已加载插件</div>
+  <!-- 三卡片概览 -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px;">
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 6px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#58a6ff;" id="pluginCount">-</div>
+      <div style="font-size:10px;color:#8b949e;margin-top:2px;">已加载</div>
     </div>
-    <div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;text-align:center;">
-      <div style="font-size:22px;font-weight:700;color:#3fb950;" id="enabledCount">-</div>
-      <div style="font-size:11px;color:#8b949e;">已启用</div>
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 6px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#3fb950;" id="enabledCount">-</div>
+      <div style="font-size:10px;color:#8b949e;margin-top:2px;">已启用</div>
     </div>
-    <div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;text-align:center;">
-      <div style="font-size:22px;font-weight:700;color:#d29922;" id="pendingCount">-</div>
-      <div style="font-size:11px;color:#8b949e;">总线待处理</div>
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 6px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#d29922;" id="pendingCount">-</div>
+      <div style="font-size:10px;color:#8b949e;margin-top:2px;">待处理</div>
     </div>
   </div>
 
   <!-- 插件列表 -->
-  <div id="pluginList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;"></div>
+  <div id="pluginList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
 
-  <!-- 未发现的插件 -->
+  <!-- 未加载插件 -->
   <div id="unloadedSection" style="display:none;margin-bottom:12px;">
-    <div style="font-size:12px;color:#8b949e;margin-bottom:6px;">📂 未加载的插件目录</div>
+    <div style="font-size:11px;color:#8b949e;margin-bottom:6px;padding-left:4px;">📂 未加载的插件目录</div>
     <div id="unloadedList" style="display:flex;flex-direction:column;gap:4px;"></div>
   </div>
 
-  <!-- 执行结果 -->
-  <div style="font-size:12px;color:#8b949e;margin-bottom:4px;">📋 执行日志</div>
-  <div id="execLog" style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;min-height:40px;font-size:11px;color:#484f58;">
-    点击插件右侧「▶️ 执行」或「全部执行」
+  <!-- 执行日志 -->
+  <div style="font-size:11px;color:#8b949e;margin-bottom:6px;padding-left:4px;">📋 执行日志</div>
+  <div id="execLog" style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px;min-height:36px;font-size:10px;color:#484f58;line-height:1.6;max-height:160px;overflow-y:auto;">
+    点击「▶️ 执行」或「全部执行」
   </div>
 </div>
 
@@ -53,54 +54,67 @@ async function loadPlugins() {
   const d = await apiFetch('/plugins/api/list');
   document.getElementById('pluginCount').textContent = d.length;
   document.getElementById('enabledCount').textContent = d.filter(p => p.enabled !== false).length;
-
   const status = await apiFetch('/plugins/api/status');
   document.getElementById('pendingCount').textContent = status.bus_pending ?? '0';
 
+  // 并行加载券商数据
+  const [brokersResp, mappingResp] = await Promise.all([
+    apiFetch('/brokers/api/list').catch(() => ({data:[]})),
+    apiFetch('/plugins/api/broker_mapping').catch(() => [])
+  ]);
+  const brokers = brokersResp.data || brokersResp || [];
+  const map = {};
+  if (Array.isArray(mappingResp)) mappingResp.forEach(m => { map[m.strategy] = m.broker_id; });
+
   const pl = document.getElementById('pluginList');
-  pl.innerHTML = '';
   if (d.length === 0) {
     pl.innerHTML = '<div style="padding:20px;text-align:center;color:#484f58;font-size:12px;">暂无插件</div>';
     return;
   }
-  for (const p of d) {
-    const scheduleLabel = {daily:'📅 每日执行', intraday:'⏱️ 盘中轮询', manual:'🖐️ 手动触发'}[p.schedule] || p.schedule;
-    const statusColor = p.enabled !== false ? '#3fb950' : '#484f58';
-    const statusIcon = p.enabled !== false ? '🟢' : '⚪';
-    pl.innerHTML += `
-      <div style="background:#161b22;border:1px solid #21262d;border-radius:8px;padding:12px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span>${statusIcon}</span>
-          <div style="flex:1;">
-            <div style="font-weight:600;font-size:13px;color:#e6edf3;">${p.display_name || p.name}</div>
-            <div style="font-size:10px;color:#8b949e;margin-top:2px;">${p.description || ''}</div>
+  pl.innerHTML = d.map(p => {
+    const sLabel = {daily:'📅 每日', intraday:'⏱️ 盘中', manual:'🖐️ 手动'}[p.schedule] || p.schedule;
+    const sIcon = p.enabled !== false ? '🟢' : '⚪';
+    const curBroker = map[p.name] || '';
+    const brokerOpts = brokers.map(b =>
+      `<option value="${b.id}" ${b.id === curBroker ? 'selected' : ''}>${b.name}</option>`
+    ).join('');
+    return `
+      <div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:12px;">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <span style="font-size:16px;line-height:1.4;">${sIcon}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span style="font-weight:600;font-size:13px;color:#e6edf3;">${p.display_name || p.name}</span>
+              <span style="font-size:9px;color:#484f58;background:#161b22;padding:1px 5px;border-radius:3px;">v${p.version}</span>
+              <span style="font-size:9px;color:#58a6ff;">${sLabel}</span>
+            </div>
+            <div style="font-size:10px;color:#8b949e;margin:3px 0 8px;">${p.description || ''}</div>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <select class="broker-select" data-strategy="${p.name}" onchange="changeBroker(this)" style="flex:1;min-width:0;font-size:10px;padding:5px 6px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;">
+                ${brokerOpts}
+              </select>
+              <button class="btn" onclick="runPlugin('${p.name}')" style="font-size:10px;padding:5px 10px;white-space:nowrap;">▶️ 执行</button>
+            </div>
           </div>
-          <span style="font-size:10px;color:#484f58;">v${p.version}</span>
-          <span style="font-size:10px;color:#58a6ff;">${scheduleLabel}</span>
-          <select class="broker-select" data-strategy="${p.name}" style="font-size:10px;padding:3px 5px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#c9d1d9;max-width:130px;" onchange="changeBroker(this)">
-            <option value="">加载中...</option>
-          </select>
-          <button class="btn" onclick="runPlugin('${p.name}')" style="font-size:11px;padding:4px 8px;">▶️ 执行</button>
         </div>
       </div>
     `;
-  }
+  }).join('');
 }
 
 async function discoverPlugins() {
   const d = await apiFetch('/plugins/api/discover');
+  const sec = document.getElementById('unloadedSection');
   if (d.unloaded && d.unloaded.length > 0) {
-    document.getElementById('unloadedSection').style.display = 'block';
-    const ul = document.getElementById('unloadedList');
-    ul.innerHTML = d.unloaded.map(name => `
-      <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:11px;">
-        <span style="color:#484f58;">📁</span>
-        <span style="color:#8b949e;">${name}</span>
-        <span style="color:#484f58;font-size:10px;">已发现但未加载</span>
-      </div>
-    `).join('');
+    sec.style.display = 'block';
+    document.getElementById('unloadedList').innerHTML = d.unloaded.map(name =>
+      `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;font-size:10px;">
+        <span style="color:#484f58;">📁 ${name}</span>
+        <span style="color:#8b949e;">已发现但未加载</span>
+      </div>`
+    ).join('');
   } else {
-    document.getElementById('unloadedSection').style.display = 'none';
+    sec.style.display = 'none';
   }
 }
 
@@ -110,79 +124,45 @@ async function runPlugin(name) {
   btn.disabled = true;
   try {
     const r = await apiFetch('/plugins/api/run/' + name, {method:'POST'});
-    log(`✅ [${name}] ${r.message || '执行完成'}`);
+    log('✅ [' + name + '] ' + (r.message || '完成'));
   } catch(e) {
-    log(`❌ [${name}] ${e.message}`);
+    log('❌ [' + name + '] ' + e.message);
   }
   btn.textContent = '▶️ 执行';
   btn.disabled = false;
 }
 
 async function runAll() {
-  log('🔄 全部插件执行中...');
+  log('🔄 全部执行中...');
   try {
     const r = await apiFetch('/plugins/api/run_all', {method:'POST'});
     const results = r.results || {};
-    for (const [name, signals] of Object.entries(results)) {
-      log(`  ✅ ${name}: ${signals.length}条信号`);
-    }
-    log(`🏁 全部完成，共 ${r.total || 0} 条信号`);
-  } catch(e) {
-    log(`❌ 执行失败: ${e.message}`);
-  }
+    for (const [n, sigs] of Object.entries(results)) log('  ✅ ' + n + ': ' + sigs.length + '条');
+    log('🏁 共 ' + (r.total||0) + ' 条信号');
+  } catch(e) { log('❌ ' + e.message); }
 }
 
 function log(msg) {
   const el = document.getElementById('execLog');
-  const time = new Date().toLocaleTimeString();
-  el.innerHTML += `<div style="padding:2px 0;">[${time}] ${msg}</div>`;
+  el.innerHTML += '<div style="padding:1px 0;">[' + new Date().toLocaleTimeString() + '] ' + msg + '</div>';
   el.scrollTop = el.scrollHeight;
-  if (el.children.length > 50) el.innerHTML = el.children.slice(-50).map(c => c.outerHTML).join('');
-}
-
-refreshAll();
-// 每30秒自动刷新
-setInterval(refreshAll, 30000);
-
-// 加载券商列表和策略-券商映射
-async function loadBrokers() {
-  try {
-    const brokersResp = await apiFetch('/brokers/api/list');
-    const brokers = brokersResp.data || brokersResp || [];
-    const mappingResp = await apiFetch('/plugins/api/broker_mapping');
-    const mapping = {};
-    if (Array.isArray(mappingResp)) {
-      mappingResp.forEach(m => { mapping[m.strategy] = m.broker_id; });
-    }
-    document.querySelectorAll('.broker-select').forEach(sel => {
-      const strategy = sel.dataset.strategy;
-      const currentBroker = mapping[strategy] || '';
-      sel.innerHTML = '<option value="">加载失败</option>';
-      sel.innerHTML = brokers.map(b =>
-        `<option value="${b.id}" ${b.id === currentBroker ? 'selected' : ''}>${b.name}</option>`
-      ).join('');
-    });
-  } catch(e) {
-    console.log('券商加载失败:', e.message);
+  if (el.children.length > 40) {
+    const kids = Array.from(el.children).slice(-40);
+    el.innerHTML = kids.map(c => c.outerHTML).join('');
   }
 }
 
 async function changeBroker(sel) {
-  const strategy = sel.dataset.strategy;
-  const brokerId = sel.value;
   try {
     const r = await apiFetch('/plugins/api/set_broker', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({strategy, broker_id: brokerId})
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({strategy: sel.dataset.strategy, broker_id: sel.value})
     });
     showToast(r.message || '已保存', 'success');
-  } catch(e) {
-    showToast('保存失败: ' + e.message, 'error');
-  }
+  } catch(e) { showToast('失败: ' + e.message, 'error'); }
 }
 
-loadBrokers();
-setInterval(loadBrokers, 30000);
+refreshAll();
+setInterval(refreshAll, 30000);
 </script>
 {% endblock %}
