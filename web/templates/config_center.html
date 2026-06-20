@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}配置中心 - M+{% endblock %}
+{% block content %}
+
+<div class="panel" style="padding:14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <h2 style="margin:0;font-size:16px;">⚙️ 统一配置中心</h2>
+    <button class="btn" onclick="loadList()" style="font-size:11px;padding:5px 10px;">🔄 刷新</button>
+  </div>
+  <div id="configList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:14px;"></div>
+  <div id="configEditor" style="display:none;background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span id="editorTitle" style="font-weight:600;font-size:13px;color:#e6edf3;"></span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn primary" onclick="saveConfig()" style="font-size:11px;padding:4px 10px;">💾 保存</button>
+        <button class="btn" onclick="closeEditor()" style="font-size:11px;padding:4px 10px;">✕ 关闭</button>
+      </div>
+    </div>
+    <textarea id="editorContent" style="width:100%;min-height:200px;font-size:11px;font-family:monospace;padding:8px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#e6edf3;white-space:pre;overflow-x:auto;"></textarea>
+    <div id="editorMsg" style="font-size:11px;color:#8b949e;margin-top:6px;"></div>
+  </div>
+</div>
+
+<script>
+let _currentNs = '';
+
+async function loadList() {
+  const list = await apiFetch('/config/api/list');
+  const el = document.getElementById('configList');
+  el.innerHTML = list.map(c => `
+    <div onclick="openEditor('${c.namespace}')" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0d1117;border:1px solid #21262d;border-radius:6px;font-size:11px;cursor:pointer;">
+      <span style="font-weight:600;min-width:100px;color:#58a6ff;">${c.namespace}</span>
+      <span style="color:#8b949e;">${c.fields} 字段</span>
+      <span style="color:#484f58;font-size:10px;margin-left:auto;">${c.updated || '-'}</span>
+      <span style="color:#484f58;">✎</span>
+    </div>
+  `).join('');
+}
+
+async function openEditor(ns) {
+  _currentNs = ns;
+  document.getElementById('editorTitle').textContent = '✏️ ' + ns;
+  document.getElementById('configEditor').style.display = 'block';
+  document.getElementById('editorMsg').textContent = '加载中...';
+  const data = await apiFetch('/config/api/get/' + ns);
+  document.getElementById('editorContent').value = JSON.stringify(data, null, 2);
+  document.getElementById('editorMsg').textContent = '编辑后点「保存」';
+}
+
+async function saveConfig() {
+  const msg = document.getElementById('editorMsg');
+  msg.textContent = '⏳ 保存中...';
+  try {
+    const data = JSON.parse(document.getElementById('editorContent').value);
+    const r = await apiFetch('/config/api/set/' + _currentNs, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    msg.textContent = '✅ ' + (r.message || '已保存');
+    loadList();
+  } catch(e) {
+    msg.textContent = '❌ ' + e.message;
+  }
+}
+
+function closeEditor() {
+  document.getElementById('configEditor').style.display = 'none';
+  _currentNs = '';
+}
+
+loadList();
+</script>
+{% endblock %}
