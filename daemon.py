@@ -149,13 +149,13 @@ def run_daily_cycle():
         today_str = now.strftime("%Y-%m-%d")
         save_status(last_cycle=today_str)
 
-        logger.info("[步骤1/3] 增量更新数据...")
+        logger.info("[步骤1/3] 数据服务更新行情...")
         try:
-            logger.info("  [Docker环境] 直接调用Python更新...")
+            from data_service import run_update
+            run_update(full=False)
             from data_prod import load_price_cache
             cache = load_price_cache()
-            stocks_before = len(cache)
-            logger.info(f"  当前缓存: {stocks_before}只股票")
+            logger.info(f"  缓存: {len(cache)}只股票")
         except Exception as e:
             logger.error(f"  数据更新异常: {e}")
 

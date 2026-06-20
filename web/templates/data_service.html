@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}数据服务 - M+{% endblock %}
+{% block content %}
+
+<div class="panel" style="padding:14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <h2 style="margin:0;font-size:16px;">📡 数据服务</h2>
+    <div style="display:flex;gap:6px;">
+      <button class="btn" onclick="updateData(false)" style="font-size:11px;padding:5px 10px;">📥 增量更新</button>
+      <button class="btn primary" onclick="updateData(true)" style="font-size:11px;padding:5px 10px;">📥 全量更新</button>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px;">
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 6px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#58a6ff;" id="cacheAge">-</div>
+      <div style="font-size:10px;color:#8b949e;margin-top:2px;">缓存时效</div>
+    </div>
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 6px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#3fb950;" id="stocksCount">-</div>
+      <div style="font-size:10px;color:#8b949e;margin-top:2px;">股票数量</div>
+    </div>
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 6px;text-align:center;">
+      <div style="font-size:20px;font-weight:700;color:#d29922;" id="cacheSize">-</div>
+      <div style="font-size:10px;color:#8b949e;margin-top:2px;">缓存大小</div>
+    </div>
+  </div>
+
+  <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">📋 运行日志</div>
+    <div id="updateLog" style="font-size:10px;color:#484f58;min-height:30px;line-height:1.6;">
+      点击「增量更新」或「全量更新」
+    </div>
+  </div>
+</div>
+
+<script>
+async function loadHealth() {
+  const h = await apiFetch('/data/api/health');
+  document.getElementById('cacheAge').textContent = h.cache_age_hours ? h.cache_age_hours + 'h' : '无';
+  document.getElementById('cacheAge').style.color = h.status === 'healthy' ? '#3fb950' : '#f85149';
+  document.getElementById('stocksCount').textContent = h.stocks_count || '-';
+  document.getElementById('cacheSize').textContent = h.cache_size_mb ? h.cache_size_mb + 'MB' : '-';
+}
+
+async function updateData(full) {
+  const btn = event.target;
+  btn.textContent = '⏳';
+  btn.disabled = true;
+  log((full ? '📥 全量' : '📥 增量') + ' 更新开始...');
+  try {
+    const r = await apiFetch('/data/api/update', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({full})
+    });
+    log('✅ ' + (r.message || '完成'));
+    loadHealth();
+  } catch(e) { log('❌ ' + e.message); }
+  btn.textContent = full ? '📥 全量更新' : '📥 增量更新';
+  btn.disabled = false;
+}
+
+function log(msg) {
+  const el = document.getElementById('updateLog');
+  el.innerHTML += '<div>[' + new Date().toLocaleTimeString() + '] ' + msg + '</div>';
+  el.scrollTop = el.scrollHeight;
+}
+
+loadHealth();
+</script>
+{% endblock %}
