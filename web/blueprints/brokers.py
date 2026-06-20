@@ -52,7 +52,6 @@ def api_list():
             "enabled": bc.get("enabled", False),
             "ready": bc.get("enabled", False) and key_set and secret_set,
             "default": bid == default,
-            "strategies": bc.get("strategies", []),
         })
     return ok(result)
 
@@ -107,21 +106,6 @@ def api_set_default():
     return err("参数错误")
 
 
-@bp.route("/api/strategies", methods=["POST"])
-def api_strategies():
-    """保存券商策略绑定"""
-    data = request.json or {}
-    broker_id = data.get("broker_id", "")
-    strategies = data.get("strategies", [])
-    cfg = _load_cfg()
-    if broker_id not in cfg:
-        return err("券商不存在", 404)
-    cfg[broker_id]["strategies"] = strategies
-    _save_cfg(cfg)
-    logger.info(f"券商 {broker_id} 策略绑定: {strategies}")
-    return ok(message="策略绑定已更新")
-
-
 @bp.route("/api/save_key", methods=["POST"])
 def api_save_key():
     """保存某个Key"""
@@ -144,7 +128,7 @@ def api_test():
     for b in list_brokers():
         if not b.get("enabled"):
             continue
-        for strategy in b.get("strategies", []):
-            result = test_connection(strategy)
-            results[strategy] = result
+        broker_id = b.get("id", "")
+        result = test_connection(broker_id)
+        results[broker_id] = result
     return ok(results)

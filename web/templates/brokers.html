@@ -21,28 +21,18 @@
 </style>
 
 <script>
-const ALL_STRATEGIES = ["conservative", "momentum", "intraday"];
-const STRATEGY_LABELS = {conservative:"🛡️ 保守", momentum:"🚀 激进", intraday:"⚡ 日内"};
-
 async function loadBrokers() {
     try {
         const d = await apiFetch('/brokers/api/list');
         const brokers = d.data || d || [];
         const div = document.getElementById('brokerList');
         div.innerHTML = brokers.map(b => {
-            const selected = b.strategies || [];
-            const opts = ALL_STRATEGIES.map(s =>
-                `<option value="${s}" ${selected.includes(s) ? 'selected' : ''}>${STRATEGY_LABELS[s]||s}</option>`
-            ).join('');
             return `<div style="padding:12px;border-bottom:1px solid #21262d;">
                 <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
                     <div style="flex:1;min-width:120px;">
                         <b style="font-size:14px;">${b.name}</b>
                         <div style="font-size:11px;color:#8b949e;">${b.type} ${b.paper ? '📄 纸交易' : '🔴 实盘'}</div>
                     </div>
-                    <select class="sel-strategy" id="strat_${b.id}" multiple style="min-width:120px;" onchange="saveStrategies('${b.id}')">
-                        ${opts}
-                    </select>
                     <span style="font-size:12px;${b.ready ? 'color:#3fb950;' : b.enabled ? 'color:#d29922;' : 'color:#484f58;'}">
                         ${b.ready ? '✅ 就绪' : b.enabled ? '⚠️ 未配置' : '⏸️ 未启用'}
                     </span>
@@ -57,19 +47,8 @@ async function loadBrokers() {
     }
 }
 
-async function saveStrategies(brokerId) {
-    const sel = document.getElementById('strat_' + brokerId);
-    if (!sel) return;
-    const strategies = Array.from(sel.selectedOptions).map(o => o.value);
-    try {
-        await apiFetch('/brokers/api/strategies', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({broker_id: brokerId, strategies})
-        });
-        showToast('策略绑定已更新', 'success');
-    } catch(e) {
-        showToast('保存失败: ' + e.message, 'error');
-    }
+if (document.querySelector('.sel-strategy')) {
+    document.querySelector('.sel-strategy').style.display = 'none';
 }
 
 async function loadKeys() {

@@ -147,11 +147,17 @@ setInterval(refreshAll, 30000);
 // 加载券商列表和策略-券商映射
 async function loadBrokers() {
   try {
-    const brokers = await apiFetch('/brokers/api/list');
-    const mapping = await apiFetch('/plugins/api/broker_mapping');
+    const brokersResp = await apiFetch('/brokers/api/list');
+    const brokers = brokersResp.data || brokersResp || [];
+    const mappingResp = await apiFetch('/plugins/api/broker_mapping');
+    const mapping = {};
+    if (Array.isArray(mappingResp)) {
+      mappingResp.forEach(m => { mapping[m.strategy] = m.broker_id; });
+    }
     document.querySelectorAll('.broker-select').forEach(sel => {
       const strategy = sel.dataset.strategy;
       const currentBroker = mapping[strategy] || '';
+      sel.innerHTML = '<option value="">加载失败</option>';
       sel.innerHTML = brokers.map(b =>
         `<option value="${b.id}" ${b.id === currentBroker ? 'selected' : ''}>${b.name}</option>`
       ).join('');
