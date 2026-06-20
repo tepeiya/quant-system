@@ -17,8 +17,34 @@ function showToast(message, type = 'info', duration = 2600) {
     window.__toastTimer = setTimeout(() => box.style.display = 'none', duration);
 }
 
+// CSRF Token 管理
+let _csrfToken = null;
+
+async function _ensureCsrfToken() {
+    if (_csrfToken) return _csrfToken;
+    try {
+        const res = await fetch('/api/csrf_token');
+        const data = await res.json();
+        _csrfToken = data.token;
+        // 15分钟后刷新
+        setTimeout(() => { _csrfToken = null; }, 14 * 60 * 1000);
+        return _csrfToken;
+    } catch {
+        return null;
+    }
+}
+
 // 通用API请求封装
 async function apiFetch(url, options = {}) {
+    // POST/PUT/DELETE 自动带 CSRF Token
+    const method = (options.method || 'GET').toUpperCase();
+    if (['POST', 'PUT', 'DELETE'].includes(method)) {
+        const token = await _ensureCsrfToken();
+        if (token) {
+            options.headers = options.headers || {};
+            options.headers['X-CSRF-Token'] = token;
+        }
+    }
     const res = await fetch(url, options);
     let data = null;
     try { data = await res.json(); } catch (_) {}

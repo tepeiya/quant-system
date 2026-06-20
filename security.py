@@ -245,8 +245,7 @@ def apply_security_fixes(app):
         from flask import session, request, redirect, jsonify
         path = request.path
         public = PUBLIC_PATHS + [
-                  "/dashboard/", "/heatmap/", "/wheel/", "/trading/",
-                  "/settings/api/", "/executor/api/"
+                  "/dashboard/", "/heatmap/", "/wheel/", "/trading/", "/settings/api/"
                  ]
         if any(path.startswith(p) for p in public):
             return

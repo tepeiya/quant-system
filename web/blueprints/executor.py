@@ -4,6 +4,7 @@
 """
 from flask import Blueprint, jsonify, render_template
 from api_response import ok, err
+from security import csrf_protect
 import json, os, signal_bus
 
 bp = Blueprint("executor", __name__, url_prefix="/executor")
@@ -28,6 +29,7 @@ def api_status():
 
 
 @bp.route("/api/run_once", methods=["POST"])
+@csrf_protect
 def api_run_once():
     """手动执行一次"""
     import sys
@@ -42,6 +44,7 @@ def api_run_once():
 
 
 @bp.route("/api/dry_run", methods=["POST"])
+@csrf_protect
 def api_dry_run():
     """模拟执行一次"""
     import sys
