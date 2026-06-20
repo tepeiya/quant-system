@@ -46,7 +46,10 @@ class VectorStrategy:
         self.ticker_idx = {t: i for i, t in enumerate(tickers)}
         self.quality = np.array([quality_scores.get(t, 50) if quality_scores else 50 for t in tickers])
         sectors = load_sector_map()
-        self.sector_semi_hv = np.array([sectors.get(t, {}).get("semi", 0) for t in tickers])
+        if isinstance(sectors, dict):
+            self.sector_semi_hv = np.array([sectors.get(t, {}).get("semi", 0) if isinstance(sectors.get(t), dict) else 0 for t in tickers])
+        else:
+            self.sector_semi_hv = np.zeros(len(tickers))
 
     def run(self, prices: dict[str, pd.DataFrame],
             spy: pd.DataFrame,
