@@ -133,6 +133,7 @@ a:hover { color: #79c0ff; }
 }
 .nav-item:hover { color: #e6edf3; background: rgba(177,186,196,0.06); }
 .nav-item.active { color: #58a6ff; background: rgba(88,166,255,0.08); border-left-color: #58a6ff; font-weight: 500; }
+.nav-group { font-size: 10px; color: #484f58; padding: 12px 20px 4px; text-transform: uppercase; letter-spacing: 0.5px; list-style: none; }
 .nav-icon { font-size: 15px; width: 20px; text-align: center; }
 
 .nav-footer { border-top: 1px solid #21262d; padding: 8px 0; margin-top: auto; }
