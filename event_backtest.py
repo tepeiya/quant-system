@@ -156,40 +156,53 @@ class EventBacktest:
                     })
                     del positions[sym]
 
-            # ===== 2. 选股（每周一次） =====
+            # ===== 2. 选股（每周一次，用daily_signal的评分） =====
             week_num = i // 5
             if week_num != last_signal_week:
                 last_signal_week = week_num
-                # 选股
-                candidates = []
-                for j in range(n):
-                    price = P[i, j]
-                    if np.isnan(price) or price <= 0:
-                        continue
-                    sma200 = 0 if np.isnan(SMA200[i, j]) else SMA200[i, j]
-                    if sma200 > 0 and price < sma200:
-                        continue
+                buy_candidates = []
+                try:
+                    from daily_signal import generate_signals as ds_gen
+                    import datetime as _dt
+                    current_dt = str(all_dates[i])[:10]
+                    cache_snapshot = {t: prices[t].loc[:all_dates[i]] for t in prices if all_dates[i] in prices[t].index}
+                    if len(cache_snapshot) >= 30:
+                        sig_result = ds_gen(cache_snapshot)
+                        cand_list = sig_result.get("buy_candidates", [])
+                        if cand_list:
+                            buy_candidates = [
+                                (c["ticker"], c["score"], c["price"])
+                                for c in cand_list
+                            ]
+                except Exception as e:
+                    logger.debug(f"daily_signal评分不可用, 回退内置选股: {e}")
 
-                    # 简化评分：用12月动量
-                    mom = (price / P[max(0, i-252), j] - 1) if P[max(0, i-252), j] > 0 and not np.isnan(P[max(0, i-252), j]) else 0
-                    if mom <= 0:
-                        continue
-                    rsi_v = RSI[i, j]
-                    if not np.isnan(rsi_v) and rsi_v > 82:
-                        continue
-
-                    score = mom * 100 * 0.5
-                    sma20 = 0
-                    if i >= 20:
-                        sma20 = np.nanmean(P[max(0, i-20):i+1, j])
-                    if sma20 > 0 and price > sma20:
-                        score += 20
-                    if ATR[i, j] < 2.0:
-                        score += 5
-
-                    candidates.append((tickers[j], round(score, 1), price))
-                candidates.sort(key=lambda x: -x[1])
-                buy_candidates = candidates[:self.max_positions * 2]
+                if not buy_candidates:
+                    # 回退到内置选股
+                    for j in range(n):
+                        price = P[i, j]
+                        if np.isnan(price) or price <= 0:
+                            continue
+                        sma200 = 0 if np.isnan(SMA200[i, j]) else SMA200[i, j]
+                        if sma200 > 0 and price < sma200:
+                            continue
+                        mom = (price / P[max(0, i-252), j] - 1) if P[max(0, i-252), j] > 0 and not np.isnan(P[max(0, i-252), j]) else 0
+                        if mom <= 0:
+                            continue
+                        rsi_v = RSI[i, j]
+                        if not np.isnan(rsi_v) and rsi_v > 82:
+                            continue
+                        score = mom * 100 * 0.5
+                        sma20 = 0
+                        if i >= 20:
+                            sma20 = np.nanmean(P[max(0, i-20):i+1, j])
+                        if sma20 > 0 and price > sma20:
+                            score += 20
+                        if ATR[i, j] < 2.0:
+                            score += 5
+                        candidates.append((tickers[j], round(score, 1), price))
+                    candidates.sort(key=lambda x: -x[1])
+                    buy_candidates = candidates[:self.max_positions * 2]
             else:
                 buy_candidates = []
 
