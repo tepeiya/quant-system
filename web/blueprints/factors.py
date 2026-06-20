@@ -140,13 +140,11 @@ def api_ranking():
 @bp.route("/api/run_ranking", methods=["POST"])
 def api_run_ranking():
     """重新计算因子排名"""
-    import subprocess, sys
+    import subprocess, sys, os
     try:
         result = subprocess.run(
             [sys.executable, "factor_ranking.py"],
-            capture_output=True, text=True, timeout=120,
-            env={**os.environ}
-        )
+            capture_output=True, text=True, timeout=120)
         output = (result.stdout + result.stderr)[-500:]
         if result.returncode == 0:
             return jsonify({"status": "ok", "message": "因子排名计算完成"})
