@@ -5,6 +5,12 @@ from flask import Blueprint, jsonify, render_template
 from api_response import ok, err
 import numpy as np
 
+# 集成配置数据库持久化
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import config_db
+config_db.ensure_initialized()
+
 bp = Blueprint("settings", __name__, url_prefix="/settings")
 
 def _fix(obj):
@@ -176,6 +182,8 @@ def api_save_config():
         if k in current:
             current[k] = v
     save(current)
+    # 持久化到数据库
+    config_db.set_config("system_config", current)
     return jsonify({"status": "ok", "message": "配置已保存"})
 
 @bp.route("/api/reset_config", methods=["POST"])
@@ -347,6 +355,8 @@ def api_save_intraday_config():
     os.makedirs("config", exist_ok=True)
     with open("config/intraday_config.json", "w") as f:
         json.dump(data, f, indent=2)
+    # 持久化到数据库
+    config_db.set_config("intraday_config", data)
     return ok(message="日内配置已保存")
 
 

@@ -45,6 +45,14 @@ def load_users() -> dict:
 def save_users(users: dict):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, indent=2)
+    # 持久化到数据库
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+        import config_db
+        config_db.set_config("users", users)
+    except Exception:
+        pass
 
 
 def get_user_dir(username: str) -> str:

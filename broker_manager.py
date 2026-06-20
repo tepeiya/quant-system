@@ -105,6 +105,12 @@ def save_config(config: dict):
     os.makedirs("config", exist_ok=True)
     with open(BROKER_CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=2)
+    # 持久化到数据库
+    try:
+        import config_db
+        config_db.set_config("broker_config", config)
+    except Exception:
+        pass
 
 
 def list_brokers() -> list[dict]:
