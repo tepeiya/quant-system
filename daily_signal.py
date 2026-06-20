@@ -374,6 +374,18 @@ def generate_signals(use_cached_quality=True):
     with open(op, "w") as f:
         json.dump(output, f, indent=2, default=str)
     logger.info(f"已保存: {op}")
+
+    # === 写入信号总线 ===
+    try:
+        import signal_bus
+        signal_bus.write_signal("conservative", output.get("top_scores", scores[:5]),
+                                market=output.get("market"),
+                                buy_list=[s["ticker"] for s in output.get("buy_candidates", [])],
+                                metadata={"signal_file": op, "scores_count": len(scores)})
+        logger.info("  ✅ 已写入信号总线")
+    except Exception as e:
+        logger.debug(f"  信号总线写入失败(不影响): {e}")
+
     logger.info(f"耗时: {(_dt.datetime.now()-_ts).total_seconds():.1f}s")
     return output
 

@@ -271,6 +271,17 @@ def generate_signal() -> dict:
             json.dump(bt_result, f, indent=2)
 
     logger.info(f"信号已保存: {len(signal['candidates'])}只候选")
+
+    # === 写入信号总线 ===
+    try:
+        import signal_bus
+        signal_bus.write_signal("intraday", signal.get("candidates", []),
+                                buy_list=[s.get("ticker") for s in signal.get("candidates", [])],
+                                metadata={"scanned": signal.get("all_scanned", 0)})
+        logger.info("  ✅ 已写入信号总线")
+    except Exception as e:
+        logger.debug(f"  信号总线写入失败(不影响): {e}")
+
     return signal
 
 

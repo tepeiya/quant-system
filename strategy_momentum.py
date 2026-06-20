@@ -274,14 +274,26 @@ def generate_signals(prices: dict[str, pd.DataFrame], top_n: int = 15) -> list[s
 
     # 保存信号
     signal_file = f"{OUTPUT_DIR}/signal_momentum.json"
+    signal_data = {
+        "strategy": "momentum_aggressive",
+        "date": str(datetime.now()),
+        "tickers": top_tickers,
+        "count": len(top_tickers),
+    }
     with open(signal_file, "w") as f:
-        json.dump({
-            "strategy": "momentum_aggressive",
-            "date": str(datetime.now()),
-            "tickers": top_tickers,
-            "count": len(top_tickers),
-        }, f, indent=2)
+        json.dump(signal_data, f, indent=2)
     logger.info(f"动量信号: {len(top_tickers)}只 → {signal_file}")
+
+    # === 写入信号总线 ===
+    try:
+        import signal_bus
+        candidates = [{"ticker": t, "score": round(1 - i/len(top_tickers), 3)} for i, t in enumerate(top_tickers[:10])]
+        signal_bus.write_signal("momentum", candidates,
+                                buy_list=top_tickers,
+                                metadata={"signal_file": signal_file})
+        logger.info("  ✅ 已写入信号总线")
+    except Exception as e:
+        logger.debug(f"  信号总线写入失败(不影响): {e}")
 
     return top_tickers
 
