@@ -36,11 +36,21 @@ def api_discover():
     from plugin_loader import get_loader
     loader = get_loader()
     names = loader.discover()
-    loaded = [p.name for p in loader.get_all_plugins()]
+    loaded_names = [p.name for p in loader.get_all_plugins()]
+    # 获取已经加载的目录名（目录名与插件name可能不同）
+    loaded_dirs = set()
+    for p in loader.get_all_plugins():
+        # 从模块__file__反推目录名
+        mod = getattr(p, '__module__', '')
+        if mod:
+            parts = mod.split('.')
+            if len(parts) >= 2:
+                loaded_dirs.add(parts[1])
+    unloaded = [n for n in names if n not in loaded_dirs]
     return jsonify({
         "discovered": names,
-        "loaded": loaded,
-        "unloaded": [n for n in names if n not in loaded],
+        "loaded": loaded_names,
+        "unloaded": unloaded,
     })
 
 
@@ -100,3 +110,26 @@ def api_status():
         "bus_pending": bus.get("pending", 0),
         "daemon_status": daemon_status,
     })
+
+
+@bp.route("/api/broker_mapping")
+def api_broker_mapping():
+    """获取策略-券商映射列表"""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+    from strategy_broker import get_mapping_with_broker_names
+    return jsonify(get_mapping_with_broker_names())
+
+
+@bp.route("/api/set_broker", methods=["POST"])
+@csrf_protect
+def api_set_broker():
+    """设置策略绑定的券商"""
+    data = __import__("flask").request.json or {}
+    strategy = data.get("strategy", "")
+    broker_id = data.get("broker_id", "")
+    if not strategy or not broker_id:
+        return err("参数不完整")
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+    from strategy_broker import set_broker_for_strategy
+    set_broker_for_strategy(strategy, broker_id)
+    return ok(message=f"✅ {strategy} → {broker_id}")

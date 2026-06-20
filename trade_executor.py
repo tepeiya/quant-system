@@ -77,6 +77,15 @@ class TradeExecutor:
 
         logger.info(f"[{strategy}] 处理信号: 买入{buy_list[:5]} 卖出{sell_list[:5]}")
 
+        # 根据策略选择对应的券商
+        try:
+            from strategy_broker import get_broker_for_strategy
+            target_broker = get_broker_for_strategy(strategy)
+            if target_broker and target_broker != self.broker_id:
+                self.set_broker(target_broker)
+        except Exception as e:
+            logger.debug(f"策略券商映射读取失败(使用默认): {e}")
+
         client = self.get_client()
         if not client:
             logger.warning(f"[{strategy}] 券商未连接")

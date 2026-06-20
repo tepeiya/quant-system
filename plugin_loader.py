@@ -202,6 +202,7 @@ def get_loader() -> PluginLoader:
     global _loader
     if _loader is None:
         _loader = PluginLoader()
+        _loader.load_all()
     return _loader
 
 

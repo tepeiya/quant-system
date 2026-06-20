@@ -64,7 +64,7 @@ async function loadPlugins() {
     return;
   }
   for (const p of d) {
-    const scheduleLabel = {daily:'📅 每日', intraday:'⏱️ 盘中', manual:'🖐️ 手动'}[p.schedule] || p.schedule;
+    const scheduleLabel = {daily:'📅 每日执行', intraday:'⏱️ 盘中轮询', manual:'🖐️ 手动触发'}[p.schedule] || p.schedule;
     const statusColor = p.enabled !== false ? '#3fb950' : '#484f58';
     const statusIcon = p.enabled !== false ? '🟢' : '⚪';
     pl.innerHTML += `
@@ -77,6 +77,9 @@ async function loadPlugins() {
           </div>
           <span style="font-size:10px;color:#484f58;">v${p.version}</span>
           <span style="font-size:10px;color:#58a6ff;">${scheduleLabel}</span>
+          <select class="broker-select" data-strategy="${p.name}" style="font-size:10px;padding:3px 5px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#c9d1d9;max-width:130px;" onchange="changeBroker(this)">
+            <option value="">加载中...</option>
+          </select>
           <button class="btn" onclick="runPlugin('${p.name}')" style="font-size:11px;padding:4px 8px;">▶️ 执行</button>
         </div>
       </div>
@@ -138,6 +141,42 @@ function log(msg) {
 }
 
 refreshAll();
+// 每30秒自动刷新
 setInterval(refreshAll, 30000);
+
+// 加载券商列表和策略-券商映射
+async function loadBrokers() {
+  try {
+    const brokers = await apiFetch('/brokers/api/list');
+    const mapping = await apiFetch('/plugins/api/broker_mapping');
+    document.querySelectorAll('.broker-select').forEach(sel => {
+      const strategy = sel.dataset.strategy;
+      const currentBroker = mapping[strategy] || '';
+      sel.innerHTML = brokers.map(b =>
+        `<option value="${b.id}" ${b.id === currentBroker ? 'selected' : ''}>${b.name}</option>`
+      ).join('');
+    });
+  } catch(e) {
+    console.log('券商加载失败:', e.message);
+  }
+}
+
+async function changeBroker(sel) {
+  const strategy = sel.dataset.strategy;
+  const brokerId = sel.value;
+  try {
+    const r = await apiFetch('/plugins/api/set_broker', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({strategy, broker_id: brokerId})
+    });
+    showToast(r.message || '已保存', 'success');
+  } catch(e) {
+    showToast('保存失败: ' + e.message, 'error');
+  }
+}
+
+loadBrokers();
+setInterval(loadBrokers, 30000);
 </script>
 {% endblock %}
