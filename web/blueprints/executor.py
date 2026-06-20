@@ -35,7 +35,7 @@ def api_run_once():
     import sys
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     try:
-        from executor import TradeExecutor
+                from trade_executor import TradeExecutor
         ex = TradeExecutor()
         results = ex.run_once(dry_run=False)
         return jsonify({"status": "ok", "results": results})
@@ -50,7 +50,7 @@ def api_dry_run():
     import sys
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     try:
-        from executor import TradeExecutor
+                from trade_executor import TradeExecutor
         ex = TradeExecutor()
         results = ex.run_once(dry_run=True)
         return jsonify({"status": "ok", "results": results})
