@@ -178,6 +178,7 @@ class EventBacktest:
                     logger.debug(f"daily_signal评分不可用, 回退内置选股: {e}")
 
                 if not buy_candidates:
+                    candidates = []  # 修复：初始化空列表
                     # 回退到内置选股
                     for j in range(n):
                         price = P[i, j]
