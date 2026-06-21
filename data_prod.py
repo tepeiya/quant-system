@@ -356,22 +356,22 @@ def fetch_prices(tickers: list[str],
     if missing:
         logger.info(f"缓存命中{len(result)}只, 需要获取{len(missing)}只")
 
-    # 3. data_global 优先（新浪/Yahoo v8/东财，零鉴权）
+    # 3. Alpaca IEX优先（快且免费）
+    if missing:
+        alpaca_ok = _fetch_alpaca_batch(missing, result, start, end)
+        if alpaca_ok > 0:
+            logger.info(f"Alpaca(IEX)获取: {alpaca_ok}只")
+            missing = [t for t in missing if t not in result]
+
+    # 4. data_global 回退（新浪/Yahoo v8/东财）
     if missing and DATA_GLOBAL_AVAILABLE:
-        logger.info(f"data_global获取: {len(missing)}只...")
+        logger.info(f"data_global回退: {len(missing)}只...")
         new_data = fetch_batch_data(missing, days=730)
         for sym, df in new_data.items():
             if sym not in result and df is not None and len(df) >= 20:
                 result[sym] = df
         logger.info(f"data_global获取: {len(new_data)}只")
         missing = [t for t in missing if t not in result]
-
-    # 4. Alpaca批量获取（次选）
-    if missing:
-        alpaca_ok = _fetch_alpaca_batch(missing, result, start, end)
-        if alpaca_ok > 0:
-            logger.info(f"Alpaca获取: {alpaca_ok}只")
-            missing = [t for t in missing if t not in result]
 
     # 5. yfinance/Tiingo补充（最后备选）
     if missing:
