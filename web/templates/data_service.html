@@ -6,8 +6,8 @@
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
     <h2 style="margin:0;font-size:16px;">📡 数据服务</h2>
     <div style="display:flex;gap:6px;">
-      <button class="btn" onclick="updateData(false)" style="font-size:11px;padding:5px 10px;">📥 增量更新</button>
-      <button class="btn primary" onclick="updateData(true)" style="font-size:11px;padding:5px 10px;">📥 全量更新</button>
+      <button class="btn" onclick="updateData(false)" id="btnIncr" style="font-size:11px;padding:5px 10px;">📥 增量更新</button>
+      <button class="btn primary" onclick="updateData(true)" id="btnFull" style="font-size:11px;padding:5px 10px;">📥 全量预热</button>
     </div>
   </div>
 
@@ -26,15 +26,33 @@
     </div>
   </div>
 
-  <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:12px;margin-bottom:12px;">
-    <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">📋 运行日志</div>
+  <!-- 进度条区域 -->
+  <div id="progressArea" style="display:none;background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span id="progressTitle" style="font-size:12px;color:#e6edf3;font-weight:600;">⏳ 运行中...</span>
+      <span id="progressCount" style="font-size:10px;color:#8b949e;"></span>
+    </div>
+    <div style="background:#21262d;border-radius:10px;height:20px;overflow:hidden;margin-bottom:6px;">
+      <div id="progressBar" style="width:0%;height:100%;background:linear-gradient(90deg,#238636,#2ea043);border-radius:10px;transition:width .5s;"></div>
+    </div>
+    <div id="progressLog" style="font-size:10px;color:#8b949e;max-height:150px;overflow-y:auto;line-height:1.6;padding:4px 0;"></div>
+    <div style="margin-top:6px;display:flex;gap:6px;">
+      <span id="progressElapsed" style="font-size:10px;color:#484f58;"></span>
+      <span id="progressStatus" style="font-size:10px;color:#d29922;"></span>
+    </div>
+  </div>
+
+  <div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:12px;">
+    <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">📋 历史日志</div>
     <div id="updateLog" style="font-size:10px;color:#484f58;min-height:30px;line-height:1.6;">
-      点击「增量更新」或「全量更新」
+      点击「增量更新」或「全量预热」
     </div>
   </div>
 </div>
 
 <script>
+let progressTimer = null;
+
 async function loadHealth() {
   const h = await apiFetch('/data/api/health');
   document.getElementById('cacheAge').textContent = h.cache_age_hours ? h.cache_age_hours + 'h' : '无';
@@ -44,20 +62,76 @@ async function loadHealth() {
 }
 
 async function updateData(full) {
-  const btn = event.target;
-  btn.textContent = '⏳';
-  btn.disabled = true;
-  log((full ? '📥 全量' : '📥 增量') + ' 更新开始...');
+  if (progressTimer) return; // 已有任务
+
+  const btn = full ? 'btnFull' : 'btnIncr';
+  document.getElementById(btn).disabled = true;
+  document.getElementById(btn).textContent = '⏳';
+
   try {
     const r = await apiFetch('/data/api/update', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({full})
     });
-    log('✅ ' + (r.message || '完成'));
-    loadHealth();
-  } catch(e) { log('❌ ' + e.message); }
-  btn.textContent = full ? '📥 全量更新' : '📥 增量更新';
-  btn.disabled = false;
+    if (r.status === 'error') {
+      log('❌ ' + r.message);
+      document.getElementById(btn).disabled = false;
+      document.getElementById(btn).textContent = full ? '📥 全量预热' : '📥 增量更新';
+      return;
+    }
+    // 开始轮询进度
+    document.getElementById('progressArea').style.display = 'block';
+    document.getElementById('progressTitle').textContent = full ? '📥 全量预热中...' : '📥 增量更新中...';
+    document.getElementById('progressBar').style.width = '0%';
+    progressTimer = setInterval(() => pollProgress(full, btn), 2000);
+  } catch(e) {
+    log('❌ ' + e.message);
+    document.getElementById(btn).disabled = false;
+    document.getElementById(btn).textContent = full ? '📥 全量预热' : '📥 增量更新';
+  }
+}
+
+async function pollProgress(full, btn) {
+  try {
+    const p = await apiFetch('/data/api/progress');
+    document.getElementById('progressBar').style.width = p.pct + '%';
+    document.getElementById('progressCount').textContent = p.done + '/' + p.total + ' 已完成';
+    document.getElementById('progressElapsed').textContent = '⏱ ' + p.elapsed;
+
+    // 日志
+    const logEl = document.getElementById('progressLog');
+    if (p.log && p.log.length > 0) {
+      logEl.innerHTML = p.log.join('<br>');
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    if (!p.running) {
+      clearInterval(progressTimer);
+      progressTimer = null;
+      document.getElementById(btn).disabled = false;
+      document.getElementById(btn).textContent = full ? '📥 全量预热' : '📥 增量更新';
+
+      if (p.status === 'done') {
+        document.getElementById('progressTitle').textContent = '✅ ' + p.type + '完成！';
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('progressBar').style.background = 'linear-gradient(90deg,#238636,#2ea043)';
+        log('✅ ' + p.type + '完成，共获取 ' + p.done + ' 只');
+      } else if (p.status === 'error') {
+        document.getElementById('progressTitle').textContent = '❌ ' + p.type + '失败';
+        document.getElementById('progressBar').style.background = 'linear-gradient(90deg,#f85149,#da3633)';
+        log('❌ 错误: ' + (p.error || '未知'));
+      }
+
+      loadHealth();
+
+      // 5秒后隐藏进度条
+      setTimeout(() => {
+        document.getElementById('progressArea').style.display = 'none';
+      }, 10000);
+    }
+  } catch(e) {
+    console.error('poll error', e);
+  }
 }
 
 function log(msg) {
