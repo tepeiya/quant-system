@@ -151,11 +151,11 @@ def run_daily_cycle():
 
         logger.info("[步骤1/3] 数据服务更新行情...")
         try:
-            from warmup_data import warmup
-            r = warmup(batch_size=80)
-            from data_prod import load_price_cache
+            from data_prod import load_price_cache, refresh_cache
+            r = refresh_cache(days_back=10)
             cache = load_price_cache()
-            logger.info(f"  缓存: {len(cache)}只股票 (本次获取{r.get('fetched',0)}只, 剩余{r.get('remaining',0)}只)")
+            total = sum(r.values()) if r else 0
+            logger.info(f"  缓存: {len(cache)}只股票 (更新{len(r)}只, {total}行新数据)")
         except Exception as e:
             logger.error(f"  数据更新异常: {e}")
 
