@@ -167,18 +167,25 @@ def _build_prompt(candidates: list, market_context: dict) -> str:
         for c in candidates
     ])
 
-    prompt = f"""你是一个专业的股票分析师。请分析以下候选股票，给出买入建议。
+    prompt = f"""你是一个专业的美国股票分析师。请分析以下候选股票。
 
 {context_str}
 候选股票:
 {stocks_str}
 
-请逐只分析并输出 JSON 格式结果:
-{{"verdict": "BUY/SELL/SKIP", "reason": "一句话理由", "confidence": "high/medium/low"}}
+对每只股票，综合考虑:
+1. 技术面：动量趋势、RSI是否过热、价格位置
+2. 基本面：这家公司是做什么的、近期表现
+3. 风险：有没有明显的问题或不确定性
 
-只回复 JSON 数组，不要其他文字。格式:
+输出 JSON 格式（不要其他文字）:
 [
-  {{"ticker": "AAPL", "verdict": "BUY", "reason": "...", "confidence": "high"}},
+  {{
+    "ticker": "AAPL",
+    "verdict": "BUY",           // BUY=建议买入, SKIP=建议跳过
+    "reason": "一句话说明理由",  // 比如"动量强劲且RSI适中，苹果服务收入增长稳健"
+    "confidence": "medium"       // high/medium/low
+  }},
   ...
 ]"""
 

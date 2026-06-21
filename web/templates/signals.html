@@ -69,10 +69,14 @@ async function refreshSignals() {
         tl.innerHTML = topScores.map((s, i) => {
             const ticker = Array.isArray(s) ? s[0] : s.ticker || '?';
             const score = Array.isArray(s) ? s[1] : s.score || 0;
+            const aiReason = s.ai_reason ? s.ai_reason : '';
+            const aiConf = s.ai_confidence ? s.ai_confidence : '';
+            const aiBadge = aiConf === 'high' ? '🔵' : aiConf === 'low' ? '⚪' : '';
             return `<div class="signal-row">
                 <span class="rank">#${i + 1}</span>
-                <span class="name">${ticker}</span>
+                <span class="name">${ticker} ${aiBadge}</span>
                 <span class="score" style="color:${score >= 60 ? '#3fb950' : '#d29922'};">${score.toFixed(0)}</span>
+                ${aiReason ? `<span style="font-size:9px;color:#484f58;flex:1;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px;">${aiReason}</span>` : ''}
             </div>`;
         }).join('');
     }
@@ -85,12 +89,16 @@ async function refreshSignals() {
         cl.innerHTML = buyCandidates.map((c, i) => {
             const chg = c.mom || 0;
             const chgClass = chg > 0 ? '#3fb950' : (chg < 0 ? '#f85149' : '#8b949e');
+            const aiReason = c.ai_reason ? c.ai_reason : '';
+            const aiConf = c.ai_confidence ? c.ai_confidence : '';
+            const aiIcon = aiConf === 'high' ? '🔵' : aiConf === 'low' ? '⚪' : '';
             return `<div class="signal-row">
                 <span class="rank">#${i + 1}</span>
-                <span class="name">${c.ticker}</span>
+                <span class="name">${c.ticker} ${aiIcon}</span>
                 <span class="score" style="color:${c.score >= 60 ? '#3fb950' : '#d29922'};">${c.score.toFixed(0)}</span>
                 <span class="price">$${(c.price || 0).toFixed(0)}</span>
                 <span class="change" style="color:${chgClass};">${chg > 0 ? '+' : ''}${chg.toFixed(1)}%</span>
+                ${aiReason ? `<span style="font-size:9px;color:#484f58;flex-basis:100%;margin-top:4px;">💡 ${aiReason}</span>` : ''}
             </div>`;
         }).join('');
     }

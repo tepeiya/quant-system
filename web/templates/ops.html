@@ -253,8 +253,15 @@ function drawEquityChart(points, totalReturn) {
 }
 
 // 自动加载对比
-setTimeout(loadBtCompare, 1000);
+setTimeout(loadBtCompare, 500);
 loadStatus();
 setInterval(loadStatus,30000);
+
+// 任务点击后延迟加载回测结果
+document.querySelectorAll('[data-task]').forEach(el => {
+    el.addEventListener('click', function() {
+        setTimeout(loadBtCompare, 5000);
+    });
+});
 </script>
 {% endblock %}
