@@ -420,7 +420,23 @@ class RiskManager:
         返回:
             list: 需要止损的持仓
         """
-        return self.stop_loss.check_all(positions)
+        result = self.stop_loss.check_all(positions)
+        if result:
+            logger.warning(f"[总线] 止损触发 {len(result)} 笔")
+            try:
+                import signal_bus
+                signal_bus.write_message(
+                    strategy="risk_service",
+                    msg_type="stop_loss",
+                    payload={
+                        "stops": [{"symbol": s["symbol"], "reason": s.get("reason", ""),
+                                    "pnl_pct": s.get("pnl_pct", 0)} for s in result],
+                        "count": len(result),
+                        "triggered_at": __import__("datetime").datetime.now().strftime("%H:%M:%S"),
+                    })
+            except Exception as e:
+                logger.warning(f"[总线] 止损通知发送失败: {e}")
+        return result
 
     def check_circuit(self, daily_pnl_pct: float, recent_pnls: list,
                       current_dd_pct: float) -> list:
@@ -442,6 +458,21 @@ class RiskManager:
         tripped, msg = self.circuit_breaker.check_drawdown(current_dd_pct)
         if tripped:
             alerts.append({"type": "drawdown", "message": msg})
+
+        if alerts:
+            logger.warning(f"[总线] 熔断触发 {len(alerts)} 条")
+            try:
+                import signal_bus
+                signal_bus.write_message(
+                    strategy="risk_service",
+                    msg_type="circuit_breaker",
+                    payload={
+                        "alerts": alerts,
+                        "daily_pnl_pct": round(daily_pnl_pct, 2),
+                        "triggered_at": __import__("datetime").datetime.now().strftime("%H:%M:%S"),
+                    })
+            except Exception as e:
+                logger.warning(f"[总线] 熔断通知发送失败: {e}")
 
         return alerts
 

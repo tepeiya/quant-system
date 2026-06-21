@@ -155,6 +155,15 @@ class PluginLoader:
         names = self.discover()
         for name in names:
             self.load_plugin(name)
+        loaded = list(self._plugins.keys())
+        logger.info(f"  ✅ 已加载 {len(loaded)} 个插件: {', '.join(loaded)}")
+        try:
+            import signal_bus
+            signal_bus.write_message("plugin_loader", "plugins_loaded", {
+                "count": len(loaded), "plugins": loaded,
+            })
+        except:
+            pass
         return self._plugins
 
     def unload_plugin(self, plugin_name: str):
@@ -189,6 +198,16 @@ class PluginLoader:
             except Exception as e:
                 logger.error(f"  ❌ {name} 执行失败: {e}")
                 results[name] = []
+        total = sum(len(v) for v in results.values())
+        try:
+            import signal_bus
+            signal_bus.write_message("plugin_loader", "signals_generated", {
+                "plugins": list(results.keys()),
+                "total_signals": total,
+                "details": {k: len(v) for k, v in results.items()},
+            })
+        except:
+            pass
         return results
 
 

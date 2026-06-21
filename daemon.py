@@ -129,6 +129,7 @@ def run_daily_cycle():
             next_run = next_monday.replace(hour=DATA_HOUR, minute=0, second=0, microsecond=0)
             wait = (next_run - now).total_seconds()
             logger.info(f"[主循环] 周末跳过，下次运行: {next_run}")
+            _send_status("weekend_skip", f"周末跳过，下次运行: {next_run}")
             shutdown_event.wait(min(wait, 3600))
             continue
 
@@ -150,6 +151,7 @@ def run_daily_cycle():
         save_status(last_cycle=today_str)
 
         logger.info("[步骤1/3] 数据服务更新行情...")
+        _send_status("step1_start", "数据服务更新行情")
         try:
             from data_prod import load_price_cache, refresh_cache
             r = refresh_cache(days_back=10)
@@ -168,7 +170,9 @@ def run_daily_cycle():
                 break
 
         logger.info("[步骤2/3] === 通过插件系统生成信号 ===")
+        _send_status("step2_start", "通过插件系统生成信号")
         try:
+
             from plugin_loader import load_all, run_all
             # 确保插件已加载
             if not load_all():
@@ -206,6 +210,7 @@ def run_daily_cycle():
 
         # ===== 通过执行器自动调仓 =====
         logger.info("[步骤3/3] 通过执行器自动下单...")
+        _send_status("step3_start", "通过执行器自动下单")
         try:
             from trade_executor import TradeExecutor
             ex = TradeExecutor()
@@ -282,6 +287,7 @@ def run_daily_cycle():
         except Exception as e:
             logger.error(f"  收盘记录失败: {e}")
 
+        _send_status("daily_done", "今日交易流程完成")
         logger.info(f"✅ 今日交易流程完成，等待明天")
 
 
@@ -447,6 +453,22 @@ def _refresh_cache_bg():
         refresh_if_needed()
     except:
         pass
+
+
+def _send_status(msg_type: str, message: str, extra: dict = None):
+    """发送daemon状态到信号总线"""
+    try:
+        import signal_bus
+        payload = {
+            "message": message,
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "pid": read_pid(),
+        }
+        if extra:
+            payload.update(extra)
+        signal_bus.write_message("daemon", msg_type, payload)
+    except Exception as e:
+        logger.debug(f"[总线] daemon状态发送失败: {e}")
 
 
 # ====== 信号处理 ======
