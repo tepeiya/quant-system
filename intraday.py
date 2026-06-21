@@ -140,11 +140,24 @@ def scan_intraday_signals() -> list[dict]:
     realtime_prices = {}
     try:
         from data_prod import get_realtime_prices
-        realtime_prices = get_realtime_prices(tickers[:50])  # 最多50只
+        realtime_prices = get_realtime_prices(tickers[:50])
         if realtime_prices:
             logger.info(f"  实时行情: {len(realtime_prices)}只可用")
     except Exception as e:
-        logger.debug(f"  实时行情获取失败(使用日K线): {e}")
+        logger.debug(f"  实时行情获取失败: {e}")
+
+    # 加载板块数据（用于板块热点评分）
+    sector_map = {}
+    try:
+        from data_prod import fetch_fundamentals
+        funda = fetch_fundamentals(tickers[:300])
+        for t, info in funda.items():
+            sec = (info or {}).get("sector")
+            if sec and sec != "N/A":
+                sector_map[t] = sec
+        logger.info(f"  板块数据: {len(sector_map)}只")
+    except Exception as e:
+        logger.debug(f"  板块数据加载失败: {e}")
 
     signals = []
 
@@ -271,6 +284,36 @@ def scan_intraday_signals() -> list[dict]:
         logger.debug(f"  {t}: score={score:.1f} chg={today_chg:.1f}% "
                      f"vol={vol_ratio:.1f}x atr={atr_pct:.1f}% "
                      f"stop={stop_loss_pct:.1f}% tp={take_profit_pct:.1f}%")
+
+    # 板块热点评分
+    # 统计每个板块的候选股数量和平均得分
+    sector_candidates = {}
+    for s in signals:
+        sec = sector_map.get(s["ticker"])
+        if sec:
+            if sec not in sector_candidates:
+                sector_candidates[sec] = {"count": 0, "scores": []}
+            sector_candidates[sec]["count"] += 1
+            sector_candidates[sec]["scores"].append(s["score"])
+
+    # 板块热度加分：板块内候选 >= 2 只视为"板块热"，每只加1.5分
+    # 板块内候选 >= 3 只视为"板块非常热"，每只加3分
+    hot_sectors = {}
+    for sec, data in sector_candidates.items():
+        if data["count"] >= 3:
+            hot_sectors[sec] = 3.0
+            logger.info(f"  🔥 板块热: {sec} ({data['count']}只候选, 均分{np.mean(data['scores']):.1f})")
+        elif data["count"] >= 2:
+            hot_sectors[sec] = 1.5
+            logger.info(f"  🔸 板块温和: {sec} ({data['count']}只候选)")
+
+    # 给属于热门板块的股票加分
+    for s in signals:
+        sec = sector_map.get(s["ticker"])
+        if sec and sec in hot_sectors:
+            s["score"] += hot_sectors[sec]
+            s["sector_hot_bonus"] = hot_sectors[sec]
+            s["sector"] = sec
 
     signals.sort(key=lambda x: x["score"], reverse=True)
     logger.info(f"日内扫描完成: {len(signals)}只候选")
