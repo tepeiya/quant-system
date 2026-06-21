@@ -156,15 +156,21 @@ def cancel_cloud_stops(client, sym: str = None):
 
 
 def check_stop_loss():
-    """检查持仓：云端止损+移动止损（可选）+固定止盈止损"""
+    """检查持仓：云端止损+移动止损+ATR自适应止盈止损"""
     client = get_alpaca()
     if not client:
         return
 
     cfg = load_intraday_config()
-    stop_loss_pct = float(cfg.get("stop_loss_pct", 1.5))
-    take_profit_pct = float(cfg.get("take_profit_pct", 2.5))
-    trailing_stop_pct = float(cfg.get("trailing_stop_pct", 1.0))
+    # 从信号中读取个股的ATR自适应止损止盈
+    signal = load_signal()
+    candidate_map = {}
+    for c in signal.get("candidates", []):
+        candidate_map[c["ticker"]] = c
+
+    # 默认值（当信号中没有时回退）
+    default_stop = 1.5
+    default_tp = 2.5
     trailing_enabled = cfg.get("trailing_stop_enabled", False)
 
     from alpaca.trading.requests import MarketOrderRequest
@@ -182,15 +188,21 @@ def check_stop_loss():
         cur = pos["current_price"]
         pnl = pos["pnl_pct"]
 
+        # 获取个股的ATR自适应止损止盈
+        ci = candidate_map.get(sym, {})
+        sl_pct = float(ci.get("stop_loss_pct", default_stop))
+        tp_pct = float(ci.get("take_profit_pct", default_tp))
+        trail_pct = float(cfg.get("trailing_stop_atr_multiple", 1.0)) * float(ci.get("atr_pct", 1.0))
+
         # 更新最高价（用于移动止损）
         if trailing_enabled:
             old_high = highs.get(sym, entry)
             if cur > old_high:
                 highs[sym] = cur
 
-        # 止盈
-        if pnl >= take_profit_pct:
-            logger.info(f"  [止盈] {sym} {pnl:+.2f}% >= {take_profit_pct}%")
+        # 止盈（ATR自适应）
+        if pnl >= tp_pct:
+            logger.info(f"  [止盈] {sym} {pnl:+.2f}% >= {tp_pct}% (ATR自适应)")
             try:
                 cancel_cloud_stops(client, sym)
                 client.submit_order(MarketOrderRequest(
@@ -202,11 +214,11 @@ def check_stop_loss():
                 logger.error(f"    止盈失败: {e}")
             continue
 
-        # 移动止损（从最高点回落）
+        # 移动止损（从最高点回落，ATR自适应）
         if trailing_enabled:
             peak = highs.get(sym, entry)
-            if peak > entry and cur < peak * (1 - trailing_stop_pct / 100):
-                logger.info(f"  [移动止损] {sym} {pnl:+.2f}% 从最高{peak:.2f}回落{(peak-cur)/peak*100:.2f}%")
+            if peak > entry and cur < peak * (1 - trail_pct / 100):
+                logger.info(f"  [移动止损] {sym} {pnl:+.2f}% 从最高{peak:.2f}回落{(peak-cur)/peak*100:.2f}% (ATR: {trail_pct:.1f}%)")
                 try:
                     cancel_cloud_stops(client, sym)
                     client.submit_order(MarketOrderRequest(
@@ -218,10 +230,9 @@ def check_stop_loss():
                     logger.error(f"    移动止损失败: {e}")
                 continue
 
-        # 固定止损（由云端止损单保障，这里只是检查云端单是否存在）
-        # 如果股价已经跌破固定止损但云端单还没触发，补提
-        if pnl <= -stop_loss_pct:
-            logger.info(f"  [止损补单] {sym} {pnl:+.2f}% <= -{stop_loss_pct}%")
+        # 固定止损（ATR自适应，由云端止损单保障）
+        if pnl <= -sl_pct:
+            logger.info(f"  [止损补单] {sym} {pnl:+.2f}% <= -{sl_pct}% (ATR自适应)")
             try:
                 client.submit_order(MarketOrderRequest(
                     symbol=sym, qty=pos["qty"], side=OrderSide.SELL,
@@ -305,8 +316,9 @@ def execute_intraday(auto: bool = False):
                 cash -= cost
                 logger.info(f"  买入 {sym} x{qty} @ ${price:.2f}")
 
-                # 买入后立即提交云端止损单
-                stop_price = price * (1 - stop_loss_pct / 100)
+                # 买入后立即提交云端止损单（ATR自适应）
+                sl_pct = float(c.get("stop_loss_pct", 1.5))
+                stop_price = price * (1 - sl_pct / 100)
                 place_cloud_stop(client, sym, qty, stop_price)
             except Exception as e:
                 logger.error(f"  买入 {sym} 失败: {str(e)[:80]}")

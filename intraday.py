@@ -30,9 +30,11 @@ DEFAULT_CONFIG = {
     "max_positions": 5,
     "per_position_pct": 0.18,
     "capital_pct": 0.20,
-    "stop_loss_pct": 1.5,
-    "take_profit_pct": 2.5,
-    "trailing_stop_pct": 1.0,
+    "stop_loss_atr_multiple": 1.5,      # ATR倍数止损
+    "take_profit_atr_multiple": 2.5,     # ATR倍数止盈
+    "trailing_stop_atr_multiple": 1.0,   # ATR倍数追踪止损
+    "stop_loss_min_pct": 0.5,            # 最小止损%
+    "stop_loss_max_pct": 4.0,            # 最大止损%
     "scan_interval_minutes": 30,
     "close_time": "15:50",
     "momentum_windows": [5, 15, 30],
@@ -120,7 +122,7 @@ def get_ticker_rankings(cache: dict) -> list:
 def scan_intraday_signals() -> list[dict]:
     """
     扫描日内交易信号
-    用日K线数据 + 成交量筛选 + 动量评分
+    用日K线数据 + 盘中实时行情 + 成交量筛选 + 动量评分
     """
     from data_prod import load_price_cache
     cache = load_price_cache()
@@ -129,9 +131,20 @@ def scan_intraday_signals() -> list[dict]:
         return []
 
     cfg = load_config()
+
+    # 获取盘中实时价格（Alpaca IEX + 新浪回退）
     tickers = get_ticker_rankings(cache)
     if not tickers:
         tickers = sorted(cache.keys())[:200]
+
+    realtime_prices = {}
+    try:
+        from data_prod import get_realtime_prices
+        realtime_prices = get_realtime_prices(tickers[:50])  # 最多50只
+        if realtime_prices:
+            logger.info(f"  实时行情: {len(realtime_prices)}只可用")
+    except Exception as e:
+        logger.debug(f"  实时行情获取失败(使用日K线): {e}")
 
     signals = []
 
@@ -141,7 +154,11 @@ def scan_intraday_signals() -> list[dict]:
             continue
         
         close = df["Close"].values
-        price = float(close[-1])
+        # 优先使用实时价格，没有则用昨日收盘
+        price = realtime_prices.get(t)
+        if price is None or price <= 0:
+            price = float(close[-1])
+
         if price < cfg["min_price"] or price > cfg["max_price"]:
             continue
 
@@ -155,8 +172,12 @@ def scan_intraday_signals() -> list[dict]:
         if avg_vol < cfg.get("min_avg_volume", 500000):
             continue
 
-        # 多维度动量评分
-        today_chg = (close[-1] - close[-2]) / close[-2] * 100 if len(close) >= 2 else 0
+        # 有实时价格时用实时价算今日涨跌幅
+        if t in realtime_prices:
+            today_chg = (realtime_prices[t] - close[-1]) / close[-1] * 100
+        else:
+            today_chg = (close[-1] - close[-2]) / close[-2] * 100 if len(close) >= 2 else 0
+
         week_chg = (close[-1] - close[-6]) / close[-6] * 100 if len(close) >= 6 else 0
         month_chg = (close[-1] - close[-21]) / close[-21] * 100 if len(close) >= 21 else 0
 
@@ -168,7 +189,7 @@ def scan_intraday_signals() -> list[dict]:
                 continue
 
         # ATR
-        atr = float(df["ATR_Pct"].values[-1]) if "ATR_Pct" in df.columns else 2.0
+        atr_pct = float(df["ATR_Pct"].values[-1]) if "ATR_Pct" in df.columns else 2.0
 
         # 均线趋势
         sma20 = df["SMA20"].values[-1] if "SMA20" in df.columns else price
@@ -179,7 +200,7 @@ def scan_intraday_signals() -> list[dict]:
         # --- 综合评分 ---
         # 1. 短中长动量加权（越短权重越高）
         mom_score = today_chg * 0.6 + week_chg * 0.25 + month_chg * 0.15
-        
+
         # 2. 成交量确认
         vol_bonus = 0
         if vol_ratio > 3.0:
@@ -188,7 +209,7 @@ def scan_intraday_signals() -> list[dict]:
             vol_bonus = 1.5
         elif vol_ratio > 1.5:
             vol_bonus = 0.5
-        
+
         # 3. 趋势分数
         trend_score = 0
         if price_above_ma20:
@@ -202,14 +223,14 @@ def scan_intraday_signals() -> list[dict]:
 
         # 4. ATR波动调整
         atr_adj = 0
-        if atr < 1.5:
+        if atr_pct < 1.5:
             atr_adj = 1.0
-        elif atr < 2.5:
+        elif atr_pct < 2.5:
             atr_adj = 0.5
-        elif atr > 4.0:
+        elif atr_pct > 4.0:
             atr_adj = -1.0
 
-        # 5. RSI 加分（RSI 30-50 之间的上行空间大）
+        # 5. RSI 加分
         rsi_score = 0
         if rsi < 35:
             rsi_score = 1.0
@@ -221,22 +242,39 @@ def scan_intraday_signals() -> list[dict]:
         score = mom_score + vol_bonus + trend_score + atr_adj + rsi_score
 
         # 风控过滤
-        if today_chg > 8.0:  # 不追涨超8%
+        if today_chg > 8.0:
             continue
-        if today_chg < -6.0:  # 不抄跌超6%
+        if today_chg < -6.0:
             continue
+
+        # 计算ATR自适应止损/止盈
+        stop_loss_pct = max(cfg["stop_loss_min_pct"],
+                            min(atr_pct * cfg["stop_loss_atr_multiple"], cfg["stop_loss_max_pct"]))
+        take_profit_pct = max(stop_loss_pct * 1.5,
+                              atr_pct * cfg["take_profit_atr_multiple"])
 
         signals.append({
             "ticker": t,
             "score": round(score, 2),
             "price": round(price, 2),
             "today_chg": round(today_chg, 2),
-            "week_chg": round(week_chg, 2),
+            "has_realtime": t in realtime_prices,
             "vol_ratio": round(vol_ratio, 2),
-            "atr": round(atr, 2),
+            "atr_pct": round(atr_pct, 2),
             "rsi": round(rsi, 1),
             "avg_vol": int(avg_vol),
+            "stop_loss_pct": round(stop_loss_pct, 2),
+            "take_profit_pct": round(take_profit_pct, 2),
+            "ma20": round(float(sma20), 2),
+            "ma50": round(float(sma50), 2),
         })
+        logger.debug(f"  {t}: score={score:.1f} chg={today_chg:.1f}% "
+                     f"vol={vol_ratio:.1f}x atr={atr_pct:.1f}% "
+                     f"stop={stop_loss_pct:.1f}% tp={take_profit_pct:.1f}%")
+
+    signals.sort(key=lambda x: x["score"], reverse=True)
+    logger.info(f"日内扫描完成: {len(signals)}只候选")
+    return signals
 
     signals.sort(key=lambda x: x["score"], reverse=True)
     max_pos = cfg.get("max_positions", 5)
