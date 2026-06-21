@@ -67,13 +67,15 @@ SP500_BUILTIN = sorted([
 
 
 def get_tickers() -> list[str]:
-    # 1. 优先从东财获取实时全市场列表
+    # 1. 优先从东财获取实时全市场列表（只认>=400只，东财被VPS屏蔽时不要它）
     if DATA_GLOBAL_AVAILABLE:
         try:
             tickers = get_us_tickers(min_price=3.0, max_count=500)
-            if len(tickers) >= 50:
+            if len(tickers) >= 400:
                 logger.info(f"成分股(东财): {len(tickers)}只")
                 return tickers
+            elif len(tickers) >= 50:
+                logger.info(f"东财仅返回{len(tickers)}只，跳过，尝试其他数据源")
         except Exception as e:
             logger.warning(f"东财获取成分股失败: {e}")
     # 2. 缓存文件
