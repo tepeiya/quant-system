@@ -60,6 +60,8 @@ class VectorStrategy:
 
         cfg = load_config()
         dates = pd.bdate_range(start, end, freq="W")
+        from time_utils import ensure_no_tz
+        spy = ensure_no_tz(spy)
         if hasattr(spy.index, 'tz') and spy.index.tz is not None:
             dates = dates.tz_localize(None)
         T = len(dates)

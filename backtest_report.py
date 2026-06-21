@@ -28,8 +28,8 @@ def run_backtest(start: str = "2023-01-01", end: str = None) -> dict:
         end = datetime.now().strftime("%Y-%m-%d")
 
     spy = compute_indicators(get_spy())
-    if getattr(spy.index, 'tz', None) is not None:
-        spy.index = spy.index.tz_localize(None)
+    from time_utils import ensure_no_tz
+    spy = ensure_no_tz(spy)
 
     quality = compute_quality_scores(cache)
     tickers = sorted(cache.keys())[:200]
