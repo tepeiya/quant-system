@@ -153,16 +153,20 @@ def scan_intraday_signals() -> list[dict]:
     except Exception as e:
         logger.debug(f"  实时行情获取失败: {e}")
 
-    # 加载板块数据（用于板块热点评分）
+    # 加载板块数据（从缓存/基本面缓存，不实时拉取）
     sector_map = {}
     try:
-        from data_prod import fetch_fundamentals
-        funda = fetch_fundamentals(tickers[:300])
-        for t, info in funda.items():
-            sec = (info or {}).get("sector")
-            if sec and sec != "N/A":
-                sector_map[t] = sec
-        logger.info(f"  板块数据: {len(sector_map)}只")
+        # 优先从基本面缓存加载
+        import pickle as _pkl
+        funda_cache_file = os.path.join(CACHE_DIR, "fundamentals.pkl")
+        if os.path.exists(funda_cache_file):
+            with open(funda_cache_file, "rb") as f:
+                funda_cache = _pkl.load(f)
+            for t, info in funda_cache.items():
+                sec = (info or {}).get("sector")
+                if sec and sec not in ("N/A", "", None):
+                    sector_map[t] = sec
+        logger.info(f"  板块数据: {len(sector_map)}只 (从缓存)")
     except Exception as e:
         logger.debug(f"  板块数据加载失败: {e}")
 
