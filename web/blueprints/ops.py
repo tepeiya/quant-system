@@ -135,25 +135,13 @@ def api_refresh_now():
 @bp.route("/api/data_warmup", methods=["POST"])
 def api_data_warmup():
     def task():
-        from data_prod import get_tickers, load_price_cache, save_price_cache
-        import yfinance as yf, time, random, gc
-        tickers = get_tickers()
-        cache = load_price_cache()
-        missing = [t for t in tickers if t not in cache or cache[t] is None or len(cache[t]) < 200]
-        for i, tkr in enumerate(missing):
-            try:
-                t = yf.Ticker(tkr)
-                df = t.history(start="2018-01-01", end="2026-05-17", auto_adjust=True)
-                if df is not None and len(df) >= 200:
-                    cache[tkr] = df
-            except:
-                pass
-            if (i+1) % 20 == 0:
-                save_price_cache(cache)
-                time.sleep(0.5)
-        save_price_cache(cache)
+        from warmup_data import warmup
+        r = warmup(batch_size=80)
+        with open("/tmp/data_warmup_result.txt", "w") as f:
+            import json
+            f.write(json.dumps(r, indent=2, ensure_ascii=False))
     _run_bg(task, "data_warmup")
-    return ok(message="数据预热已开始")
+    return ok(message="数据预热已开始（Alpaca IEX优先，多源回退）")
 
 
 @bp.route("/api/run_backtest", methods=["POST"])
@@ -422,6 +410,7 @@ def api_log(task_name):
         "export": "/tmp/export_last.txt", "refresh": "/tmp/refresh_last.txt",
         "daemon": "logs/daemon_web_start.log",
         "event_backtest": "/tmp/event_backtest_last.txt",
+        "data_warmup": "/tmp/data_warmup_result.txt",
     }
     path = paths.get(task_name)
     if path and os.path.exists(path):

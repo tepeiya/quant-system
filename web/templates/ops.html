@@ -130,7 +130,7 @@ async function runTask(id) {
 }
 
 async function showLog(id) {
-    const map={daemon_start:'daemon',daemon_stop:'daemon',refresh_now:'refresh',data_warmup:'backtest',run_backtest:'backtest',run_signal:'signal',evolve_factors:'evolve',export_report:'export',run_event_backtest:'event_backtest'};
+    const map={daemon_start:'daemon',daemon_stop:'daemon',refresh_now:'refresh',data_warmup:'data_warmup',run_backtest:'backtest',run_signal:'signal',evolve_factors:'evolve',export_report:'export',run_event_backtest:'event_backtest'};
     const key=map[id]||id, task=TASKS.find(t=>t.id===id);
     document.getElementById('logPanel').style.display='block';
     document.getElementById('logTitle').textContent=(task?task.name:id)+' — 日志';
