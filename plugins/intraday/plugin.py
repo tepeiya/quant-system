@@ -18,8 +18,8 @@ import signal_bus
 class Plugin(StrategyPlugin):
     name = "intraday"
     display_name = "日内交易策略"
-    description = "盘中实时动量选股+止盈止损+移动止损"
-    version = "2.0.0"
+    description = "盘中实时动量选股+ATR自适应止损+板块热点+微因子评分"
+    version = "3.0.0"
     schedule = "intraday"
     enabled = True
 
@@ -46,4 +46,12 @@ class Plugin(StrategyPlugin):
         info = super().get_info()
         info["signal_file"] = "signals/intraday_signal.json"
         info["scan_interval"] = "15分钟"
+        info["features"] = [
+            "盘中实时行情(Alpaca IEX/新浪)",
+            "ATR自适应止盈止损(1.5x/2.5x)",
+            "板块热点联动(≥2只+1.5, ≥3只+3)",
+            "相对大盘强度评分",
+            "RSI超卖反转识别",
+            "放量确认加分",
+        ]
         return info

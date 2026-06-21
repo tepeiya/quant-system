@@ -89,6 +89,7 @@ async function loadPlugins() {
               <span style="font-size:9px;color:#58a6ff;">${sLabel}</span>
             </div>
             <div style="font-size:10px;color:#8b949e;margin:3px 0 8px;">${p.description || ''}</div>
+            ${p.features ? '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;">' + p.features.map(f => '<span style="font-size:8px;color:#58a6ff;background:rgba(88,166,255,.1);padding:1px 5px;border-radius:4px;">' + f + '</span>').join('') + '</div>' : ''}
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
               <select class="broker-select" data-strategy="${p.name}" onchange="changeBroker(this)" style="flex:1;min-width:0;font-size:10px;padding:5px 6px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#c9d1d9;">
                 ${brokerOpts}
