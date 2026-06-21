@@ -1,217 +1,149 @@
 # 📊 M+ 量化系统 — Multi-Factor Momentum+
 
-多因子动量选股量化交易系统，支持 **双策略独立运行**、**零鉴权全球数据源**、**Web 面板**、**全自动交易守护进程**。
-
-> 🚀 **激进策略回测 +124.3%** · 🛡️ **保守策略回测 +46.0%** · 📡 **新浪/东财/Yahoo 零鉴权**
+模块化多策略量化交易系统，支持**插件化策略**、**信号总线**、**统一执行器**、**Web面板**、**全自动交易守护进程**。
 
 ---
 
-## 🚀 一键部署（VPS / Docker）
+## 🏗️ 系统架构
 
-### 方式一：一键脚本（推荐）
-
-```bash
-curl -sSL https://raw.githubusercontent.com/tepeiya/quant-system/main/install.sh | bash
 ```
-自动安装 Docker → 克隆代码 → 引导填写 API Key → 构建镜像 → 启动
-
-### 方式二：手动 Docker
-
-```bash
-git clone https://github.com/tepeiya/quant-system.git
-cd quant-system
-cp env_template .env   # 编辑 .env 填入 API Key
-docker compose up -d
+📡 数据服务  →  🧩 策略插件(5个)  →  📨 信号总线  →  💹 统一执行器  →  🔌 券商接口
+                          ↑                          ↑
+                    ⛏️ 因子矿工(31个因子)       🛡️ 风控检查
+                    🧬 因子进化(IC调权重)        📝 订单记录
 ```
 
-访问 `http://<VPS_IP>:8765`，默认管理员 `admin` / `admin123`。
+### 五大插件
+
+| 插件 | 调度 | 说明 |
+|---|---|---|
+| ⛏️ **因子矿工** | 每日 | 计算31个因子IC排名，找出当前最有效的因子 |
+| 🧬 **因子进化** | 每日 | 根据IC自动调整因子权重 |
+| 🛡️ **保守策略** | 每日 | 多因子综合评分选股（动量43%+质量25%+趋势12%+价值8%+低波6%+量比6%） |
+| 🚀 **激进动量** | 每日 | 纯动量排名策略（12/6/3月加权） |
+| ⚡ **日内交易** | 盘中 | 实时动量扫描+止盈止损+移动止损，收盘前清仓 |
+
+### 31个因子（因子矿工）
+
+| 类别 | 因子 | 来源 |
+|---|---|---|
+| 📈 动量(9个) | 5/10/21/63/126/252日动量、动量加速度、价格到SMA20/50距离 | 行情数据 |
+| 📊 趋势(4个) | SMA20/50/200交叉、趋势强度 | 行情数据 |
+| 📉 波动(4个) | ATR、波动率、波动率比、ATR Z-Score | 行情数据 |
+| 🔗 相关(4个) | 与SPY的20/60日相关性、Beta、RSI | 行情数据 |
+| 📶 量价(3个) | 量比1日/20日、量价比 | 行情数据 |
+| 💰 **资金流(3个)** | 主力净流入强度、最新流入、趋势 | **东财** |
+| 📰 **期权(3个)** | Put/Call量比、持仓比、隐含波动率 | **Yahoo** |
+| 📋 **基本面(3个)** | 营收增长、利润率、负债率 | **东财** |
 
 ---
 
-## 📡 数据源（零鉴权，无需 API Key）
-
-系统整合了 [global-stock-data](https://github.com/simonlin1212/global-stock-data) 的全栈数据层，5 个免费数据源：
-
-| 数据源 | 鉴权 | 覆盖 | 用途 |
-|--------|------|------|------|
-| 新浪财经 | ❌ 无需 | 美股行情 + K线（回溯至1984） | 主力数据源 |
-| 东方财富 | ❌ 无需 | 行情 + 全市场列表 + 基本面 + 资金流 | 股票池、交易数据 |
-| 腾讯财经 | ❌ 无需 | 美股71字段 + 港股78字段 | 备用行情 |
-| Yahoo Finance | 自动 crumb | K线 + 期权链 + 财务数据 | 回退/期权 |
-| SEC EDGAR | ❌ 无需(需UA) | Filing + XBRL | 财报深度分析 |
-
-> 全部直连 HTTP API，无需 API Key，无需第三方封装。国内服务器也能直接访问新浪/东财。
-
----
-
-## 🧩 双策略体系
-
-两套策略**完全独立运行**，互不影响，通过资金分配比例共存。
-
-### 🛡️ 保守策略（`strategy_vector.py`）
-
-| 指标 | 数值 |
-|------|------|
-| 选股 | 动量 + 质量因子 + 趋势 + 大盘择时 |
-| 持仓 | 8-10 只 |
-| 调仓 | 每日 |
-| 回测收益 | **+46.0%** |
-| 年化 | **+6.0%** |
-| 最大回撤 | **-16.1%** |
-| 适合 | 震荡市 / 熊市 |
-
-### 🚀 激进策略（`strategy_momentum.py`）
-
-| 指标 | 数值 |
-|------|------|
-| 选股 | 纯动量（12-1月动量排名） |
-| 持仓 | 15 只等权 |
-| 调仓 | 每月 |
-| 回测收益 | **+124.3%** |
-| 年化 | **+13.3%** |
-| 最大回撤 | **-22.7%** |
-| 适合 | 牛市 / 趋势市 |
-
-### 💰 资金分配
-
-在 Web 设置页面（`/settings/`）用滑块调整两策略资金比例，支持 0-100%，合计不超过 100%，剩余自动留作现金缓冲。
-
----
-
-## 📋 功能清单
-
-### Web 面板
-
-| 页面 | 说明 |
-|:----|:------|
-| 📈 大盘 | 总权益、现金、持仓、资金曲线 |
-| 🏆 信号 | 因子评分 Top10、买入候选 |
-| 📋 持仓 | 持仓明细、PnL |
-| 🔥 热图 | 板块动量热力图 |
-| 🛒 下单 | 手动交易界面 |
-| ⚙️ 设置 | 策略参数 + 双策略资金分配滑块 |
-| 🛠️ 运维 | 一键数据预热、回测、信号生成、启动/停止自动交易 |
-
-### 策略引擎
-
-- **双策略并行**：保守（动量+质量+择时）+ 激进（纯动量不择时）
-- **4态大盘择时**：多头 / 震荡 / 过热 / 熊市
-- **ATR动态风控**：根据波动率调整止损和仓位
-- **S&P 500 全量回测**：支持 300+ 只股票的向量化回测
-
-### 自动交易守护进程
+## 🔧 快速启动
 
 ```bash
-# 启动自动交易
+# 安装依赖
+pip install -r requirements.txt
+
+# 首次运行：数据预热
+python3 data_service.py --full
+
+# 启动Web面板
+python3 web_app.py
+
+# 启动自动交易守护进程
 python3 daemon.py
 
-# 每日流程（自动执行）
-09:00  数据增量更新
-09:30  生成保守策略信号 + 激进策略信号
-09:35  保守策略调仓 + 激进策略调仓
-盘中   每5分钟止损监控
+# 查看所有插件
+python3 plugin_loader.py
+```
+
+访问 `http://localhost:8765` 登录Web面板。
+
+---
+
+## 🌐 Web 面板导航
+
+```
+📊 行情 — 大盘 / 宏观 / 热图 / 因子
+🧠 策略 — 信号 / 持仓 / 配对 / 轮式 / 日内
+💹 交易 — 策略插件 / 执行器 / 订单记录 / 交易历史 / 信号历史 / 手动下单
+🔧 系统 — 数据服务 / 信号总线 / 券商管理 / 配置中心 / 策略参数 / 资金分配 / 运维
 ```
 
 ---
 
-## ⚙️ 环境变量
+## 🔁 自动交易流程
+
+```
+美东时间 09:00  数据服务增量更新
+         09:30  因子矿工(IC排名) → 因子进化(调权重) → 保守/动量策略(生成信号)
+         09:35  统一执行器(读总线→风控→下单)
+    盘中每15min  日内策略(扫描→执行)
+    盘中持续     止损监控
+         16:00  收盘记录权益→推送日报→数据备份
+```
+
+---
+
+## ⚙️ 配置
+
+所有配置在 **Web面板 → 配置中心** 统一管理：
+
+| 配置项 | 说明 |
+|---|---|
+| `config/system_config.json` | 策略参数（止损/仓位/RSI/熔断等80+参数） |
+| `config/intraday_config.json` | 日内交易参数 |
+| `config/broker_config.json` | 券商账户配置 |
+| `config/factor_weights.json` | 因子权重（因子进化自动调整） |
+| `config/trade_mode.json` | 纸盘/实盘切换 |
+| `config/strategy_broker_map.json` | 策略→券商绑定（插件页面配置） |
+
+### 环境变量
+
+| 变量 | 说明 |
+|---|---|
+| `ALPACA_API_KEY_ID` / `ALPACA_SECRET_KEY` | Alpaca 纸交易 Key |
+| `ALPACA_INTRADAY_KEY_ID` / `ALPACA_INTRADAY_SECRET` | Alpaca 日内专用 Key |
+| `ALPACA_LIVE_KEY_ID` / `ALPACA_LIVE_SECRET` | Alpaca 实盘 Key（慎用） |
+| `CONSERVATIVE_CAP_RATIO` / `MOMENTUM_CAP_RATIO` | 双策略资金分配比例 |
+
+---
+
+## 🐳 Docker 部署
 
 ```bash
-# --- 必填 ---
-ALPACA_API_KEY_ID=       # Alpaca Key（纸交易/实盘）
-ALPACA_SECRET_KEY=       # Alpaca Secret
-
-# --- 可选 ---
-CONSERVATIVE_CAP_RATIO=0.5  # 保守策略资金比例（默认50%）
-MOMENTUM_CAP_RATIO=0.5      # 激进策略资金比例（默认50%）
-TIINGO_API_KEY=             # Tiingo数据源（备用）
-FRED_API_KEY=               # FRED宏观数据
-PUSHPLUS_TOKEN=             # 微信推送
-
-# 国内镜像代理（国内服务器访问 Yahoo 用）
-# https_proxy=http://127.0.0.1:7890
+docker build -t m-plus .
+docker run -d --name m-plus -p 8765:8765 \
+  -e ALPACA_API_KEY_ID=your_key \
+  -e ALPACA_SECRET_KEY=your_secret \
+  m-plus
 ```
 
 ---
 
-## 🏗️ 项目结构
+## 🗄️ 数据持久化
 
-```
-quant-system/
-├── web_app.py                   # Web面板入口
-├── daemon.py                    # 双策略自动交易守护进程
-├── install.sh                   # VPS一键部署脚本
-├── Dockerfile / docker-compose.yml
-│
-├── strategy_vector.py           # 🛡️ 保守策略引擎
-├── strategy_momentum.py         # 🚀 激进策略引擎
-├── paper_trader.py              # 保守策略执行器
-├── paper_trader_momentum.py     # 激进策略执行器
-│
-├── data_global.py               # 🌐 全球数据层（新浪/东财/Yahoo）
-├── data_prod.py                 # 数据生产（集成 data_global）
-├── warmup_full.py               # S&P 500 全量数据预热
-│
-├── broker_manager.py            # 券商接口（Alpaca/IBKR）
-├── factor_learner.py            # 因子自动进化
-├── wheel_strategy.py            # 轮式期权策略
-├── pairs_trading.py             # 配对交易
-├── performance_attribution.py   # 绩效归因
-│
-├── config/                      # 配置文件
-├── signals/                     # 信号与交易记录
-├── data_cache/                  # 数据缓存
-├── web/
-│   ├── blueprints/              # Web API 蓝图
-│   ├── templates/               # 页面模板
-│   └── static/                  # 静态资源
-└── logs/                        # 运行日志
-```
+| 存储 | 路径 | 说明 |
+|---|---|---|
+| SQLite 配置库 | `data/config.db` | 所有配置的数据库备份 |
+| SQLite 信号总线 | `data/signal_bus.db` | 策略→执行器的消息队列 |
+| JSON 配置 | `config/*.json` | 向下兼容的配置文件 |
+| 行情缓存 | `data_cache/*.pkl` | 股票历史行情+技术指标 |
+| 信号日志 | `signals/*.json` | 每日信号/交易记录 |
+| 每日备份 | `data/backups/*` | 配置自动每日备份 |
 
 ---
 
-## 🧪 常用管理命令
+## 🔐 安全
 
-```bash
-# 一键部署
-bash install.sh
-
-# Docker 管理
-docker compose logs -f        # 查看日志
-docker compose restart        # 重启
-docker compose down           # 停止
-
-# 数据预热（下载 S&P 500 全部股票）
-python3 warmup_full.py
-
-# 生成今日信号
-python3 daily_signal.py              # 保守策略
-python3 strategy_momentum.py --generate  # 激进策略
-
-# 全量回测
-python3 main_final.py                # 保守策略
-python3 strategy_momentum.py             # 激进策略
-
-# 运维中心（Web 面板）
-# 访问 http://<IP>:8765/ops/
-```
+- CSRF Token 全面保护
+- Session 24小时过期
+- 登录限速防暴力破解
+- API Key AES-256加密存储
+- 实盘/纸盘一键切换（Web面板底部）
 
 ---
 
-## 🖥️ 推荐部署配置
+## 📄 License
 
-| 配置 | 最低 | 推荐 |
-|------|------|------|
-| CPU | 1 核 | **2 核** |
-| 内存 | 1 GB | **2-4 GB** |
-| 存储 | 5 GB | **10 GB** |
-| 网络 | 能连外网 | 国内 VPS（阿里云/腾讯云）直连新浪 |
-
----
-
-## 📄 许可证
-
-AGPL v3
-
-> 数据来源：新浪财经 · 东方财富 · 腾讯财经 · Yahoo Finance · SEC EDGAR  
-> 灵感与数据层整合自 [simonlin1212/global-stock-data](https://github.com/simonlin1212/global-stock-data)
+MIT
