@@ -147,12 +147,21 @@ def api_data_warmup():
 @bp.route("/api/run_backtest", methods=["POST"])
 def api_run_backtest():
     def task():
-        r = subprocess.run([sys.executable, "main_final.py"],
-            capture_output=True, text=True, timeout=600, env={**os.environ})
-        with open("/tmp/backtest_last.txt", "w") as f:
-            f.write(r.stdout + "\n" + r.stderr)
+        import subprocess, time
+        log_file = open("/tmp/backtest_last.txt", "w")
+        proc = subprocess.Popen(
+            [sys.executable, "main_final.py"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            env={**os.environ}, text=True
+        )
+        # 实时写日志
+        for line in iter(proc.stdout.readline, ""):
+            log_file.write(line)
+            log_file.flush()
+        proc.wait()
+        log_file.close()
     _run_bg(task, "run_backtest")
-    return ok(message="回测已开始")
+    return ok(message="回测已开始（实时输出日志）")
 
 
 @bp.route("/api/run_event_backtest", methods=["POST"])
