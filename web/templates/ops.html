@@ -205,6 +205,8 @@ function drawEquityChart(points, totalReturn) {
     if (window.eqChart) { window.eqChart.destroy(); }
 
     canvas.style.display = 'block';
+    canvas.style.height = '200px';
+    canvas.style.aspectRatio = '16/9';
 
     var labels = points.map(function(p){ return p.date; });
     var values = points.map(function(p){ return p.value; });
