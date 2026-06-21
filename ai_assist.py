@@ -205,17 +205,25 @@ def _parse_ai_response(text: str, candidates: list) -> list:
     """解析 AI 返回的 JSON 结果"""
     import re, json
 
-    # 提取 JSON
-    json_match = re.search(r'\[.*?\]', text, re.DOTALL)
+    # 提取 JSON（贪婪匹配，应对长文本）
+    json_match = re.search(r'\[.*\]', text, re.DOTALL)
     if not json_match:
         logger.warning("AI返回中没有找到JSON")
+        # 打印返回内容帮助调试
+        logger.debug(f"AI返回原文: {text[:200]}")
         return candidates
 
     try:
         ai_results = json.loads(json_match.group(0))
     except json.JSONDecodeError:
-        logger.warning("AI返回的JSON格式错误")
-        return candidates
+        logger.warning("AI返回的JSON格式错误，尝试修复...")
+        # 尝试去掉注释
+        cleaned = re.sub(r'//.*', '', json_match.group(0))
+        try:
+            ai_results = json.loads(cleaned)
+        except:
+            logger.debug(f"AI返回原文: {text[:200]}")
+            return candidates
 
     if not isinstance(ai_results, list):
         return candidates

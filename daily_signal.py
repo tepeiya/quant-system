@@ -28,7 +28,7 @@ MAX_POS = 8
 def _update_realtime_prices(cache: dict, max_tickers: int = 100) -> dict:
     """
     用Alpaca实时API更新缓存中每只股票的最新价格。
-    只更新Top200（策略用到的），每只单独请求。
+    如果Alpaca不可用直接返回缓存（不影响信号生成）。
     """
     KEY = os.environ.get("ALPACA_API_KEY_ID", "")
     SECRET = os.environ.get("ALPACA_SECRET_KEY", "")
@@ -99,15 +99,21 @@ _ts = _dt.datetime.now()
 def generate_signals(use_cached_quality=True):
     import datetime as _dt
     
-    # 0. 先增量更新数据（联网），静默执行
+    # 0. 增量更新数据（后台静默执行，不阻塞）
     try:
-        import subprocess, sys
-        subprocess.run(
-            [sys.executable, "data_update.py"],
-            capture_output=True, timeout=60
-        )
+        import subprocess, sys, threading
+        def _bg_update():
+            try:
+                subprocess.run(
+                    [sys.executable, "data_update.py"],
+                    capture_output=True, timeout=120
+                )
+            except:
+                pass
+        t = threading.Thread(target=_bg_update, daemon=True)
+        t.start()
     except:
-        pass  # 更新失败不影响运行，用旧缓存
+        pass
 
     ts = _dt.datetime.now()
     dt_str = _dt.datetime.now().strftime("%Y-%m-%d")
@@ -120,7 +126,7 @@ def generate_signals(use_cached_quality=True):
         logger.error("无数据"); return
 
     # 1.5 实时价格更新（只更新Top30，加快速度）
-    cache = _update_realtime_prices(cache, max_tickers=30)
+    # cache = _update_realtime_prices(cache, max_tickers=30)
 
     # 2. SPY大盘——优先用真实SPY，回退到合成
     spy = None
@@ -218,6 +224,7 @@ def generate_signals(use_cached_quality=True):
         w_trend = weights.get("trend", 15)
         w_value = weights.get("value", 8)
         w_lowvol = weights.get("lowvol", 7)
+        w_volume = weights.get("volume", 6)
 
         ms = min(w_mom, mom * w_mom)
         qs = quality.get(t, 15) / 100 * w_qual if quality.get(t, 0) > 0 else 15 / 100 * w_qual

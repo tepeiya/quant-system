@@ -79,7 +79,7 @@ def update_prices(tickers: list[str] = None, days_back: int = 10):
     for i in range(0, total, batch_size):
         batch = tickers[i:i + batch_size]
         try:
-            prices = fetch_prices(batch, days_back=days_back)
+            prices = fetch_prices(batch)
             if prices:
                 # 计算指标
                 for tkr, df in prices.items():

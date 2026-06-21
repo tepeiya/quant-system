@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "provider": "openai",
+  "api_key": "sk-db39ef20996e48c1a9ab74caa0d9a4a0",
+  "model": "deepseek-v4-flash",
+  "api_base": "https://api.deepseek.com/v1",
+  "prompt_template": ""
+}

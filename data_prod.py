@@ -162,7 +162,7 @@ def refresh_cache(days_back: int = 10, use_alpaca: bool = True) -> dict:
     if use_alpaca:
         try:
             result_batch = {}
-            _fetch_alpaca_batch(tickers, result_batch, start_str, end_str)
+            _fetch_alpaca_batch(tickers, result_batch, start_str, end_str, min_bars=0)
             for ticker, new_df in result_batch.items():
                 if new_df is not None and len(new_df) > 0:
                     old = cache.get(ticker)
@@ -212,38 +212,53 @@ def _merge_dataframes(old: pd.DataFrame | None, new: pd.DataFrame) -> pd.DataFra
 
 def get_realtime_prices(tickers: list[str]) -> dict[str, float]:
     """
-    用Alpaca获取多只股票的最新实时价格（非缓存）。
-    用于信号生成前获取最新市价。
+    用Alpaca获取多只股票的最新实时价格（IEX免费源）。
+    优先用日内账户，失败回退主账户。
+    双账户都失败时回退新浪实时行情。
     
     Returns:
         dict: {ticker: latest_price, ...}
     """
     from datetime import timezone
-    KEY = os.environ.get("ALPACA_API_KEY_ID", "")
-    SECRET = os.environ.get("ALPACA_SECRET_KEY", "")
-    if not KEY or not SECRET:
-        logger.warning("Alpaca未配置，无法获取实时价格")
-        return {}
+    from alpaca.data.enums import DataFeed
 
+    for label, KEY, SECRET in [
+        ("日内", os.environ.get("ALPACA_INTRADAY_KEY_ID", ""), os.environ.get("ALPACA_INTRADAY_SECRET", "")),
+        ("主", os.environ.get("ALPACA_API_KEY_ID", ""), os.environ.get("ALPACA_SECRET_KEY", "")),
+    ]:
+        if not KEY or not SECRET:
+            continue
+        try:
+            from alpaca.data import StockHistoricalDataClient
+            from alpaca.data.requests import StockLatestQuoteRequest
+
+            client = StockHistoricalDataClient(KEY, SECRET)
+            req = StockLatestQuoteRequest(symbol_or_symbols=tickers, feed=DataFeed.IEX)
+            quotes = client.get_stock_latest_quote(req)
+            result = {}
+            for t in tickers:
+                q = quotes.get(t)
+                if q:
+                    result[t] = round(float(q.ask_price + q.bid_price) / 2, 2)
+            if result:
+                return result
+        except:
+            continue
+
+    # Alpaca双账户都失败，回退新浪实时行情
+    logger.info("Alpaca获取实时价失败，回退新浪...")
     try:
-        from alpaca.data import StockHistoricalDataClient
-        from alpaca.data.requests import StockLatestQuoteRequest
-
-        client = StockHistoricalDataClient(KEY, SECRET)
-        req = StockLatestQuoteRequest(symbol_or_symbols=tickers)
-        quotes = client.get_stock_latest_quote(req)
+        from data_global import us_quote_sina
         result = {}
         for t in tickers:
-            q = quotes.get(t)
-            if q:
-                # 取 bid/ask 中间价作为参考价
-                result[t] = round(float(q.ask_price + q.bid_price) / 2, 2)
+            try:
+                q = us_quote_sina(t)
+                if q and q.get("price", 0) > 0:
+                    result[t] = q["price"]
+            except:
+                continue
         return result
-    except ImportError:
-        logger.warning("alpaca-py未安装")
-        return {}
-    except Exception as e:
-        logger.warning(f"获取实时价格失败: {e}")
+    except:
         return {}
 
 
@@ -449,54 +464,60 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 # ==============================
 # 数据校验
 # ==============================
-def _fetch_alpaca_batch(tickers: list[str], result: dict, start: str, end: str) -> int:
-    """Alpaca批量获取价格数据（比Tiingo快）
-    注意：免费tier有速率限制
+def _fetch_alpaca_batch(tickers: list[str], result: dict, start: str, end: str, min_bars: int = 200) -> int:
+    """Alpaca批量获取价格数据，使用免费IEX数据源
+    优先用日内账户，失败回退主账户
+    min_bars: 最少需要多少行才保存（增量更新设为0即可）
     """
     import pickle as _pkl
-    KEY = os.environ.get("ALPACA_API_KEY_ID", "")
-    SECRET = os.environ.get("ALPACA_SECRET_KEY", "")
-    if not KEY or not SECRET:
-        return 0
+    from alpaca.data.enums import DataFeed
 
-    try:
-        from alpaca.data import StockHistoricalDataClient
-        from alpaca.data.requests import StockBarsRequest
-        from alpaca.data.timeframe import TimeFrame
+    for label, KEY, SECRET in [
+        ("日内", os.environ.get("ALPACA_INTRADAY_KEY_ID", ""), os.environ.get("ALPACA_INTRADAY_SECRET", "")),
+        ("主", os.environ.get("ALPACA_API_KEY_ID", ""), os.environ.get("ALPACA_SECRET_KEY", "")),
+    ]:
+        if not KEY or not SECRET:
+            continue
+        try:
+            from alpaca.data import StockHistoricalDataClient
+            from alpaca.data.requests import StockBarsRequest
+            from alpaca.data.timeframe import TimeFrame
 
-        client = StockHistoricalDataClient(KEY, SECRET)
-        sd = datetime.strptime(start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        ed = datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            client = StockHistoricalDataClient(KEY, SECRET)
+            sd = datetime.strptime(start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            ed = datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
-        need = [t for t in tickers if "-" not in t and "." not in t]
-        ok = 0
-        for i in range(0, len(need), 50):
-            batch = need[i:i+50]
-            try:
-                bars = client.get_stock_bars(StockBarsRequest(
-                    symbol_or_symbols=batch, timeframe=TimeFrame.Day,
-                    start=sd, end=ed, limit=5000,
-                ))
-                df = bars.df
-                for t in batch:
-                    try:
-                        tdf = df.xs(t, level="symbol")[["open","high","low","close","volume"]].copy()
-                        tdf.columns = ["Open","High","Low","Close","Volume"]
-                        tdf.index = pd.to_datetime(tdf.index)
-                        if len(tdf) >= 200:
-                            result[t] = compute_indicators(tdf)
-                            ok += 1
-                    except:
-                        pass
-            except Exception as e:
-                logger.warning(f"Alpaca batch {i}: {str(e)[:60]}")
-        return ok
-    except ImportError:
-        logger.warning("alpaca-py未安装")
-        return 0
-    except Exception as e:
-        logger.warning(f"Alpaca批量获取失败: {str(e)[:60]}")
-        return 0
+            need = [t for t in tickers if "-" not in t and "." not in t]
+            ok = 0
+            for i in range(0, len(need), 50):
+                batch = need[i:i+50]
+                try:
+                    bars = client.get_stock_bars(StockBarsRequest(
+                        symbol_or_symbols=batch, timeframe=TimeFrame.Day,
+                        start=sd, end=ed, limit=5000,
+                        feed=DataFeed.IEX,
+                    ))
+                    df = bars.df
+                    for t in batch:
+                        try:
+                            tdf = df.xs(t, level="symbol")[["open","high","low","close","volume"]].copy()
+                            tdf.columns = ["Open","High","Low","Close","Volume"]
+                            tdf.index = pd.to_datetime(tdf.index)
+                            if len(tdf) >= min_bars:
+                                result[t] = compute_indicators(tdf)
+                                ok += 1
+                        except:
+                            pass
+                except Exception as e:
+                    logger.warning(f"Alpaca[{label}] batch {i}: {str(e)[:60]}")
+            if ok > 0:
+                return ok
+        except ImportError:
+            logger.warning("alpaca-py未安装")
+            return 0
+        except Exception as e:
+            logger.warning(f"Alpaca[{label}]批量获取失败: {str(e)[:60]}")
+    return 0
 
 
 def fetch_fundamentals(tickers: list[str]) -> dict:
@@ -582,3 +603,136 @@ def validate(data: dict[str, pd.DataFrame]) -> dict:
         "issue_list": issues[:10],
         "pass_pct": f"{clean/max(len(data),1)*100:.0f}%",
     }
+
+
+# ==============================
+# 熔断器 + 多数据源管理
+# ==============================
+class CircuitBreaker:
+    def __init__(self, name: str, threshold: int = 3, cooldown_seconds: int = 300):
+        self.name = name
+        self.threshold = threshold
+        self.cooldown = cooldown_seconds
+        self._failures = 0
+        self._last_fail_time = 0.0
+        self._state = "closed"
+    
+    def allow_request(self) -> bool:
+        now = __import__("time").time()
+        if self._state == "open":
+            if now - self._last_fail_time > self.cooldown:
+                self._state = "half-open"
+                logger.info(f"\U0001f536 熔断[{self.name}] 半开，允许探活请求")
+                return True
+            return False
+        return True
+    
+    def record_success(self):
+        self._failures = 0
+        if self._state == "half-open":
+            self._state = "closed"
+            logger.info(f"\u2705 熔断[{self.name}] 已恢复")
+    
+    def record_failure(self):
+        self._failures += 1
+        self._last_fail_time = __import__("time").time()
+        if self._failures >= self.threshold:
+            self._state = "open"
+            logger.warning(f"\U0001f534 熔断[{self.name}] 已打开，冷却{self.cooldown}秒")
+    
+    @property
+    def is_open(self) -> bool:
+        return self._state == "open" and (__import__("time").time() - self._last_fail_time) <= self.cooldown
+
+
+_circuit_breakers = {
+    "alpaca_iex": CircuitBreaker("Alpaca(IEX)", threshold=2, cooldown_seconds=60),
+    "sina": CircuitBreaker("新浪", threshold=3, cooldown_seconds=120),
+    "yahoo": CircuitBreaker("Yahoo", threshold=2, cooldown_seconds=300),
+    "eastmoney": CircuitBreaker("东财", threshold=3, cooldown_seconds=180),
+    "tiingo": CircuitBreaker("Tiingo", threshold=2, cooldown_seconds=120),
+}
+
+
+def fetch_prices_with_fallback(
+    tickers: list[str],
+    start: str = "2018-01-01",
+    end: str = None,
+    min_bars: int = 200,
+) -> dict[str, pd.DataFrame]:
+    if end is None:
+        end = __import__("datetime").datetime.now().strftime("%Y-%m-%d")
+    cache = load_price_cache()
+    result = dict(cache)
+    need = [t for t in tickers if t not in result or len(result[t]) < min_bars]
+    if not need:
+        return result
+    
+    strategies = [
+        ("alpaca_iex", _fetch_alpaca_batch),
+        ("data_global", _fetch_via_data_global),
+        ("yfinance", _fetch_via_yfinance),
+        ("tiingo", _fetch_via_tiingo),
+    ]
+    
+    for name, fetcher in strategies:
+        cb = _circuit_breakers.get(name)
+        if cb and cb.is_open:
+            logger.info(f"\u23ed {name} 已熔断，跳过")
+            continue
+        still_need = [t for t in need if t not in result]
+        if not still_need:
+            break
+        try:
+            logger.info(f"\U0001f4e1 {name}: 获取{len(still_need)}只...")
+            fetcher(still_need, result, start, end)
+            count = len([t for t in still_need if t in result])
+            if count > 0:
+                logger.info(f"  \u2705 {name}: 成功{count}只")
+                if cb: cb.record_success()
+            else:
+                logger.warning(f"  \u26a0\ufe0f {name}: 获取0只")
+                if cb: cb.record_failure()
+        except Exception as e:
+            logger.warning(f"  \u274c {name}: {str(e)[:80]}")
+            if cb: cb.record_failure()
+    
+    save_price_cache(result)
+    return result
+
+
+def _fetch_via_data_global(tickers, result, start, end):
+    if not DATA_GLOBAL_AVAILABLE:
+        raise Exception("data_global未加载")
+    from data_global import fetch_batch_data
+    need = [t for t in tickers if t not in result]
+    if not need:
+        return
+    new_data = fetch_batch_data(need, days=730)
+    for sym, df in new_data.items():
+        if sym not in result and df is not None and len(df) >= 20:
+            result[sym] = compute_indicators(df)
+
+
+def _fetch_via_yfinance(tickers, result, start, end):
+    import yfinance as yf
+    for t in tickers:
+        if t in result:
+            continue
+        try:
+            df = yf.download(t, start=start, end=end, progress=False, auto_adjust=True)
+            if df is not None and len(df) >= 200:
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.get_level_values(0)
+                result[t] = compute_indicators(df)
+        except:
+            pass
+
+
+def _fetch_via_tiingo(tickers, result, start, end):
+    for t in tickers:
+        if t in result:
+            continue
+        df = _fetch_tiingo(t, start, end)
+        if df is not None and len(df) >= 200:
+            result[t] = compute_indicators(df)
