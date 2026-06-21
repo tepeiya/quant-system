@@ -116,35 +116,44 @@ def _filter_with_gemini(candidates: list, market_context: dict,
 
 def _filter_with_openai(candidates: list, market_context: dict,
                         api_key: str, cfg: dict) -> list:
-    """用 OpenAI 兼容 API 分析"""
+    """用 OpenAI 兼容 API 分析（直接 requests，不需要 openai 库）"""
+    import requests as _requests
+    import json as _json
+
+    api_base = cfg.get("api_base", "").strip().rstrip("/")
+    model_name = cfg.get("model", "gpt-4o-mini")
+    prompt = _build_prompt(candidates, market_context)
+
     try:
-        import openai
-
-        client_kwargs = {"api_key": api_key}
-        api_base = cfg.get("api_base", "").strip()
-        if api_base:
-            client_kwargs["base_url"] = api_base
-
-        client = openai.OpenAI(**client_kwargs)
-        model_name = cfg.get("model", "gpt-4o-mini")
-
-        prompt = _build_prompt(candidates, market_context)
-
-        resp = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=500,
+        resp = _requests.post(
+            f"{api_base}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3,
+                "max_tokens": 500,
+            },
+            timeout=15,
         )
 
-        result = _parse_ai_response(resp.choices[0].message.content, candidates)
+        if resp.status_code != 200:
+            logger.error(f"AI API 返回 {resp.status_code}: {resp.text[:100]}")
+            return candidates
+
+        data = resp.json()
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if not content:
+            logger.warning("AI 返回空内容")
+            return candidates
+
+        result = _parse_ai_response(content, candidates)
         logger.info(f"AI分析完成: {len(candidates)}→{len(result)}只")
         return result
 
-    except ImportError:
-        logger.warning("openai 未安装，跳过AI分析")
-        logger.warning("  pip install openai")
-        return candidates
     except Exception as e:
         logger.error(f"AI分析失败: {e}")
         return candidates
