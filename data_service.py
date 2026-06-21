@@ -173,7 +173,7 @@ def check_health() -> dict:
     health = check_cache_health()
 
     # 检查缓存年龄
-    cache_path = os.path.join(CACHE_DIR, "price_cache.pkl")
+    cache_path = os.path.join(CACHE_DIR, "prices.pkl")
     cache_age = None
     cache_size = 0
     if os.path.exists(cache_path):
