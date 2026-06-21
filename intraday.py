@@ -16,6 +16,13 @@
 import os, sys, json, logging, numpy as np, pandas as pd
 from datetime import datetime, timedelta
 
+# data_global 可选加载
+try:
+    from data_global import us_kline_sina, klines_to_dataframe
+    DATA_GLOBAL_AVAILABLE = True
+except:
+    DATA_GLOBAL_AVAILABLE = False
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [INTRADAY] %(message)s")
 logger = logging.getLogger("quant.intraday")
 
@@ -307,7 +314,16 @@ def scan_intraday_signals() -> list[dict]:
             hot_sectors[sec] = 1.5
             logger.info(f"  🔸 板块温和: {sec} ({data['count']}只候选)")
 
-    # 给属于热门板块的股票加分
+    # 板块热度加分
+    hot_sectors = {}
+    for sec, data in sector_candidates.items():
+        if data["count"] >= 3:
+            hot_sectors[sec] = 3.0
+            logger.info(f"  🔥 板块热: {sec} ({data['count']}只候选, 均分{np.mean(data['scores']):.1f})")
+        elif data["count"] >= 2:
+            hot_sectors[sec] = 1.5
+            logger.info(f"  🔸 板块温和: {sec} ({data['count']}只候选)")
+
     for s in signals:
         sec = sector_map.get(s["ticker"])
         if sec and sec in hot_sectors:
@@ -315,14 +331,58 @@ def scan_intraday_signals() -> list[dict]:
             s["sector_hot_bonus"] = hot_sectors[sec]
             s["sector"] = sec
 
-    signals.sort(key=lambda x: x["score"], reverse=True)
-    logger.info(f"日内扫描完成: {len(signals)}只候选")
-    return signals
+    # === 微因子评分 ===
+    # 1. 相对大盘强度
+    spy_chg = 0
+    try:
+        spy_df = cache.get("SPY") or cache.get("SPY.US")
+        if spy_df is None and DATA_GLOBAL_AVAILABLE:
+            from data_global import us_kline_sina, klines_to_dataframe
+            raw = us_kline_sina("SPY", 5)
+            if raw:
+                spy_df = klines_to_dataframe(raw)
+                if spy_df is not None and len(spy_df) >= 2:
+                    spy_df = __import__("data_prod", fromlist=["compute_indicators"]).compute_indicators(spy_df)
+        if spy_df is not None and len(spy_df) >= 2:
+            spy_close = spy_df["Close"].values
+            spy_chg = (spy_close[-1] - spy_close[-2]) / spy_close[-2] * 100
+    except Exception as e:
+        logger.debug(f"  SPY数据获取失败: {e}")
+    for s in signals:
+        rel_strength = s.get("today_chg", 0) - spy_chg
+        s["rel_strength"] = round(rel_strength, 2)
+        # 跑赢大盘1%以上加分
+        if rel_strength > 1.0:
+            bonus = min(rel_strength * 1.5, 5.0)
+            s["micro_rel_bonus"] = round(bonus, 2)
+            s["score"] += bonus
+        elif rel_strength < -1.0:
+            s["micro_rel_bonus"] = round(rel_strength * 0.5, 2)
+            s["score"] += rel_strength * 0.5  # 跑输减分
+
+    # 2. RSI超卖反转：昨日RSI<35 + 今日涨 = 反弹信号
+    for s in signals:
+        rsi = s.get("rsi", 50)
+        today_chg = s.get("today_chg", 0)
+        if rsi < 35 and today_chg > 0.5:
+            bonus = min((35 - rsi) * 0.15, 2.0)
+            s["micro_rsi_reversal"] = round(bonus, 2)
+            s["score"] += bonus
+            logger.debug(f"  🔄 RSI反转 {s['ticker']}: RSI={rsi} chg={today_chg:.1f}% +{bonus:.1f}")
+
+    # 3. 开盘放量确认：量比>2.0 且 RSI合理(<65) = 更强的信号
+    for s in signals:
+        vr = s.get("vol_ratio", 0)
+        rsi = s.get("rsi", 50)
+        if vr > 2.0 and rsi < 65:
+            bonus = min(vr * 0.3, 1.5)
+            s["micro_volume_confirm"] = round(bonus, 2)
+            s["score"] += bonus
 
     signals.sort(key=lambda x: x["score"], reverse=True)
     max_pos = cfg.get("max_positions", 5)
     result = signals[:max_pos * 2]
-    logger.info(f"日内扫描: 扫描{len(tickers)}只, 候选{len(result)}只 (取Top{max_pos})")
+    logger.info(f"日内扫描: 扫描{len(tickers)}只, 微因子候选{len(result)}只 (取Top{max_pos})")
     return result
 
 
