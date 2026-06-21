@@ -186,7 +186,7 @@ def check_health() -> dict:
         "cache_age_hours": round(cache_age, 1) if cache_age else None,
         "cache_size_mb": round(cache_size / 1024 / 1024, 1) if cache_size else 0,
         "needs_refresh": health.get("needs_refresh", True),
-        "stocks_count": health.get("stocks_count", 0),
+        "stocks_count": health.get("stock_count", 0),
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
