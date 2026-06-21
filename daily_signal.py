@@ -197,7 +197,10 @@ def generate_signals(use_cached_quality=True):
     for t in tickers:
         df = cache.get(t)
         if df is None: continue
-        target_ts = pd.Timestamp(dt_str).tz_localize("UTC")
+        target_ts = pd.Timestamp(dt_str)
+        # 确保时区匹配
+        if hasattr(df.index, 'tz') and df.index.tz is not None:
+            target_ts = target_ts.tz_localize(df.index.tz)
         idx = df.index.get_indexer([target_ts], method="nearest")
         if idx[0] < 0 or idx[0] >= len(df): continue
         row = df.iloc[idx[0]]
