@@ -270,7 +270,7 @@ def execute_intraday(auto: bool = False):
         return
 
     cfg = load_intraday_config()
-    stop_loss_pct = float(cfg.get("stop_loss_pct", 1.5))
+    max_pos = int(cfg.get("max_positions", 5))
 
     from alpaca.trading.requests import MarketOrderRequest
     from alpaca.trading.enums import OrderSide, TimeInForce
@@ -278,19 +278,32 @@ def execute_intraday(auto: bool = False):
     acct = client.get_account()
     equity = float(acct.equity)
     cash = float(acct.cash)
-    allocated = equity * CAPITAL_RATIO
+    allocated = min(equity * CAPITAL_RATIO, cash)  # 日内分配资金，不超过可用现金
 
     positions = get_positions(client)
     trade_log = load_trade_log()
     trades = []
 
     logger.info(f"权益: ${equity:.2f}, 日内分配: ${allocated:.2f} ({CAPITAL_RATIO*100:.0f}%)")
-    logger.info(f"当前持仓: {len(positions)} 只")
+    logger.info(f"当前持仓: {len(positions)} 只 (上限{max_pos})")
 
     check_stop_loss()
     positions = get_positions(client)
 
+    # 如果已达最大持仓数，不再买入
+    if len(positions) >= max_pos:
+        logger.info(f"  持仓已达上限({max_pos}只)，跳过本次买入")
+        return
+
+    # 剩余可买仓位
+    remaining_slots = max_pos - len(positions)
+    candidates = candidates[:remaining_slots]
+    logger.info(f"  可买: {len(candidates)}/{remaining_slots}只")
+
+    # 剩余资金在候选股之间平分
     per_target = allocated / max(len(candidates), 1)
+    remaining_cash = allocated
+
     for c in candidates:
         sym = c["ticker"]
         if sym in positions:
@@ -299,24 +312,26 @@ def execute_intraday(auto: bool = False):
         price = c.get("price", 0)
         if price <= 0:
             continue
-        qty = int(per_target / price)
+
+        qty = int(min(per_target, remaining_cash) / price)
         if qty <= 0:
             qty = 1
         cost = qty * price
-        if cost > cash:
-            qty = int(cash / price)
+        if cost > remaining_cash:
+            qty = int(remaining_cash / price)
             if qty <= 0:
                 continue
             cost = qty * price
+
         if qty > 0 and auto:
             try:
                 client.submit_order(MarketOrderRequest(
                     symbol=sym, qty=qty, side=OrderSide.BUY,
                     time_in_force=TimeInForce.DAY))
-                cash -= cost
-                logger.info(f"  买入 {sym} x{qty} @ ${price:.2f}")
+                remaining_cash -= cost
+                logger.info(f"  买入 {sym} x{qty} @ ${price:.2f} (已用${allocated-remaining_cash:.0f}/{allocated:.0f})")
 
-                # 买入后立即提交云端止损单（ATR自适应）
+                # 买入后立即提交云端止损单
                 sl_pct = float(c.get("stop_loss_pct", 1.5))
                 stop_price = price * (1 - sl_pct / 100)
                 place_cloud_stop(client, sym, qty, stop_price)
@@ -326,6 +341,8 @@ def execute_intraday(auto: bool = False):
         else:
             logger.info(f"  [预览] 买入 {sym} x{qty} @ ${price:.2f}")
         trades.append({"symbol": sym, "side": "BUY", "qty": qty, "price": round(price, 2), "auto": auto})
+
+    logger.info(f"执行完成: {len(trades)}笔 (剩余资金${remaining_cash:.0f})")
 
     if trades:
         trade_log["trades"].append({"time": str(datetime.now()), "action": "scan", "trades": trades})
