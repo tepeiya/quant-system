@@ -243,26 +243,32 @@ class TradeExecutor:
     # 轮询总线 + 自动执行
     # -------------------------------------------------------
 
-    def run_once(self, dry_run: bool = False):
+    def run_once(self, dry_run: bool = False, strategy_filter: str = None, consumer: str = "executor"):
         """单次执行：读总线 → 处理信号 → 执行"""
-        msgs = signal_bus.read_pending_messages(consumer="executor", limit=20)
+        msgs = signal_bus.read_pending_messages(consumer=consumer, limit=20)
 
         all_intents = []
         for msg in msgs:
+            msg_strategy = msg.get("strategy", "")
             if msg["msg_type"] == "signal":
+                if strategy_filter and msg_strategy != strategy_filter:
+                    continue
                 intents = self.process_signal(msg)
                 all_intents.extend(intents)
                 signal_bus.mark_consumed(msg["msg_id"])
             elif msg["msg_type"] == "order":
                 # order 类型消息直接执行（直接从总线来的订单意图）
                 payload = msg["payload"]
+                source_strategy = payload.get("source_strategy", msg_strategy or "unknown")
+                if strategy_filter and source_strategy != strategy_filter:
+                    continue
                 intent = {
                     "ticker": payload.get("ticker", ""),
                     "side": payload.get("side", "buy"),
                     "qty": payload.get("qty", 0),
                     "price": payload.get("price", 0),
                     "reason": payload.get("reason", "manual"),
-                    "source_strategy": payload.get("source_strategy", msg.get("strategy", "unknown")),
+                    "source_strategy": source_strategy,
                 }
                 all_intents.append(intent)
                 signal_bus.mark_consumed(msg["msg_id"])

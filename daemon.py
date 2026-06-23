@@ -311,9 +311,6 @@ def run_intraday_loop():
     interval = max(interval_min, 5) * 60  # 最小5分钟
     logger.info(f"[日内] 轮询线程启动，美东9:30-16:00 (北京21:30-05:00) 每{interval_min}分钟执行")
 
-    # 启动时跳过一天，避免重启后立刻误开仓
-    skip_next = True
-
     while not shutdown_event.is_set():
         now = datetime.now()
         if now.weekday() >= 5:
@@ -323,6 +320,18 @@ def run_intraday_loop():
         hour = now.hour
         minute = now.minute
 
+        # 收盘前强制清仓（美东15:45 = 北京04:45）
+        if hour == 4 and minute >= 45:
+            logger.info("[日内] 收盘前，强制清仓...")
+            try:
+                from intraday_trader import close_all
+                close_all(auto=True)
+                logger.info("  [日内] 清仓完成")
+            except Exception as e:
+                logger.warning(f"  [日内] 清仓异常: {e}")
+            shutdown_event.wait(3600)
+            continue
+
         # 非美股交易时间跳过（夏令时：北京21:30-05:00）
         if hour >= 5 and hour < 21:
             shutdown_event.wait(1800)
@@ -330,7 +339,7 @@ def run_intraday_loop():
         if hour == 21 and minute < 30:
             shutdown_event.wait(1800)
             continue
-        if hour >= 4 and minute >= 45:
+        if hour > 4:
             shutdown_event.wait(3600)
             continue
 
@@ -350,8 +359,8 @@ def run_intraday_loop():
             logger.warning(f"  [日内] 插件扫描异常: {e}")
             # 回退旧逻辑
             try:
-                from intraday import scan_intraday_signals as scan_intraday
-                scan_intraday()
+                from intraday import generate_signal
+                generate_signal()
                 save_status(last_intraday_scan=str(datetime.now()))
             except Exception as e2:
                 logger.debug(f"  [日内] 回退扫描跳过: {e2}")
@@ -360,7 +369,11 @@ def run_intraday_loop():
         try:
             from trade_executor import TradeExecutor
             ex = TradeExecutor()
-            results = ex.run_once(dry_run=False)
+            results = ex.run_once(
+                dry_run=False,
+                strategy_filter="intraday",
+                consumer="executor_intraday",
+            )
             logger.info(f"  [日内] 执行器处理 {len(results)} 笔")
         except Exception as e:
             logger.debug(f"  [日内] 执行器交易跳过: {e}")
@@ -376,16 +389,6 @@ def run_intraday_loop():
                 logger.info("  [日内] (回退)执行完成")
             except:
                 pass
-
-        # 收盘前强制清仓（美东15:45 = 北京04:45）
-        if hour >= 4 and minute >= 45:
-            logger.info("[日内] 收盘前，强制清仓...")
-            try:
-                from intraday_trader import close_all
-                close_all(auto=True)
-                logger.info("  [日内] 清仓完成")
-            except Exception as e:
-                logger.warning(f"  [日内] 清仓异常: {e}")
 
         shutdown_event.wait(interval)
 

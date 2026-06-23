@@ -271,6 +271,7 @@ def execute_intraday(auto: bool = False):
 
     cfg = load_intraday_config()
     max_pos = int(cfg.get("max_positions", 5))
+    capital_ratio = float(cfg.get("capital_pct", CAPITAL_RATIO))
 
     from alpaca.trading.requests import MarketOrderRequest
     from alpaca.trading.enums import OrderSide, TimeInForce
@@ -278,21 +279,32 @@ def execute_intraday(auto: bool = False):
     acct = client.get_account()
     equity = float(acct.equity)
     cash = float(acct.cash)
-    allocated = min(equity * CAPITAL_RATIO, cash)  # 日内分配资金，不超过可用现金
-
     positions = get_positions(client)
+    current_exposure = sum(float(p.get("market_value", 0)) for p in positions.values())
+    target_capital = equity * capital_ratio
+    remaining_budget = max(0.0, target_capital - current_exposure)
+    allocated = min(remaining_budget, cash)  # 剩余日内预算，不超过可用现金
     trade_log = load_trade_log()
     trades = []
 
-    logger.info(f"权益: ${equity:.2f}, 日内分配: ${allocated:.2f} ({CAPITAL_RATIO*100:.0f}%)")
+    logger.info(
+        f"权益: ${equity:.2f}, 日内目标资金: ${target_capital:.2f}, "
+        f"已占用: ${current_exposure:.2f}, 可用预算: ${allocated:.2f} ({capital_ratio*100:.0f}%)"
+    )
     logger.info(f"当前持仓: {len(positions)} 只 (上限{max_pos})")
 
     check_stop_loss()
     positions = get_positions(client)
+    current_exposure = sum(float(p.get("market_value", 0)) for p in positions.values())
+    remaining_budget = max(0.0, target_capital - current_exposure)
+    allocated = min(remaining_budget, cash)
 
     # 如果已达最大持仓数，不再买入
     if len(positions) >= max_pos:
         logger.info(f"  持仓已达上限({max_pos}只)，跳过本次买入")
+        return
+    if allocated <= 0:
+        logger.info("  日内预算已用尽，跳过本次买入")
         return
 
     # 剩余可买仓位

@@ -318,16 +318,6 @@ def scan_intraday_signals() -> list[dict]:
             hot_sectors[sec] = 1.5
             logger.info(f"  🔸 板块温和: {sec} ({data['count']}只候选)")
 
-    # 板块热度加分
-    hot_sectors = {}
-    for sec, data in sector_candidates.items():
-        if data["count"] >= 3:
-            hot_sectors[sec] = 3.0
-            logger.info(f"  🔥 板块热: {sec} ({data['count']}只候选, 均分{np.mean(data['scores']):.1f})")
-        elif data["count"] >= 2:
-            hot_sectors[sec] = 1.5
-            logger.info(f"  🔸 板块温和: {sec} ({data['count']}只候选)")
-
     for s in signals:
         sec = sector_map.get(s["ticker"])
         if sec and sec in hot_sectors:
