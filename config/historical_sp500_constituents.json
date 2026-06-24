@@ -1,0 +1,169 @@
+{
+  "delisted_stocks": {
+    "WCOM": {
+      "delisted": "2002-07-01",
+      "reason": "WorldCom\u7834\u4ea7"
+    },
+    "ENRN": {
+      "delisted": "2001-12-02",
+      "reason": "\u5b89\u7136\u7834\u4ea7"
+    },
+    "NOVL": {
+      "delisted": "2014-04-01",
+      "reason": "\u88abAttachmate\u6536\u8d2d"
+    },
+    "YHOO": {
+      "delisted": "2017-06-13",
+      "reason": "\u88abVerizon\u6536\u8d2d"
+    },
+    "TWTR": {
+      "delisted": "2022-11-07",
+      "reason": "\u88ab\u9a6c\u65af\u514b\u6536\u8d2d"
+    },
+    "AOL": {
+      "delisted": "2015-05-01",
+      "reason": "\u88abVerizon\u6536\u8d2d"
+    },
+    "LEH": {
+      "delisted": "2008-09-15",
+      "reason": "\u96f7\u66fc\u5144\u5f1f\u7834\u4ea7"
+    },
+    "BSX": {
+      "delisted": "2006-01-01",
+      "reason": "Boston Scientific\u91cd\u7ec4"
+    },
+    "KMRT": {
+      "delisted": "2002-01-01",
+      "reason": "Kmart\u7834\u4ea7"
+    },
+    "G": {
+      "delisted": "2005-10-01",
+      "reason": "Gillette\u88abP&G\u6536\u8d2d"
+    },
+    "WB": {
+      "delisted": "2008-10-03",
+      "reason": "Wachovia\u88ab Wells Fargo\u6536\u8d2d"
+    },
+    "WM": {
+      "delisted": "2008-09-25",
+      "reason": "Washington Mutual\u7834\u4ea7"
+    },
+    "CFC": {
+      "delisted": "2008-03-01",
+      "reason": "Countrywide\u88abBOA\u6536\u8d2d"
+    },
+    "FRE": {
+      "delisted": "2008-09-07",
+      "reason": "Freddie Mac\u653f\u5e9c\u63a5\u7ba1"
+    },
+    "FNM": {
+      "delisted": "2008-09-07",
+      "reason": "Fannie Mae\u653f\u5e9c\u63a5\u7ba1"
+    },
+    "S": {
+      "delisted": "2020-04-01",
+      "reason": "Sprint\u88abT-Mobile\u6536\u8d2d"
+    },
+    "TMUS.R": {
+      "delisted": "2020-04-01",
+      "reason": "\u5408\u5e76"
+    },
+    "DISH": {
+      "delisted": "2025-01-01",
+      "reason": "\u7834\u4ea7\u98ce\u9669"
+    }
+  },
+  "sp500_changes": [
+    {
+      "date": "2024-03-18",
+      "added": "SMCI",
+      "removed": "WHIRL"
+    },
+    {
+      "date": "2024-03-04",
+      "added": "KVUE",
+      "removed": "BMY"
+    },
+    {
+      "date": "2023-12-18",
+      "added": "SIRI",
+      "removed": "ZION"
+    },
+    {
+      "date": "2023-09-18",
+      "added": "GEV",
+      "removed": "GE"
+    },
+    {
+      "date": "2023-03-20",
+      "added": "ON",
+      "removed": "FOXA"
+    },
+    {
+      "date": "2022-11-07",
+      "added": null,
+      "removed": "TWTR"
+    },
+    {
+      "date": "2022-05-02",
+      "added": "PAYX",
+      "removed": null
+    },
+    {
+      "date": "2021-03-22",
+      "added": "NDAQ",
+      "removed": "XLNX"
+    },
+    {
+      "date": "2021-01-04",
+      "added": "AAPL",
+      "removed": null
+    },
+    {
+      "date": "2020-04-01",
+      "added": "TMUS",
+      "removed": "S"
+    },
+    {
+      "date": "2019-06-03",
+      "added": "LVS",
+      "removed": "ANDV"
+    },
+    {
+      "date": "2018-06-04",
+      "added": "NOW",
+      "removed": "GGP"
+    },
+    {
+      "date": "2017-06-13",
+      "added": null,
+      "removed": "YHOO"
+    },
+    {
+      "date": "2015-03-19",
+      "added": "ACT",
+      "removed": "BRCM"
+    },
+    {
+      "date": "2010-04-01",
+      "added": null,
+      "removed": "C"
+    },
+    {
+      "date": "2008-10-03",
+      "added": "WFC",
+      "removed": "WB"
+    },
+    {
+      "date": "2008-09-15",
+      "added": null,
+      "removed": "LEH"
+    },
+    {
+      "date": "2002-07-01",
+      "added": null,
+      "removed": "WCOM"
+    }
+  ],
+  "last_updated": "2026-06-24T14:40:18.364704"
+}
