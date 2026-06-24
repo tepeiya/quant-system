@@ -1,581 +1,509 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>风险管理 - M+量化系统</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #0f1419; color: #e7e9ea; min-height: 100vh;
-        }
-        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-        
-        /* Header */
-        .header {
-            background: linear-gradient(135deg, #1a1f2e 0%, #2d3748 100%);
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .header h1 { font-size: 24px; color: #fff; }
-        .header .subtitle { color: #a0aec0; font-size: 14px; margin-top: 4px; }
-        
-        /* Cards */
-        .card {
-            background: #1a1f2e;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 1px solid #2d3748;
-        }
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #2d3748;
-        }
-        .card-title { font-size: 16px; font-weight: 600; color: #fff; }
-        
-        /* Grid */
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-        .grid-3 { grid-template-columns: repeat(3, 1fr); }
-        .grid-4 { grid-template-columns: repeat(4, 1fr); }
-        
-        /* Stats */
-        .stat { text-align: center; padding: 15px; }
-        .stat-value { font-size: 32px; font-weight: 700; margin-bottom: 5px; }
-        .stat-label { font-size: 12px; color: #a0aec0; text-transform: uppercase; }
-        .stat-danger { color: #fc8181; }
-        .stat-warning { color: #f6ad55; }
-        .stat-success { color: #68d391; }
-        .stat-info { color: #63b3ed; }
-        
-        /* Table */
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #2d3748; }
-        th { color: #a0aec0; font-weight: 500; font-size: 12px; text-transform: uppercase; }
-        td { color: #e7e9ea; }
-        
-        /* Badge */
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .badge-danger { background: #fc818133; color: #fc8181; }
-        .badge-warning { background: #f6ad5533; color: #f6ad55; }
-        .badge-success { background: #68d39133; color: #68d391; }
-        
-        /* Button */
-        .btn {
-            padding: 8px 16px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-        .btn-primary { background: #3182ce; color: #fff; }
-        .btn-primary:hover { background: #2c5282; }
-        .btn-secondary { background: #4a5568; color: #fff; }
-        .btn-secondary:hover { background: #2d3748; }
-        
-        /* Form */
-        .form-group { margin-bottom: 15px; }
-        .form-label { display: block; margin-bottom: 5px; color: #a0aec0; font-size: 12px; }
-        .form-input {
-            width: 100%;
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #2d3748;
-            background: #0f1419;
-            color: #e7e9ea;
-            font-size: 14px;
-        }
-        .form-input:focus { outline: none; border-color: #3182ce; }
-        
-        /* Tabs */
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab {
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            background: #2d3748;
-            color: #a0aec0;
-            border: none;
-            font-size: 14px;
-        }
-        .tab.active { background: #3182ce; color: #fff; }
-        
-        /* Chart placeholder */
-        .chart { height: 200px; background: #0f1419; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #4a5568; }
-        
-        /* Alert */
-        .alert {
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .alert-danger { background: #fc818133; border: 1px solid #fc818166; color: #fc8181; }
-        .alert-warning { background: #f6ad5533; border: 1px solid #f6ad5566; color: #f6ad55; }
-        .alert-info { background: #63b3ed33; border: 1px solid #63b3ed66; color: #63b3ed; }
-        
-        /* Progress bar */
-        .progress {
-            height: 8px;
-            background: #2d3748;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        .progress-bar { height: 100%; border-radius: 4px; }
-        .progress-danger { background: linear-gradient(90deg, #fc8181, #f56565); }
-        .progress-warning { background: linear-gradient(90deg, #f6ad55, #ed8936); }
-        .progress-success { background: linear-gradient(90deg, #68d391, #48bb78); }
-        
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.7);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-        .modal.show { display: flex; }
-        .modal-content {
-            background: #1a1f2e;
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 500px;
-            width: 90%;
-        }
-        .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .modal-title { font-size: 18px; font-weight: 600; }
-        .modal-close { background: none; border: none; color: #a0aec0; cursor: pointer; font-size: 20px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div>
-                <h1>📊 风险管理中心</h1>
-                <div class="subtitle">VaR / CVaR | 回撤分析 | 集中度监控 | Beta分析</div>
+{% extends "base.html" %}
+{% block title %}风险管理 - 量化系统{% endblock %}
+{% block content %}
+
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #1a1f2e 0%, #2d3748 100%);
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .page-header h1 { font-size: 24px; color: #fff; margin: 0; }
+    .page-header .subtitle { color: #a0aec0; font-size: 14px; margin-top: 4px; }
+    
+    .risk-card {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #30363d;
+    }
+    .card-title { font-size: 16px; font-weight: 600; color: #e6edf3; }
+    
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    
+    .stat { text-align: center; padding: 15px; }
+    .stat-value { font-size: 32px; font-weight: 700; margin-bottom: 5px; }
+    .stat-label { font-size: 12px; color: #8b949e; text-transform: uppercase; }
+    .stat-danger { color: #f85149; }
+    .stat-warning { color: #d29922; }
+    .stat-success { color: #3fb950; }
+    .stat-info { color: #58a6ff; }
+    
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #30363d; }
+    th { color: #8b949e; font-weight: 500; font-size: 12px; text-transform: uppercase; }
+    td { color: #e6edf3; }
+    
+    .risk-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .badge-danger { background: rgba(248,81,73,0.2); color: #f85149; }
+    .badge-warning { background: rgba(210,153,34,0.2); color: #d29922; }
+    .badge-success { background: rgba(63,185,80,0.2); color: #3fb950; }
+    
+    .form-group { margin-bottom: 15px; }
+    .form-label { display: block; margin-bottom: 5px; color: #8b949e; font-size: 12px; }
+    .form-input {
+        width: 100%;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #30363d;
+        background: #0d1117;
+        color: #e6edf3;
+        font-size: 14px;
+    }
+    .form-input:focus { outline: none; border-color: #58a6ff; }
+    
+    .chart { height: 200px; background: #0d1117; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #484f58; }
+    
+    .alert {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .alert-danger { background: rgba(248,81,73,0.2); border: 1px solid rgba(248,81,73,0.4); color: #f85149; }
+    .alert-warning { background: rgba(210,153,34,0.2); border: 1px solid rgba(210,153,34,0.4); color: #d29922; }
+    .alert-info { background: rgba(88,166,255,0.2); border: 1px solid rgba(88,166,255,0.4); color: #58a6ff; }
+    .alert-success { background: rgba(63,185,80,0.2); border: 1px solid rgba(63,185,80,0.4); color: #3fb950; }
+    
+    .progress {
+        height: 8px;
+        background: #30363d;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .progress-bar { height: 100%; border-radius: 4px; }
+    .progress-danger { background: linear-gradient(90deg, #f85149, #da3633); }
+    .progress-warning { background: linear-gradient(90deg, #d29922, #e3b341); }
+    .progress-success { background: linear-gradient(90deg, #3fb950, #2ea043); }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.7);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal.show { display: flex; }
+    .modal-content {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 500px;
+        width: 90%;
+    }
+    .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
+    .modal-title { font-size: 18px; font-weight: 600; }
+    .modal-close { background: none; border: none; color: #8b949e; cursor: pointer; font-size: 24px; }
+    
+    .header-actions { display: flex; gap: 8px; }
+</style>
+
+<div class="page-header">
+    <div>
+        <h1>📊 风险管理中心</h1>
+        <div class="subtitle">VaR / CVaR | 回撤分析 | 集中度监控 | Beta分析</div>
+    </div>
+    <div class="header-actions">
+        <button class="btn" onclick="refreshAll()">🔄 刷新数据</button>
+        <button class="btn secondary" onclick="openConfigModal()">⚙️ 配置</button>
+    </div>
+</div>
+
+<div class="risk-card">
+    <div class="card-header">
+        <span class="card-title">🚨 风险告警</span>
+    </div>
+    <div id="alerts-container">
+        <div class="alert alert-info">正在加载告警信息...</div>
+    </div>
+</div>
+
+<div class="grid grid-4">
+    <div class="risk-card">
+        <div class="stat">
+            <div class="stat-value stat-danger" id="var-historical">--</div>
+            <div class="stat-label">95% VaR (历史法)</div>
+        </div>
+    </div>
+    <div class="risk-card">
+        <div class="stat">
+            <div class="stat-value stat-danger" id="var-parametric">--</div>
+            <div class="stat-label">95% VaR (参数法)</div>
+        </div>
+    </div>
+    <div class="risk-card">
+        <div class="stat">
+            <div class="stat-value stat-warning" id="cvar">--</div>
+            <div class="stat-label">95% CVaR (尾部风险)</div>
+        </div>
+    </div>
+    <div class="risk-card">
+        <div class="stat">
+            <div class="stat-value stat-info" id="confidence-level">95%</div>
+            <div class="stat-label">置信水平</div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="risk-card">
+        <div class="card-header">
+            <span class="card-title">📉 回撤分析</span>
+        </div>
+        <div class="grid grid-3" style="gap: 10px;">
+            <div class="stat">
+                <div class="stat-value stat-danger" id="max-drawdown">--</div>
+                <div class="stat-label">最大回撤</div>
             </div>
-            <div>
-                <button class="btn btn-primary" onclick="refreshAll()">🔄 刷新数据</button>
-                <button class="btn btn-secondary" onclick="openConfigModal()">⚙️ 配置</button>
+            <div class="stat">
+                <div class="stat-value stat-warning" id="current-drawdown">--</div>
+                <div class="stat-label">当前回撤</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="drawdown-duration">--</div>
+                <div class="stat-label">回撤天数</div>
             </div>
         </div>
-        
-        <!-- Risk Alerts -->
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">🚨 风险告警</span>
-            </div>
-            <div id="alerts-container">
-                <div class="alert alert-info">正在加载告警信息...</div>
-            </div>
-        </div>
-        
-        <!-- VaR/CVaR Stats -->
-        <div class="grid grid-4">
-            <div class="card">
-                <div class="stat">
-                    <div class="stat-value stat-danger" id="var-historical">--</div>
-                    <div class="stat-label">95% VaR (历史法)</div>
-                </div>
-            </div>
-            <div class="card">
-                <div class="stat">
-                    <div class="stat-value stat-danger" id="var-parametric">--</div>
-                    <div class="stat-label">95% VaR (参数法)</div>
-                </div>
-            </div>
-            <div class="card">
-                <div class="stat">
-                    <div class="stat-value stat-warning" id="cvar">--</div>
-                    <div class="stat-label">95% CVaR (尾部风险)</div>
-                </div>
-            </div>
-            <div class="card">
-                <div class="stat">
-                    <div class="stat-value stat-info" id="confidence-level">95%</div>
-                    <div class="stat-label">置信水平</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Drawdown and Concentration -->
-        <div class="grid grid-2">
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">📉 回撤分析</span>
-                </div>
-                <div class="grid grid-3" style="gap: 10px;">
-                    <div class="stat">
-                        <div class="stat-value stat-danger" id="max-drawdown">--</div>
-                        <div class="stat-label">最大回撤</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value stat-warning" id="current-drawdown">--</div>
-                        <div class="stat-label">当前回撤</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value" id="drawdown-duration">--</div>
-                        <div class="stat-label">回撤天数</div>
-                    </div>
-                </div>
-                <div style="margin-top: 15px;">
-                    <div class="form-label">权益曲线 (最近30天)</div>
-                    <div class="chart" id="equity-chart">图表区域</div>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">🎯 持仓集中度</span>
-                </div>
-                <div class="grid grid-3" style="gap: 10px;">
-                    <div class="stat">
-                        <div class="stat-value stat-warning" id="hhi-value">--</div>
-                        <div class="stat-label">HHI指数</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value" id="effective-n">--</div>
-                        <div class="stat-label">有效持仓数</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value" id="n-positions">--</div>
-                        <div class="stat-label">总持仓数</div>
-                    </div>
-                </div>
-                <div style="margin-top: 15px;">
-                    <div class="form-label">HHI分类: <span id="concentration-class" class="badge">--</span></div>
-                    <div class="progress" style="margin-top: 10px;">
-                        <div class="progress-bar progress-warning" id="hhi-progress" style="width: 50%;"></div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 11px; color: #4a5568;">
-                        <span>0.0</span><span>0.15</span><span>0.25</span><span>1.0</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Beta Analysis -->
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">📈 Beta分析</span>
-                <select class="form-input" style="width: auto;" onchange="updateBeta()">
-                    <option value="60">60天滚动</option>
-                    <option value="120">120天滚动</option>
-                    <option value="252">年度</option>
-                </select>
-            </div>
-            <div class="grid grid-4">
-                <div class="stat">
-                    <div class="stat-value stat-info" id="current-beta">--</div>
-                    <div class="stat-label">当前Beta</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-value" id="avg-beta">--</div>
-                    <div class="stat-label">平均Beta</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-value" id="beta-interpretation">--</div>
-                    <div class="stat-label">解读</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-value" id="correlation">--</div>
-                    <div class="stat-label">与市场相关性</div>
-                </div>
-            </div>
-            <div style="margin-top: 15px;">
-                <div class="form-label">滚动Beta走势</div>
-                <div class="chart" id="beta-chart">图表区域</div>
-            </div>
-        </div>
-        
-        <!-- VaR Calculation Tool -->
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">🧮 VaR计算工具</span>
-            </div>
-            <div class="grid grid-3">
-                <div class="form-group">
-                    <label class="form-label">收益率数据 (逗号分隔)</label>
-                    <input type="text" class="form-input" id="returns-input" placeholder="0.01,-0.02,0.005,...">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">置信水平</label>
-                    <select class="form-input" id="var-confidence">
-                        <option value="0.90">90%</option>
-                        <option value="0.95" selected>95%</option>
-                        <option value="0.99">99%</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">计算方法</label>
-                    <select class="form-input" id="var-method">
-                        <option value="all">全部方法</option>
-                        <option value="historical">历史法</option>
-                        <option value="parametric">参数法</option>
-                        <option value="monte_carlo">蒙特卡洛</option>
-                    </select>
-                </div>
-            </div>
-            <button class="btn btn-primary" onclick="calculateVar()">计算VaR</button>
-            <div id="var-result" style="margin-top: 15px;"></div>
-        </div>
-        
-        <!-- Full Risk Report -->
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">📋 完整风险报告</span>
-                <button class="btn btn-secondary" onclick="generateReport()">生成报告</button>
-            </div>
-            <div id="risk-report" style="display: none;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>指标</th>
-                            <th>数值</th>
-                            <th>说明</th>
-                        </tr>
-                    </thead>
-                    <tbody id="report-tbody">
-                    </tbody>
-                </table>
-            </div>
+        <div style="margin-top: 15px;">
+            <div class="form-label">权益曲线 (最近30天)</div>
+            <div class="chart" id="equity-chart">图表区域</div>
         </div>
     </div>
     
-    <!-- Config Modal -->
-    <div class="modal" id="config-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title">⚙️ 风险配置</span>
-                <button class="modal-close" onclick="closeConfigModal()">&times;</button>
+    <div class="risk-card">
+        <div class="card-header">
+            <span class="card-title">🎯 持仓集中度</span>
+        </div>
+        <div class="grid grid-3" style="gap: 10px;">
+            <div class="stat">
+                <div class="stat-value stat-warning" id="hhi-value">--</div>
+                <div class="stat-label">HHI指数</div>
             </div>
-            <div class="form-group">
-                <label class="form-label">VaR置信水平</label>
-                <select class="form-input" id="config-confidence">
-                    <option value="0.90">90%</option>
-                    <option value="0.95">95%</option>
-                    <option value="0.99">99%</option>
-                </select>
+            <div class="stat">
+                <div class="stat-value" id="effective-n">--</div>
+                <div class="stat-label">有效持仓数</div>
             </div>
-            <div class="form-group">
-                <label class="form-label">最大回撤限制</label>
-                <input type="number" class="form-input" id="config-max-dd" step="0.01" placeholder="0.15">
+            <div class="stat">
+                <div class="stat-value" id="n-positions">--</div>
+                <div class="stat-label">总持仓数</div>
             </div>
-            <div class="form-group">
-                <label class="form-label">最大集中度 (HHI)</label>
-                <input type="number" class="form-input" id="config-max-conc" step="0.01" placeholder="0.25">
+        </div>
+        <div style="margin-top: 15px;">
+            <div class="form-label">HHI分类: <span id="concentration-class" class="risk-badge">--</span></div>
+            <div class="progress" style="margin-top: 10px;">
+                <div class="progress-bar progress-warning" id="hhi-progress" style="width: 50%;"></div>
             </div>
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
-                <button class="btn btn-secondary" onclick="closeConfigModal()">取消</button>
+            <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 11px; color: #484f58;">
+                <span>0.0</span><span>0.15</span><span>0.25</span><span>1.0</span>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        // Load data on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            loadRiskData();
-            loadConfig();
+<div class="risk-card">
+    <div class="card-header">
+        <span class="card-title">📈 Beta分析</span>
+        <select class="form-input" style="width: auto;" onchange="updateBeta()">
+            <option value="60">60天滚动</option>
+            <option value="120">120天滚动</option>
+            <option value="252">年度</option>
+        </select>
+    </div>
+    <div class="grid grid-4">
+        <div class="stat">
+            <div class="stat-value stat-info" id="current-beta">--</div>
+            <div class="stat-label">当前Beta</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="avg-beta">--</div>
+            <div class="stat-label">平均Beta</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="beta-interpretation">--</div>
+            <div class="stat-label">解读</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="correlation">--</div>
+            <div class="stat-label">与市场相关性</div>
+        </div>
+    </div>
+    <div style="margin-top: 15px;">
+        <div class="form-label">滚动Beta走势</div>
+        <div class="chart" id="beta-chart">图表区域</div>
+    </div>
+</div>
+
+<div class="risk-card">
+    <div class="card-header">
+        <span class="card-title">🧮 VaR计算工具</span>
+    </div>
+    <div class="grid grid-3">
+        <div class="form-group">
+            <label class="form-label">收益率数据 (逗号分隔)</label>
+            <input type="text" class="form-input" id="returns-input" placeholder="0.01,-0.02,0.005,...">
+        </div>
+        <div class="form-group">
+            <label class="form-label">置信水平</label>
+            <select class="form-input" id="var-confidence">
+                <option value="0.90">90%</option>
+                <option value="0.95" selected>95%</option>
+                <option value="0.99">99%</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">计算方法</label>
+            <select class="form-input" id="var-method">
+                <option value="all">全部方法</option>
+                <option value="historical">历史法</option>
+                <option value="parametric">参数法</option>
+                <option value="monte_carlo">蒙特卡洛</option>
+            </select>
+        </div>
+    </div>
+    <button class="btn" onclick="calculateVar()">计算VaR</button>
+    <div id="var-result" style="margin-top: 15px;"></div>
+</div>
+
+<div class="risk-card">
+    <div class="card-header">
+        <span class="card-title">📋 完整风险报告</span>
+        <button class="btn secondary" onclick="generateReport()">生成报告</button>
+    </div>
+    <div id="risk-report" style="display: none;">
+        <table>
+            <thead>
+                <tr>
+                    <th>指标</th>
+                    <th>数值</th>
+                    <th>说明</th>
+                </tr>
+            </thead>
+            <tbody id="report-tbody">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal" id="config-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="modal-title">⚙️ 风险配置</span>
+            <button class="modal-close" onclick="closeConfigModal()">&times;</button>
+        </div>
+        <div class="form-group">
+            <label class="form-label">VaR置信水平</label>
+            <select class="form-input" id="config-confidence">
+                <option value="0.90">90%</option>
+                <option value="0.95">95%</option>
+                <option value="0.99">99%</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">最大回撤限制</label>
+            <input type="number" class="form-input" id="config-max-dd" step="0.01" placeholder="0.15">
+        </div>
+        <div class="form-group">
+            <label class="form-label">最大集中度 (HHI)</label>
+            <input type="number" class="form-input" id="config-max-conc" step="0.01" placeholder="0.25">
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn" onclick="saveConfig()">保存配置</button>
+            <button class="btn secondary" onclick="closeConfigModal()">取消</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadRiskData();
+    loadConfig();
+});
+
+async function loadRiskData() {
+    try {
+        const varRes = await apiFetch('/risk/api/var_cvar?method=all');
+        document.getElementById('var-historical').textContent = (varRes.var_historical * 100).toFixed(2) + '%';
+        document.getElementById('var-parametric').textContent = (varRes.var_parametric * 100).toFixed(2) + '%';
+        document.getElementById('cvar').textContent = (varRes.cvar * 100).toFixed(2) + '%';
+        
+        const ddRes = await apiFetch('/risk/api/drawdown');
+        document.getElementById('max-drawdown').textContent = (ddRes.drawdown.max_drawdown_pct).toFixed(2) + '%';
+        document.getElementById('current-drawdown').textContent = (ddRes.drawdown.current_drawdown_pct).toFixed(2) + '%';
+        document.getElementById('drawdown-duration').textContent = ddRes.drawdown.drawdown_duration + '天';
+        
+        const concRes = await apiFetch('/risk/api/concentration');
+        document.getElementById('hhi-value').textContent = concRes.hhi.toFixed(4);
+        document.getElementById('effective-n').textContent = concRes.effective_n.toFixed(1);
+        document.getElementById('n-positions').textContent = concRes.n_positions;
+        document.getElementById('concentration-class').textContent = concRes.classification;
+        document.getElementById('hhi-progress').style.width = Math.min(concRes.hhi * 100, 100) + '%';
+        
+        const betaRes = await apiFetch('/risk/api/beta_analysis');
+        document.getElementById('current-beta').textContent = betaRes.current_beta.toFixed(2);
+        document.getElementById('avg-beta').textContent = betaRes.avg_beta.toFixed(2);
+        document.getElementById('beta-interpretation').textContent = betaRes.interpretation;
+        document.getElementById('correlation').textContent = betaRes.correlation ? betaRes.correlation.toFixed(2) : '--';
+        
+        const alertRes = await apiFetch('/risk/api/risk_alerts');
+        renderAlerts(alertRes.alerts);
+        
+    } catch (error) {
+        console.error('Error loading risk data:', error);
+    }
+}
+
+function renderAlerts(alerts) {
+    const container = document.getElementById('alerts-container');
+    if (alerts.length === 0) {
+        container.innerHTML = '<div class="alert alert-success">✅ 当前无风险告警</div>';
+        return;
+    }
+    container.innerHTML = alerts.map(alert => {
+        const alertClass = alert.level === 'danger' ? 'alert-danger' : 
+                           alert.level === 'warning' ? 'alert-warning' : 'alert-info';
+        return `<div class="alert ${alertClass}">
+            <span>${alert.message}</span>
+            <small style="margin-left: auto; opacity: 0.7;">${alert.timestamp}</small>
+        </div>`;
+    }).join('');
+}
+
+async function calculateVar() {
+    const returnsInput = document.getElementById('returns-input').value;
+    const confidence = document.getElementById('var-confidence').value;
+    const method = document.getElementById('var-method').value;
+    
+    if (!returnsInput) {
+        alert('请输入收益率数据');
+        return;
+    }
+    
+    const returns = returnsInput.split(',').map(parseFloat);
+    
+    try {
+        const data = await apiFetch('/risk/api/calculate_var', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({returns, confidence: parseFloat(confidence), method})
         });
         
-        async function loadRiskData() {
-            try {
-                // Load VaR/CVaR
-                const varRes = await fetch('/risk/api/var_cvar?method=all');
-                const varData = await varRes.json();
-                document.getElementById('var-historical').textContent = (varData.var_historical * 100).toFixed(2) + '%';
-                document.getElementById('var-parametric').textContent = (varData.var_parametric * 100).toFixed(2) + '%';
-                document.getElementById('cvar').textContent = (varData.cvar * 100).toFixed(2) + '%';
-                
-                // Load Drawdown
-                const ddRes = await fetch('/risk/api/drawdown');
-                const ddData = await ddRes.json();
-                document.getElementById('max-drawdown').textContent = (ddData.drawdown.max_drawdown_pct).toFixed(2) + '%';
-                document.getElementById('current-drawdown').textContent = (ddData.drawdown.current_drawdown_pct).toFixed(2) + '%';
-                document.getElementById('drawdown-duration').textContent = ddData.drawdown.drawdown_duration + '天';
-                
-                // Load Concentration
-                const concRes = await fetch('/risk/api/concentration');
-                const concData = await concRes.json();
-                document.getElementById('hhi-value').textContent = concData.hhi.toFixed(4);
-                document.getElementById('effective-n').textContent = concData.effective_n.toFixed(1);
-                document.getElementById('n-positions').textContent = concData.n_positions;
-                document.getElementById('concentration-class').textContent = concData.classification;
-                document.getElementById('hhi-progress').style.width = Math.min(concData.hhi * 100, 100) + '%';
-                
-                // Load Beta
-                const betaRes = await fetch('/risk/api/beta_analysis');
-                const betaData = await betaRes.json();
-                document.getElementById('current-beta').textContent = betaData.current_beta.toFixed(2);
-                document.getElementById('avg-beta').textContent = betaData.avg_beta.toFixed(2);
-                document.getElementById('beta-interpretation').textContent = betaData.interpretation;
-                document.getElementById('correlation').textContent = betaData.correlation ? betaData.correlation.toFixed(2) : '--';
-                
-                // Load Alerts
-                const alertRes = await fetch('/risk/api/risk_alerts');
-                const alertData = await alertRes.json();
-                renderAlerts(alertData.alerts);
-                
-            } catch (error) {
-                console.error('Error loading risk data:', error);
-            }
+        let html = '<table><thead><tr><th>方法</th><th>VaR</th><th>说明</th></tr></thead><tbody>';
+        if (data.var_historical !== undefined) {
+            html += `<tr><td>历史法</td><td class="stat-danger">${(data.var_historical * 100).toFixed(2)}%</td><td>日最大损失</td></tr>`;
         }
+        if (data.var_parametric !== undefined) {
+            html += `<tr><td>参数法</td><td class="stat-warning">${(data.var_parametric * 100).toFixed(2)}%</td><td>假设正态分布</td></tr>`;
+        }
+        if (data.var_monte_carlo !== undefined) {
+            html += `<tr><td>蒙特卡洛</td><td>${(data.var_monte_carlo * 100).toFixed(2)}%</td><td>模拟10,000次</td></tr>`;
+        }
+        if (data.cvar !== undefined) {
+            html += `<tr><td>CVaR</td><td class="stat-danger">${(data.cvar * 100).toFixed(2)}%</td><td>尾部平均损失</td></tr>`;
+        }
+        html += '</tbody></table>';
+        document.getElementById('var-result').innerHTML = html;
         
-        function renderAlerts(alerts) {
-            const container = document.getElementById('alerts-container');
-            if (alerts.length === 0) {
-                container.innerHTML = '<div class="alert alert-success">✅ 当前无风险告警</div>';
-                return;
-            }
-            container.innerHTML = alerts.map(alert => {
-                const alertClass = alert.level === 'danger' ? 'alert-danger' : 
-                                   alert.level === 'warning' ? 'alert-warning' : 'alert-info';
-                return `<div class="alert ${alertClass}">
-                    <span>${alert.message}</span>
-                    <small style="margin-left: auto; opacity: 0.7;">${alert.timestamp}</small>
-                </div>`;
-            }).join('');
-        }
+    } catch (error) {
+        console.error('Error calculating VaR:', error);
+    }
+}
+
+async function generateReport() {
+    try {
+        const data = await apiFetch('/risk/api/risk_report');
         
-        async function calculateVar() {
-            const returnsInput = document.getElementById('returns-input').value;
-            const confidence = document.getElementById('var-confidence').value;
-            const method = document.getElementById('var-method').value;
-            
-            if (!returnsInput) {
-                alert('请输入收益率数据');
-                return;
-            }
-            
-            const returns = returnsInput.split(',').map(parseFloat);
-            
-            try {
-                const res = await fetch('/risk/api/calculate_var', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({returns, confidence: parseFloat(confidence), method})
-                });
-                const data = await res.json();
-                
-                let html = '<table><thead><tr><th>方法</th><th>VaR</th><th>说明</th></tr></thead><tbody>';
-                if (data.var_historical !== undefined) {
-                    html += `<tr><td>历史法</td><td class="stat-danger">${(data.var_historical * 100).toFixed(2)}%</td><td>日最大损失</td></tr>`;
-                }
-                if (data.var_parametric !== undefined) {
-                    html += `<tr><td>参数法</td><td class="stat-warning">${(data.var_parametric * 100).toFixed(2)}%</td><td>假设正态分布</td></tr>`;
-                }
-                if (data.var_monte_carlo !== undefined) {
-                    html += `<tr><td>蒙特卡洛</td><td>${(data.var_monte_carlo * 100).toFixed(2)}%</td><td>模拟10,000次</td></tr>`;
-                }
-                if (data.cvar !== undefined) {
-                    html += `<tr><td>CVaR</td><td class="stat-danger">${(data.cvar * 100).toFixed(2)}%</td><td>尾部平均损失</td></tr>`;
-                }
-                html += '</tbody></table>';
-                document.getElementById('var-result').innerHTML = html;
-                
-            } catch (error) {
-                console.error('Error calculating VaR:', error);
-            }
-        }
+        const tbody = document.getElementById('report-tbody');
+        tbody.innerHTML = `
+            <tr><td>VaR (历史法)</td><td>${(data.var_metrics.var_historical * 100).toFixed(2)}%</td><td>95%置信度下的日最大损失</td></tr>
+            <tr><td>CVaR</td><td>${(data.var_metrics.cvar * 100).toFixed(2)}%</td><td>尾部平均损失</td></tr>
+            <tr><td>最大回撤</td><td>${data.drawdown.max_drawdown_pct.toFixed(2)}%</td><td>历史最大跌幅</td></tr>
+            <tr><td>Beta</td><td>${data.beta?.toFixed(2) || 'N/A'}</td><td>市场敏感度</td></tr>
+            <tr><td>平均收益</td><td>${(data.statistics.mean_return * 100).toFixed(4)}%</td><td>日均收益</td></tr>
+            <tr><td>收益标准差</td><td>${(data.statistics.std_return * 100).toFixed(2)}%</td><td>日波动率</td></tr>
+            <tr><td>偏度</td><td>${data.statistics.skewness.toFixed(2)}</td><td>收益分布偏斜</td></tr>
+            <tr><td>峰度</td><td>${data.statistics.kurtosis.toFixed(2)}</td><td>尾部厚度</td></tr>
+        `;
         
-        async function generateReport() {
-            try {
-                const res = await fetch('/risk/api/risk_report');
-                const data = await res.json();
-                
-                const tbody = document.getElementById('report-tbody');
-                tbody.innerHTML = `
-                    <tr><td>VaR (历史法)</td><td>${(data.var_metrics.var_historical * 100).toFixed(2)}%</td><td>95%置信度下的日最大损失</td></tr>
-                    <tr><td>CVaR</td><td>${(data.var_metrics.cvar * 100).toFixed(2)}%</td><td>尾部平均损失</td></tr>
-                    <tr><td>最大回撤</td><td>${data.drawdown.max_drawdown_pct.toFixed(2)}%</td><td>历史最大跌幅</td></tr>
-                    <tr><td>Beta</td><td>${data.beta?.toFixed(2) || 'N/A'}</td><td>市场敏感度</td></tr>
-                    <tr><td>平均收益</td><td>${(data.statistics.mean_return * 100).toFixed(4)}%</td><td>日均收益</td></tr>
-                    <tr><td>收益标准差</td><td>${(data.statistics.std_return * 100).toFixed(2)}%</td><td>日波动率</td></tr>
-                    <tr><td>偏度</td><td>${data.statistics.skewness.toFixed(2)}</td><td>收益分布偏斜</td></tr>
-                    <tr><td>峰度</td><td>${data.statistics.kurtosis.toFixed(2)}</td><td>尾部厚度</td></tr>
-                `;
-                
-                document.getElementById('risk-report').style.display = 'block';
-                
-            } catch (error) {
-                console.error('Error generating report:', error);
-            }
-        }
+        document.getElementById('risk-report').style.display = 'block';
         
-        function refreshAll() {
-            loadRiskData();
-        }
-        
-        function openConfigModal() {
-            document.getElementById('config-modal').classList.add('show');
-        }
-        
-        function closeConfigModal() {
-            document.getElementById('config-modal').classList.remove('show');
-        }
-        
-        async function loadConfig() {
-            try {
-                const res = await fetch('/risk/api/load_risk_config');
-                const data = await res.json();
-                document.getElementById('config-confidence').value = data.var_confidence || 0.95;
-                document.getElementById('config-max-dd').value = data.max_drawdown_limit || 0.15;
-                document.getElementById('config-max-conc').value = data.max_concentration || 0.25;
-            } catch (error) {
-                console.error('Error loading config:', error);
-            }
-        }
-        
-        async function saveConfig() {
-            const config = {
-                var_confidence: parseFloat(document.getElementById('config-confidence').value),
-                max_drawdown_limit: parseFloat(document.getElementById('config-max-dd').value),
-                max_concentration: parseFloat(document.getElementById('config-max-conc').value)
-            };
-            
-            try {
-                await fetch('/risk/api/save_risk_config', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(config)
-                });
-                alert('配置已保存');
-                closeConfigModal();
-                loadRiskData();
-            } catch (error) {
-                console.error('Error saving config:', error);
-            }
-        }
-        
-        function updateBeta() {
-            // Update beta analysis with selected window
-            loadRiskData();
-        }
-    </script>
-</body>
-</html>
+    } catch (error) {
+        console.error('Error generating report:', error);
+    }
+}
+
+function refreshAll() {
+    loadRiskData();
+}
+
+function openConfigModal() {
+    document.getElementById('config-modal').classList.add('show');
+}
+
+function closeConfigModal() {
+    document.getElementById('config-modal').classList.remove('show');
+}
+
+async function loadConfig() {
+    try {
+        const data = await apiFetch('/risk/api/load_risk_config');
+        document.getElementById('config-confidence').value = data.var_confidence || 0.95;
+        document.getElementById('config-max-dd').value = data.max_drawdown_limit || 0.15;
+        document.getElementById('config-max-conc').value = data.max_concentration || 0.25;
+    } catch (error) {
+        console.error('Error loading config:', error);
+    }
+}
+
+async function saveConfig() {
+    const config = {
+        var_confidence: parseFloat(document.getElementById('config-confidence').value),
+        max_drawdown_limit: parseFloat(document.getElementById('config-max-dd').value),
+        max_concentration: parseFloat(document.getElementById('config-max-conc').value)
+    };
+    
+    try {
+        await apiFetch('/risk/api/save_risk_config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+        alert('配置已保存');
+        closeConfigModal();
+        loadRiskData();
+    } catch (error) {
+        console.error('Error saving config:', error);
+    }
+}
+
+function updateBeta() {
+    loadRiskData();
+}
+</script>
+{% endblock %}
