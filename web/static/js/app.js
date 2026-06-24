@@ -81,6 +81,8 @@ async function loadPage(url, targetId = 'mainContent') {
 
 // 导航点击事件
 document.addEventListener('DOMContentLoaded', () => {
+    applyTheme();
+    
     // 侧边栏导航
     document.querySelectorAll('.nav-item').forEach(el => {
         el.addEventListener('click', (e) => {
@@ -265,6 +267,7 @@ function toggleTheme() {
 
 function applyTheme() {
     const body = document.body;
+    if (!body) return;
     const icon = document.getElementById('themeIcon');
     const label = document.getElementById('themeLabel');
     
@@ -278,7 +281,6 @@ function applyTheme() {
         if (label) label.textContent = '深色';
     }
 }
-applyTheme();
 
 // ===== 交易模式切换 =====
 let tradeMode = localStorage.getItem('trade_mode') || 'paper';

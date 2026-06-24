@@ -17,7 +17,7 @@ import shutil
 import logging
 from datetime import datetime
 from flask import Blueprint, request, jsonify, render_template, session, redirect, url_for
-from passlib.hash import bcrypt
+import bcrypt
 from security import login_rate_limit, csrf_protect, encrypt_key, decrypt_key, log_audit, is_registration_allowed
 from api_response import ok, err
 
@@ -137,7 +137,7 @@ def login():
     if not user:
         return err("用户不存在")
 
-    if not bcrypt.verify(password, user["password"]):
+    if not bcrypt.checkpw(password.encode(), user["password"].encode()):
         return err("密码错误")
 
     session["user"] = username
@@ -185,7 +185,7 @@ def register():
     if username in users:
         return err("用户已存在")
 
-    hashed = bcrypt.hash(password)
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     users[username] = {
         "password": hashed,
         "role": "user",

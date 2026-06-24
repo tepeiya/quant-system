@@ -26,43 +26,51 @@
                     <span class="group-arrow">▾</span> 📊 行情
                 </li>
                 <div class="group-items">
-                    <li><a href="/dashboard" class="nav-item active" data-page="dashboard"><span>📈 大盘</span></a></li>
-                    <li><a href="/macro" class="nav-item" data-page="macro"><span>🌍 宏观</span></a></li>
-                    <li><a href="/heatmap" class="nav-item" data-page="heatmap"><span>🔥 热图</span></a></li>
-                    <li><a href="/factors" class="nav-item" data-page="factors"><span>🧬 因子</span></a></li>
+                    <li><a href="/dashboard/" class="nav-item active" data-page="dashboard"><span>📈 大盘</span></a></li>
+                    <li><a href="/macro/" class="nav-item" data-page="macro"><span>🌍 宏观</span></a></li>
+                    <li><a href="/heatmap/" class="nav-item" data-page="heatmap"><span>🔥 热图</span></a></li>
+                    <li><a href="/factors/" class="nav-item" data-page="factors"><span>🧬 因子</span></a></li>
+                    <li><a href="/factor_analysis/" class="nav-item" data-page="factor_analysis"><span>📊 因子分析</span></a></li>
+                </div>
+                <li class="nav-group" onclick="toggleGroup(this)">
+                    <span class="group-arrow">▾</span> 🛡️ 风控
+                </li>
+                <div class="group-items">
+                    <li><a href="/risk/" class="nav-item" data-page="risk"><span>📉 风险指标</span></a></li>
                 </div>
                 <li class="nav-group" onclick="toggleGroup(this)">
                     <span class="group-arrow">▾</span> 🧠 策略
                 </li>
                 <div class="group-items">
-                    <li><a href="/signals" class="nav-item" data-page="signals"><span>🏆 信号</span></a></li>
-                    <li><a href="/positions" class="nav-item" data-page="positions"><span>📋 持仓</span></a></li>
-                    <li><a href="/pairs" class="nav-item" data-page="pairs"><span>🔗 配对</span></a></li>
-                    <li><a href="/wheel" class="nav-item" data-page="wheel"><span>🔄 轮式</span></a></li>
-                    <li><a href="/intraday" class="nav-item" data-page="intraday"><span>⚡ 日内</span></a></li>
+                    <li><a href="/signals/" class="nav-item" data-page="signals"><span>🏆 信号</span></a></li>
+                    <li><a href="/positions/" class="nav-item" data-page="positions"><span>📋 持仓</span></a></li>
+                    <li><a href="/pairs/" class="nav-item" data-page="pairs"><span>🔗 配对</span></a></li>
+                    <li><a href="/wheel/" class="nav-item" data-page="wheel"><span>🔄 轮式</span></a></li>
+                    <li><a href="/intraday/" class="nav-item" data-page="intraday"><span>⚡ 日内</span></a></li>
                 </div>
                 <li class="nav-group" onclick="toggleGroup(this)">
                     <span class="group-arrow">▾</span> 💹 交易
                 </li>
                 <div class="group-items">
-                    <li><a href="/plugins" class="nav-item" data-page="plugins"><span>🧩 策略插件</span></a></li>
-                    <li><a href="/executor" class="nav-item" data-page="executor"><span>🤖 执行器</span></a></li>
-                    <li><a href="/orders" class="nav-item" data-page="orders"><span>📝 订单记录</span></a></li>
-                    <li><a href="/trades" class="nav-item" data-page="trades"><span>📜 交易历史</span></a></li>
-                    <li><a href="/history" class="nav-item" data-page="history"><span>📅 信号历史</span></a></li>
-                    <li><a href="/trading" class="nav-item" data-page="trading"><span>🛒 手动下单</span></a></li>
+                    <li><a href="/algo_trading/" class="nav-item" data-page="algo_trading"><span>⚙️ 算法交易</span></a></li>
+                    <li><a href="/plugins/" class="nav-item" data-page="plugins"><span>🧩 策略插件</span></a></li>
+                    <li><a href="/executor/" class="nav-item" data-page="executor"><span>🤖 执行器</span></a></li>
+                    <li><a href="/orders/" class="nav-item" data-page="orders"><span>📝 订单记录</span></a></li>
+                    <li><a href="/trades/" class="nav-item" data-page="trades"><span>📜 交易历史</span></a></li>
+                    <li><a href="/history/" class="nav-item" data-page="history"><span>📅 信号历史</span></a></li>
+                    <li><a href="/trading/" class="nav-item" data-page="trading"><span>🛒 手动下单</span></a></li>
                 </div>
                 <li class="nav-group" onclick="toggleGroup(this)">
                     <span class="group-arrow">▾</span> 🔧 系统
                 </li>
                 <div class="group-items">
-                    <li><a href="/data" class="nav-item" data-page="data"><span>📡 数据服务</span></a></li>
-                    <li><a href="/bus" class="nav-item" data-page="bus"><span>📨 信号总线</span></a></li>
-                    <li><a href="/brokers" class="nav-item" data-page="brokers"><span>🔌 券商管理</span></a></li>
-                    <li><a href="/config" class="nav-item" data-page="config"><span>⚙️ 配置中心</span></a></li>
-                    <li><a href="/settings" class="nav-item" data-page="settings"><span>🎛️ 策略参数</span></a></li>
-                    <li><a href="/allocator" class="nav-item" data-page="allocator"><span>🧩 资金分配</span></a></li>
-                    <li><a href="/ops" class="nav-item" data-page="ops"><span>🛠️ 运维中心</span></a></li>
+                    <li><a href="/data/" class="nav-item" data-page="data"><span>📡 数据服务</span></a></li>
+                    <li><a href="/bus/" class="nav-item" data-page="bus"><span>📨 信号总线</span></a></li>
+                    <li><a href="/brokers/" class="nav-item" data-page="brokers"><span>🔌 券商管理</span></a></li>
+                    <li><a href="/config/" class="nav-item" data-page="config"><span>⚙️ 配置中心</span></a></li>
+                    <li><a href="/settings/" class="nav-item" data-page="settings"><span>🎛️ 策略参数</span></a></li>
+                    <li><a href="/allocator/" class="nav-item" data-page="allocator"><span>🧩 资金分配</span></a></li>
+                    <li><a href="/ops/" class="nav-item" data-page="ops"><span>🛠️ 运维中心</span></a></li>
                 </div>
             </ul>
             <div class="nav-footer" style="border-top:1px solid #21262d;">

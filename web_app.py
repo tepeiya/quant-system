@@ -36,6 +36,8 @@ app = Flask(__name__,
     static_folder="web/static",
     static_url_path="/static")
 
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+
 # Session密钥
 import secrets
 # 从文件读取持久化 secret_key，重启后不丢失

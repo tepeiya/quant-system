@@ -12,12 +12,29 @@
 """
 
 from flask import Blueprint, jsonify, render_template, request
+import os
+import importlib.util
 import numpy as np
 import json
-import os
 from datetime import datetime, timedelta
 
 bp = Blueprint("algo_trading", __name__, url_prefix="/algo_trading")
+
+_algo_module = None
+
+
+def _get_algo():
+    """懒加载algo_trading核心模块，避免名称冲突"""
+    global _algo_module
+    if _algo_module is None:
+        module_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "algo_trading.py"
+        )
+        spec = importlib.util.spec_from_file_location("algo_trading_core", module_path)
+        _algo_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_algo_module)
+    return _algo_module
 
 
 def _fix(obj):
@@ -57,7 +74,7 @@ def api_twap_schedule():
         "n_slices": 10
     }
     """
-    from algo_trading import calculate_twap_schedule
+    algo = _get_algo()
     
     data = request.json or {}
     symbol = data.get("symbol", "AAPL")
@@ -66,14 +83,12 @@ def api_twap_schedule():
     end_time_str = data.get("end_time", "16:00")
     n_slices = int(data.get("n_slices", 10))
     
-    # 解析时间
     today = datetime.now().date()
     start_time = datetime.strptime(f"{today} {start_time_str}", "%Y-%m-%d %H:%M")
     end_time = datetime.strptime(f"{today} {end_time_str}", "%Y-%m-%d %H:%M")
     
-    schedule = calculate_twap_schedule(quantity, start_time, end_time, n_slices)
+    schedule = algo.calculate_twap_schedule(quantity, start_time, end_time, n_slices)
     
-    # 计算预期TWAP价格 (模拟)
     np.random.seed(42)
     expected_prices = np.random.uniform(100, 105, n_slices)
     
@@ -96,15 +111,8 @@ def api_twap_schedule():
 def api_vwap_schedule():
     """
     生成VWAP执行计划
-    
-    请求体:
-    {
-        "symbol": "AAPL",
-        "quantity": 10000,
-        "use_typical_profile": true
-    }
     """
-    from algo_trading import calculate_vwap_schedule, get_typical_intraday_volume_profile
+    algo = _get_algo()
     
     data = request.json or {}
     symbol = data.get("symbol", "AAPL")
@@ -112,13 +120,12 @@ def api_vwap_schedule():
     use_typical = data.get("use_typical_profile", True)
     
     if use_typical:
-        volume_profile = get_typical_intraday_volume_profile()
+        volume_profile = algo.get_typical_intraday_volume_profile()
     else:
         volume_profile = np.ones(7)
     
-    schedule = calculate_vwap_schedule(quantity, volume_profile)
+    schedule = algo.calculate_vwap_schedule(quantity, volume_profile)
     
-    # 计算预期VWAP价格 (模拟)
     np.random.seed(42)
     expected_prices = np.random.uniform(100, 105, len(schedule))
     
@@ -138,18 +145,8 @@ def api_vwap_schedule():
 
 @bp.route("/api/iceberg_order", methods=["POST"])
 def api_iceberg_order():
-    """
-    生成冰山订单
-    
-    请求体:
-    {
-        "symbol": "AAPL",
-        "quantity": 10000,
-        "visible_quantity": 1000,
-        "randomize": true
-    }
-    """
-    from algo_trading import calculate_iceberg_slices
+    """生成冰山订单"""
+    algo = _get_algo()
     
     data = request.json or {}
     symbol = data.get("symbol", "AAPL")
@@ -157,7 +154,7 @@ def api_iceberg_order():
     visible = int(data.get("visible_quantity", 1000))
     randomize = data.get("randomize", True)
     
-    slices = calculate_iceberg_slices(quantity, visible, randomize)
+    slices = algo.calculate_iceberg_slices(quantity, visible, randomize)
     
     return jsonify(_fix({
         "symbol": symbol,
@@ -171,24 +168,15 @@ def api_iceberg_order():
 
 @bp.route("/api/market_impact", methods=["POST"])
 def api_market_impact():
-    """
-    估计市场冲击
-    
-    请求体:
-    {
-        "order_value": 50000,
-        "daily_volume": 1000000,
-        "volatility": 0.02
-    }
-    """
-    from algo_trading import estimate_market_impact
+    """估计市场冲击"""
+    algo = _get_algo()
     
     data = request.json or {}
     order_value = float(data.get("order_value", 50000))
     daily_volume = float(data.get("daily_volume", 1000000))
     volatility = float(data.get("volatility", 0.02))
     
-    impact = estimate_market_impact(order_value, daily_volume, volatility)
+    impact = algo.estimate_market_impact(order_value, daily_volume, volatility)
     
     return jsonify(_fix({
         "order_value": order_value,
@@ -205,24 +193,15 @@ def api_market_impact():
 
 @bp.route("/api/execution_cost", methods=["POST"])
 def api_execution_cost():
-    """
-    估计总执行成本
-    
-    请求体:
-    {
-        "order_value": 50000,
-        "spread": 0.001,
-        "commission": 0.0005
-    }
-    """
-    from algo_trading import estimate_execution_cost
+    """估计总执行成本"""
+    algo = _get_algo()
     
     data = request.json or {}
     order_value = float(data.get("order_value", 50000))
     spread = float(data.get("spread", 0.001))
     commission = float(data.get("commission", 0.0005))
     
-    costs = estimate_execution_cost(order_value, spread, commission)
+    costs = algo.estimate_execution_cost(order_value, spread, commission)
     
     return jsonify(_fix({
         "order_value": order_value,
@@ -235,19 +214,8 @@ def api_execution_cost():
 
 @bp.route("/api/execution_quality", methods=["POST"])
 def api_execution_quality():
-    """
-    计算执行质量
-    
-    请求体:
-    {
-        "executions": [
-            {"price": 100.5, "quantity": 500, "time": "09:30:00"},
-            {"price": 100.8, "quantity": 500, "time": "10:30:00"}
-        ],
-        "benchmark_price": 100.0
-    }
-    """
-    from algo_trading import calculate_execution_quality, generate_execution_report
+    """计算执行质量"""
+    algo = _get_algo()
     
     data = request.json or {}
     executions = data.get("executions", [])
@@ -259,14 +227,14 @@ def api_execution_quality():
     total_qty = sum([e["quantity"] for e in executions])
     avg_price = sum([e["price"] * e["quantity"] for e in executions]) / total_qty
     
-    quality = calculate_execution_quality(
-        avg_price,  # expected_price用实际均价代替
+    quality = algo.calculate_execution_quality(
+        avg_price,
         avg_price,
         benchmark_price,
         total_qty
     )
     
-    report = generate_execution_report("AAPL", total_qty, executions, benchmark_price)
+    report = algo.generate_execution_report("AAPL", total_qty, executions, benchmark_price)
     
     return jsonify(_fix({
         "total_quantity": total_qty,
@@ -280,14 +248,10 @@ def api_execution_quality():
 
 @bp.route("/api/typical_volume_profile")
 def api_typical_volume_profile():
-    """
-    获取典型日内成交量分布
-    """
-    from algo_trading import get_typical_intraday_volume_profile
+    """获取典型日内成交量分布"""
+    algo = _get_algo()
+    profile = algo.get_typical_intraday_volume_profile()
     
-    profile = get_typical_intraday_volume_profile()
-    
-    # 标签
     labels = [
         "09:30-10:30", "10:30-11:30", "11:30-12:30",
         "12:30-13:30", "13:30-14:30", "14:30-15:30", "15:30-16:00"
@@ -302,9 +266,7 @@ def api_typical_volume_profile():
 
 @bp.route("/api/save_order_template", methods=["POST"])
 def api_save_order_template():
-    """
-    保存订单模板
-    """
+    """保存订单模板"""
     data = request.json or {}
     template_name = data.get("name", "默认模板")
     
@@ -340,15 +302,12 @@ def api_load_order_templates():
 
 @bp.route("/api/execution_history")
 def api_execution_history():
-    """
-    获取执行历史
-    """
+    """获取执行历史"""
     history_file = "config/execution_history.json"
     if os.path.exists(history_file):
         with open(history_file) as f:
             history = json.load(f)
     else:
-        # 模拟历史数据
         history = [
             {
                 "id": "EXEC001",
