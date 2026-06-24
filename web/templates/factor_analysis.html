@@ -99,6 +99,57 @@
     }
     
     .chart { height: 200px; background: #0d1117; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #484f58; margin-top: 15px; }
+    
+    .correlation-matrix-wrapper {
+        overflow-x: auto;
+        max-width: 100%;
+    }
+    #corr-table {
+        font-size: 11px;
+        min-width: 800px;
+    }
+    #corr-table th, #corr-table td {
+        padding: 4px 6px;
+        white-space: nowrap;
+    }
+    #corr-table th {
+        position: sticky;
+        top: 0;
+        background: #161b22;
+        z-index: 1;
+    }
+    #corr-table td:first-child {
+        position: sticky;
+        left: 0;
+        background: #161b22;
+        z-index: 1;
+        font-weight: 600;
+    }
+    .correlation-cell { padding: 4px; text-align: center; border-radius: 3px; font-weight: 500; font-size: 10px; }
+    
+    .category-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+    .cat-动量 { background: rgba(88,166,255,0.2); color: #58a6ff; }
+    .cat-波动 { background: rgba(248,81,73,0.2); color: #f85149; }
+    .cat-相关 { background: rgba(163,113,247,0.2); color: #a371f7; }
+    .cat-成交量 { background: rgba(63,185,80,0.2); color: #3fb950; }
+    .cat-趋势 { background: rgba(210,153,34,0.2); color: #d29922; }
+    .cat-技术指标 { background: rgba(56,139,253,0.2); color: #388bfd; }
+    .cat-资金流 { background: rgba(255,128,200,0.2); color: #f778ba; }
+    .cat-期权 { background: rgba(120,200,255,0.2); color: #79c0ff; }
+    .cat-基本面 { background: rgba(88,204,150,0.2); color: #56d364; }
+    .cat-其他 { background: rgba(139,148,158,0.2); color: #8b949e; }
+    
+    .factor-select {
+        max-height: 200px;
+        overflow-y: auto;
+    }
 </style>
 
 <div class="page-header">
@@ -148,10 +199,12 @@
         </select>
     </div>
     <div id="correlation-matrix">
-        <table id="corr-table">
-            <thead id="corr-thead"></thead>
-            <tbody id="corr-tbody"></tbody>
-        </table>
+        <div class="correlation-matrix-wrapper">
+            <table id="corr-table">
+                <thead id="corr-thead"></thead>
+                <tbody id="corr-tbody"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -216,20 +269,13 @@
         <div class="form-group">
             <label class="form-label">目标因子</label>
             <select class="form-input" id="target-factor">
-                <option value="momentum">动量 (Momentum)</option>
-                <option value="quality">质量 (Quality)</option>
-                <option value="value">价值 (Value)</option>
-                <option value="low_vol">低波动 (Low Vol)</option>
-                <option value="volume">量价 (Volume)</option>
+                <option value="">加载中...</option>
             </select>
         </div>
         <div class="form-group">
-            <label class="form-label">参考因子</label>
-            <select class="form-input" id="ref-factors" multiple>
-                <option value="quality">质量</option>
-                <option value="value">价值</option>
-                <option value="low_vol">低波动</option>
-                <option value="volume">量价</option>
+            <label class="form-label">参考因子（可多选）</label>
+            <select class="form-input factor-select" id="ref-factors" multiple size="6">
+                <option value="">加载中...</option>
             </select>
         </div>
         <div class="form-group">
@@ -273,17 +319,45 @@
 </div>
 
 <script>
+let allFactors = [];
+
 document.addEventListener('DOMContentLoaded', function() {
     loadAll();
 });
 
 async function loadAll() {
+    await loadFactorList();
     await Promise.all([
         loadCorrelation(),
         loadHighCorrPairs(),
         loadICDecay(),
         loadEffectiveness()
     ]);
+}
+
+async function loadFactorList() {
+    try {
+        const data = await apiFetch('/factor_analysis/api/factor_list');
+        allFactors = data.factors || [];
+        
+        document.getElementById('n-factors').textContent = data.total || allFactors.length;
+        
+        const targetSelect = document.getElementById('target-factor');
+        const refSelect = document.getElementById('ref-factors');
+        
+        targetSelect.innerHTML = '';
+        refSelect.innerHTML = '';
+        
+        allFactors.forEach(f => {
+            const cat = f.category || '其他';
+            const label = `${f.name} (${cat})`;
+            targetSelect.innerHTML += `<option value="${f.name}">${label}</option>`;
+            refSelect.innerHTML += `<option value="${f.name}">${label}</option>`;
+        });
+        
+    } catch (error) {
+        console.error('Error loading factor list:', error);
+    }
 }
 
 async function loadCorrelation() {
@@ -370,27 +444,29 @@ async function loadEffectiveness() {
         let significantCount = 0;
         let tbody = '';
         
-        const factorNames = {
-            'momentum': '动量',
-            'quality': '质量',
-            'value': '价值',
-            'low_vol': '低波动',
-            'volume': '量价'
-        };
+        const factorCategoryMap = {};
+        allFactors.forEach(f => { factorCategoryMap[f.name] = f.category; });
         
-        for (const [factor, stats] of Object.entries(data)) {
-            if (stats.is_significant) significantCount++;
+        const sortedFactors = Object.entries(data).sort((a, b) => Math.abs(b[1].ic) - Math.abs(a[1].ic));
+        
+        for (const [factor, stats] of sortedFactors) {
+            if (stats.significant) significantCount++;
             
-            const badge = stats.is_significant 
+            const cat = factorCategoryMap[factor] || '其他';
+            const catBadge = `<span class="category-badge cat-${cat}">${cat}</span>`;
+            
+            const badge = stats.significant 
                 ? '<span class="factor-badge badge-success">显著</span>' 
                 : '<span class="factor-badge badge-warning">不显著</span>';
             
+            const icDisplay = (stats.ic * 100).toFixed(2) + '%';
+            
             tbody += `<tr>
-                <td>${factorNames[factor] || factor} (${factor})</td>
-                <td>${(stats.mean_return * 100).toFixed(4)}%</td>
-                <td>${stats.t_statistic.toFixed(2)}</td>
+                <td>${factor}${catBadge}</td>
+                <td>${icDisplay}</td>
+                <td>${stats.t_stat.toFixed(2)}</td>
                 <td>${stats.p_value.toFixed(4)}</td>
-                <td>${stats.ir.toFixed(2)}</td>
+                <td>${stats.ir.toFixed(3)}</td>
                 <td>${badge}</td>
             </tr>`;
         }
@@ -441,7 +517,7 @@ async function loadPCA() {
         const data = await apiFetch('/factor_analysis/api/pca_orthogonalize');
         
         document.getElementById('pca-explained').textContent = (data.total_explained * 100).toFixed(1) + '%';
-        document.getElementById('pca-reduction').textContent = `${data.n_components}/5`;
+        document.getElementById('pca-reduction').textContent = `${data.n_components}/${data.n_factors || '?'}`;
         
         let varianceHtml = '<div style="margin-top: 15px;">';
         data.explained_variance.forEach((v, i) => {
@@ -450,7 +526,7 @@ async function loadPCA() {
                 <div style="flex: 1; height: 20px; background: #30363d; border-radius: 4px;">
                     <div style="width: ${v*100}%; height: 100%; background: linear-gradient(90deg, #58a6ff, #388bfd); border-radius: 4px;"></div>
                 </div>
-                <span style="margin-left: 10px; width: 50px;">${(v*100).toFixed(1)}%</span>
+                <span style="margin-left: 10px; width: 60px; text-align: right;">${(v*100).toFixed(1)}%</span>
             </div>`;
         });
         varianceHtml += '</div>';
