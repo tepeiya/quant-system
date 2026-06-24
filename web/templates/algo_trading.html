@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>算法交易 - M+量化系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1419; color: #e7e9ea; min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1a1f2e 0%, #2d3748 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 24px; color: #fff; }
+        .header .subtitle { color: #a0aec0; font-size: 14px; margin-top: 4px; }
+        .card { background: #1a1f2e; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #2d3748; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #2d3748; }
+        .card-title { font-size: 16px; font-weight: 600; color: #fff; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-4 { grid-template-columns: repeat(4, 1fr); }
+        .stat { text-align: center; padding: 15px; }
+        .stat-value { font-size: 28px; font-weight: 700; margin-bottom: 5px; }
+        .stat-label { font-size: 12px; color: #a0aec0; text-transform: uppercase; }
+        .stat-success { color: #68d391; }
+        .stat-warning { color: #f6ad55; }
+        .stat-danger { color: #fc8181; }
+        .stat-info { color: #63b3ed; }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        .btn-primary { background: #3182ce; color: #fff; }
+        .btn-primary:hover { background: #2c5282; }
+        .btn-secondary { background: #4a5568; color: #fff; }
+        .btn-secondary:hover { background: #2d3748; }
+        .btn-success { background: #48bb78; color: #fff; }
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; margin-bottom: 5px; color: #a0aec0; font-size: 12px; }
+        .form-input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #2d3748; background: #0f1419; color: #e7e9ea; font-size: 14px; }
+        .form-input:focus { outline: none; border-color: #3182ce; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; border-radius: 6px; cursor: pointer; background: #2d3748; color: #a0aec0; border: none; font-size: 14px; }
+        .tab.active { background: #3182ce; color: #fff; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #2d3748; }
+        th { color: #a0aec0; font-weight: 500; font-size: 12px; text-transform: uppercase; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge-success { background: #68d39133; color: #68d391; }
+        .badge-warning { background: #f6ad5533; color: #f6ad55; }
+        .badge-info { background: #63b3ed33; color: #63b3ed; }
+        .progress { height: 8px; background: #2d3748; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+        .progress-bar { height: 100%; border-radius: 4px; }
+        .progress-success { background: linear-gradient(90deg, #68d391, #48bb78); }
+        .progress-warning { background: linear-gradient(90deg, #f6ad55, #ed8936); }
+        .progress-danger { background: linear-gradient(90deg, #fc8181, #f56565); }
+        .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 10px; }
+        .alert-success { background: #68d39133; border: 1px solid #68d39166; color: #68d391; }
+        .alert-warning { background: #f6ad5533; border: 1px solid #f6ad5566; color: #f6ad55; }
+        .alert-danger { background: #fc818133; border: 1px solid #fc818166; color: #fc8181; }
+        .schedule-item { display: flex; align-items: center; padding: 10px; background: #0f1419; border-radius: 6px; margin-bottom: 8px; }
+        .schedule-time { width: 80px; font-weight: 600; color: #63b3ed; }
+        .schedule-qty { flex: 1; text-align: center; }
+        .schedule-price { width: 80px; text-align: right; color: #68d391; }
+        .chart { height: 200px; background: #0f1419; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #4a5568; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>⚡ 算法交易中心</h1>
+                <div class="subtitle">TWAP | VWAP | 冰山订单 | 市场冲击 | 执行质量</div>
+            </div>
+            <div>
+                <button class="btn btn-primary" onclick="loadExecutionHistory()">📋 执行历史</button>
+            </div>
+        </div>
+        
+        <!-- Algorithm Selection -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('twap')">TWAP 时间加权</button>
+            <button class="tab" onclick="switchTab('vwap')">VWAP 成交量加权</button>
+            <button class="tab" onclick="switchTab('iceberg')">冰山订单</button>
+            <button class="tab" onclick="switchTab('impact')">市场冲击</button>
+        </div>
+        
+        <!-- TWAP Tab -->
+        <div id="tab-twap">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">📊 TWAP执行计划</span>
+                </div>
+                <div class="grid grid-4">
+                    <div class="form-group">
+                        <label class="form-label">股票代码</label>
+                        <input type="text" class="form-input" id="twap-symbol" value="AAPL" placeholder="AAPL">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">订单数量</label>
+                        <input type="number" class="form-input" id="twap-quantity" value="10000" placeholder="10000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">分片数量</label>
+                        <select class="form-input" id="twap-slices">
+                            <option value="5">5片</option>
+                            <option value="10" selected>10片</option>
+                            <option value="20">20片</option>
+                            <option value="30">30片</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-primary" onclick="generateTWAP()">生成计划</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="twap-result" style="display: none;">
+                <div class="grid grid-4">
+                    <div class="card">
+                        <div class="stat">
+                            <div class="stat-value stat-info" id="twap-total-qty">--</div>
+                            <div class="stat-label">总数量</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="stat">
+                            <div class="stat-value stat-success" id="twap-avg-price">--</div>
+                            <div class="stat-label">预期均价</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="stat">
+                            <div class="stat-value" id="twap-duration">--</div>
+                            <div class="stat-label">执行时长</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="stat">
+                            <div class="stat-value" id="twap-slices-count">--</div>
+                            <div class="stat-label">分片数</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">执行时间表</span>
+                    </div>
+                    <div id="twap-schedule"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- VWAP Tab -->
+        <div id="tab-vwap" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">📊 VWAP执行计划</span>
+                </div>
+                <div class="grid grid-3">
+                    <div class="form-group">
+                        <label class="form-label">股票代码</label>
+                        <input type="text" class="form-input" id="vwap-symbol" value="AAPL">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">订单数量</label>
+                        <input type="number" class="form-input" id="vwap-quantity" value="10000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-primary" onclick="generateVWAP()">生成计划</button>
+                    </div>
+                </div>
+                
+                <div class="chart" style="height: 150px;" id="volume-profile-chart">
+                    成交量分布图
+                </div>
+            </div>
+            
+            <div id="vwap-result" style="display: none;">
+                <div class="grid grid-3">
+                    <div class="card">
+                        <div class="stat">
+                            <div class="stat-value stat-success" id="vwap-expected">--</div>
+                            <div class="stat-label">预期VWAP</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="stat">
+                            <div class="stat-value" id="vwap-total">--</div>
+                            <div class="stat-label">总金额</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="stat">
+                            <div class="stat-value" id="vwap-n-slices">--</div>
+                            <div class="stat-label">分片数</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">VWAP执行分布</span>
+                    </div>
+                    <div id="vwap-schedule"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Iceberg Tab -->
+        <div id="tab-iceberg" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">🧊 冰山订单</span>
+                </div>
+                <div class="grid grid-4">
+                    <div class="form-group">
+                        <label class="form-label">股票代码</label>
+                        <input type="text" class="form-input" id="iceberg-symbol" value="AAPL">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">总数量</label>
+                        <input type="number" class="form-input" id="iceberg-quantity" value="10000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">可见数量</label>
+                        <input type="number" class="form-input" id="iceberg-visible" value="1000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" id="iceberg-randomize" checked> 随机化显示量
+                        </label>
+                        <button class="btn btn-primary" onclick="generateIceberg()">生成订单</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="iceberg-result" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">订单切片</span>
+                    </div>
+                    <div id="iceberg-slices"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Market Impact Tab -->
+        <div id="tab-impact" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">⚡ 市场冲击估计</span>
+                </div>
+                <div class="grid grid-3">
+                    <div class="form-group">
+                        <label class="form-label">订单金额 ($)</label>
+                        <input type="number" class="form-input" id="impact-order-value" value="50000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">日均成交量 ($)</label>
+                        <input type="number" class="form-input" id="impact-daily-volume" value="1000000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">波动率</label>
+                        <input type="number" class="form-input" id="impact-volatility" value="0.02" step="0.01">
+                        <button class="btn btn-primary" style="margin-top: 5px;" onclick="calculateImpact()">计算</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="impact-result" style="display: none;">
+                <div class="grid grid-4">
+                    <div class="card">
+                        <div class="stat">
+                            <div class="stat-value stat-info" id="impact-participation">--</div>
+                            <div class="stat-label">参与率</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="stat">
+                            <div class="stat-value stat-warning" id="impact-temporary">--</div>
+                            <div class="stat-label">临时冲击</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="stat">
+                            <div class="stat-value" id="impact-permanent">--</div>
+                            <div class="stat-label">永久冲击</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="stat">
+                            <div class="stat-value stat-danger" id="impact-total">--</div>
+                            <div class="stat-label">总冲击</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="stat">
+                        <div class="stat-value stat-danger" id="impact-cost">--</div>
+                        <div class="stat-label">估计成本 ($)</div>
+                    </div>
+                    <div id="impact-interpretation" style="margin-top: 15px; text-align: center;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Execution History -->
+        <div id="execution-history" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">📋 执行历史</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>股票</th>
+                            <th>算法</th>
+                            <th>数量</th>
+                            <th>均价</th>
+                            <th>基准VWAP</th>
+                            <th>Shortfall</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            // Hide all tabs
+            ['twap', 'vwap', 'iceberg', 'impact'].forEach(tab => {
+                document.getElementById('tab-' + tab).style.display = 'none';
+            });
+            document.getElementById('execution-history').style.display = 'none';
+            
+            // Show selected tab
+            document.getElementById('tab-' + tabName).style.display = 'block';
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+        
+        async function generateTWAP() {
+            const symbol = document.getElementById('twap-symbol').value;
+            const quantity = document.getElementById('twap-quantity').value;
+            const slices = document.getElementById('twap-slices').value;
+            
+            try {
+                const res = await fetch('/algo_trading/api/twap_schedule', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        symbol, quantity: parseInt(quantity), n_slices: parseInt(slices)
+                    })
+                });
+                const data = await res.json();
+                
+                // Update stats
+                document.getElementById('twap-total-qty').textContent = data.total_quantity.toLocaleString();
+                document.getElementById('twap-avg-price').textContent = '$' + data.avg_expected_price.toFixed(2);
+                document.getElementById('twap-duration').textContent = data.duration_hours.toFixed(1) + 'h';
+                document.getElementById('twap-slices-count').textContent = data.n_slices;
+                
+                // Update schedule
+                let scheduleHtml = '';
+                data.schedule.forEach(s => {
+                    scheduleHtml += `
+                        <div class="schedule-item">
+                            <div class="schedule-time">${s.time.slice(11, 19)}</div>
+                            <div class="schedule-qty">${s.quantity.toLocaleString()} 股</div>
+                            <div class="schedule-price">$${s.expected_price.toFixed(2)}</div>
+                        </div>`;
+                });
+                document.getElementById('twap-schedule').innerHTML = scheduleHtml;
+                
+                document.getElementById('twap-result').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error generating TWAP:', error);
+            }
+        }
+        
+        async function generateVWAP() {
+            const symbol = document.getElementById('vwap-symbol').value;
+            const quantity = document.getElementById('vwap-quantity').value;
+            
+            try {
+                const res = await fetch('/algo_trading/api/vwap_schedule', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({symbol, quantity: parseInt(quantity)})
+                });
+                const data = await res.json();
+                
+                document.getElementById('vwap-expected').textContent = '$' + data.expected_vwap.toFixed(2);
+                document.getElementById('vwap-total').textContent = '$' + (data.total_quantity * data.expected_vwap / 1000).toFixed(0) + 'K';
+                document.getElementById('vwap-n-slices').textContent = data.n_slices;
+                
+                // Update schedule
+                let scheduleHtml = '';
+                data.schedule.forEach(s => {
+                    const pct = (s.quantity / data.total_quantity * 100).toFixed(1);
+                    scheduleHtml += `
+                        <div class="schedule-item">
+                            <div class="schedule-time">切片 ${s.slice_id}</div>
+                            <div class="schedule-qty">
+                                ${s.quantity.toLocaleString()} 股 (${pct}%)
+                                <div class="progress" style="margin-top: 5px;">
+                                    <div class="progress-bar progress-success" style="width: ${pct}%;"></div>
+                                </div>
+                            </div>
+                            <div class="schedule-price">$${s.expected_price.toFixed(2)}</div>
+                        </div>`;
+                });
+                document.getElementById('vwap-schedule').innerHTML = scheduleHtml;
+                
+                document.getElementById('vwap-result').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error generating VWAP:', error);
+            }
+        }
+        
+        async function generateIceberg() {
+            const symbol = document.getElementById('iceberg-symbol').value;
+            const quantity = parseInt(document.getElementById('iceberg-quantity').value);
+            const visible = parseInt(document.getElementById('iceberg-visible').value);
+            const randomize = document.getElementById('iceberg-randomize').checked;
+            
+            try {
+                const res = await fetch('/algo_trading/api/iceberg_order', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({symbol, quantity, visible_quantity: visible, randomize})
+                });
+                const data = await res.json();
+                
+                let slicesHtml = `<div class="alert alert-info">隐藏比例: ${data.hidden_percentage.toFixed(1)}% (总${data.total_quantity}股, 可见${data.visible_quantity}股)</div>`;
+                
+                data.slices.forEach(s => {
+                    slicesHtml += `
+                        <div class="schedule-item">
+                            <div class="schedule-time">切片 ${s.slice_id}</div>
+                            <div class="schedule-qty">可见: ${s.display_quantity} 股 | 剩余: ${s.total_remaining} 股</div>
+                            <div class="schedule-price">隐藏: ${s.hidden_quantity} 股</div>
+                        </div>`;
+                });
+                
+                document.getElementById('iceberg-slices').innerHTML = slicesHtml;
+                document.getElementById('iceberg-result').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error generating Iceberg:', error);
+            }
+        }
+        
+        async function calculateImpact() {
+            const orderValue = parseFloat(document.getElementById('impact-order-value').value);
+            const dailyVolume = parseFloat(document.getElementById('impact-daily-volume').value);
+            const volatility = parseFloat(document.getElementById('impact-volatility').value);
+            
+            try {
+                const res = await fetch('/algo_trading/api/market_impact', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({order_value: orderValue, daily_volume: dailyVolume, volatility})
+                });
+                const data = await res.json();
+                
+                document.getElementById('impact-participation').textContent = (data.participation_rate * 100).toFixed(2) + '%';
+                document.getElementById('impact-temporary').textContent = (data.temporary_impact * 100).toFixed(3) + '%';
+                document.getElementById('impact-permanent').textContent = (data.permanent_impact * 100).toFixed(3) + '%';
+                document.getElementById('impact-total').textContent = (data.total_impact * 100).toFixed(3) + '%';
+                document.getElementById('impact-cost').textContent = '$' + data.estimated_cost.toFixed(2);
+                
+                let interpClass = data.interpretation === '低冲击' ? 'alert-success' : 
+                                 data.interpretation === '中等' ? 'alert-warning' : 'alert-danger';
+                document.getElementById('impact-interpretation').innerHTML = 
+                    `<div class="alert ${interpClass}">${data.interpretation}</div>`;
+                
+                document.getElementById('impact-result').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error calculating impact:', error);
+            }
+        }
+        
+        async function loadExecutionHistory() {
+            try {
+                const res = await fetch('/algo_trading/api/execution_history');
+                const data = await res.json();
+                
+                let tbody = '';
+                data.history.forEach(h => {
+                    const shortfallBadge = h.shortfall < 0.001 ? 'badge-success' : 
+                                          h.shortfall < 0.002 ? 'badge-warning' : 'badge-danger';
+                    tbody += `<tr>
+                        <td>${h.id}</td>
+                        <td>${h.symbol}</td>
+                        <td>${h.algorithm}</td>
+                        <td>${h.quantity.toLocaleString()}</td>
+                        <td>$${h.avg_price.toFixed(2)}</td>
+                        <td>$${h.benchmark_vwap.toFixed(2)}</td>
+                        <td><span class="badge ${shortfallBadge}">${(h.shortfall * 100).toFixed(2)}%</span></td>
+                        <td><span class="badge badge-success">${h.status}</span></td>
+                    </tr>`;
+                });
+                
+                document.getElementById('history-tbody').innerHTML = tbody;
+                
+                // Show history tab
+                ['twap', 'vwap', 'iceberg', 'impact'].forEach(tab => {
+                    document.getElementById('tab-' + tab).style.display = 'none';
+                });
+                document.getElementById('execution-history').style.display = 'block';
+                document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+                
+            } catch (error) {
+                console.error('Error loading history:', error);
+            }
+        }
+    </script>
+</body>
+</html>

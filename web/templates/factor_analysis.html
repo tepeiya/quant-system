@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>因子分析 - M+量化系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1419; color: #e7e9ea; min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1a1f2e 0%, #2d3748 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 24px; color: #fff; }
+        .header .subtitle { color: #a0aec0; font-size: 14px; margin-top: 4px; }
+        .card { background: #1a1f2e; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #2d3748; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #2d3748; }
+        .card-title { font-size: 16px; font-weight: 600; color: #fff; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .stat { text-align: center; padding: 15px; }
+        .stat-value { font-size: 28px; font-weight: 700; margin-bottom: 5px; }
+        .stat-label { font-size: 12px; color: #a0aec0; text-transform: uppercase; }
+        .stat-success { color: #68d391; }
+        .stat-warning { color: #f6ad55; }
+        .stat-danger { color: #fc8181; }
+        .stat-info { color: #63b3ed; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #2d3748; }
+        th { color: #a0aec0; font-weight: 500; font-size: 12px; text-transform: uppercase; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge-danger { background: #fc818133; color: #fc8181; }
+        .badge-warning { background: #f6ad5533; color: #f6ad55; }
+        .badge-success { background: #68d39133; color: #68d391; }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        .btn-primary { background: #3182ce; color: #fff; }
+        .btn-primary:hover { background: #2c5282; }
+        .btn-secondary { background: #4a5568; color: #fff; }
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; margin-bottom: 5px; color: #a0aec0; font-size: 12px; }
+        .form-input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #2d3748; background: #0f1419; color: #e7e9ea; font-size: 14px; }
+        .form-input:focus { outline: none; border-color: #3182ce; }
+        .correlation-cell { padding: 8px; text-align: center; border-radius: 4px; font-weight: 600; }
+        .corr-high { background: #fc818133; color: #fc8181; }
+        .corr-medium { background: #f6ad5533; color: #f6ad55; }
+        .corr-low { background: #68d39133; color: #68d391; }
+        .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 10px; background: #63b3ed33; border: 1px solid #63b3ed66; color: #63b3ed; }
+        .chart { height: 200px; background: #0f1419; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #4a5568; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>🔬 因子分析中心</h1>
+                <div class="subtitle">相关性矩阵 | IC衰减 | 有效性检验 | PCA正交化</div>
+            </div>
+            <div>
+                <button class="btn btn-primary" onclick="refreshAll()">🔄 刷新</button>
+            </div>
+        </div>
+        
+        <!-- Summary Stats -->
+        <div class="grid grid-4">
+            <div class="card">
+                <div class="stat">
+                    <div class="stat-value stat-info" id="n-factors">5</div>
+                    <div class="stat-label">因子数量</div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="stat">
+                    <div class="stat-value stat-warning" id="n-high-corr">--</div>
+                    <div class="stat-label">高相关对数</div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="stat">
+                    <div class="stat-value stat-success" id="n-significant">--</div>
+                    <div class="stat-label">显著因子</div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="stat">
+                    <div class="stat-value" id="optimal-period">--</div>
+                    <div class="stat-label">建议持仓周期</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Correlation Matrix -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">📊 因子相关性矩阵</span>
+                <select class="form-input" style="width: auto;" id="corr-threshold" onchange="loadCorrelation()">
+                    <option value="0.3">低阈值 0.3</option>
+                    <option value="0.5" selected>中阈值 0.5</option>
+                    <option value="0.7">高阈值 0.7</option>
+                </select>
+            </div>
+            <div id="correlation-matrix">
+                <table id="corr-table">
+                    <thead id="corr-thead"></thead>
+                    <tbody id="corr-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- High Correlation Pairs -->
+        <div class="grid grid-2">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">⚠️ 高相关性因子对</span>
+                </div>
+                <div id="high-corr-pairs">
+                    <div class="alert">正在加载...</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">📉 IC衰减分析</span>
+                </div>
+                <div id="ic-analysis">
+                    <div class="grid grid-2" style="gap: 15px;">
+                        <div class="stat">
+                            <div class="stat-value stat-warning" id="decay-rate">--</div>
+                            <div class="stat-label">IC衰减率</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value stat-success" id="optimal-holding">--</div>
+                            <div class="stat-label">最优持仓周期</div>
+                        </div>
+                    </div>
+                    <div id="ic-interpretation" style="margin-top: 15px; color: #a0aec0; font-size: 13px;"></div>
+                    <div class="chart">IC衰减曲线</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Factor Effectiveness -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">✅ 因子有效性检验</span>
+                <button class="btn btn-secondary" onclick="loadEffectiveness()">重新计算</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>因子</th>
+                        <th>平均收益</th>
+                        <th>t统计量</th>
+                        <th>p值</th>
+                        <th>IR</th>
+                        <th>显著性</th>
+                    </tr>
+                </thead>
+                <tbody id="effectiveness-tbody">
+                    <tr><td colspan="6" style="text-align: center; color: #4a5568;">正在加载...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Orthogonalization Tools -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🔄 因子正交化工具</span>
+            </div>
+            <div class="grid grid-3">
+                <div class="form-group">
+                    <label class="form-label">目标因子</label>
+                    <select class="form-input" id="target-factor">
+                        <option value="momentum">动量 (Momentum)</option>
+                        <option value="quality">质量 (Quality)</option>
+                        <option value="value">价值 (Value)</option>
+                        <option value="low_vol">低波动 (Low Vol)</option>
+                        <option value="volume">量价 (Volume)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">参考因子</label>
+                    <select class="form-input" id="ref-factors" multiple>
+                        <option value="quality">质量</option>
+                        <option value="value">价值</option>
+                        <option value="low_vol">低波动</option>
+                        <option value="volume">量价</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">&nbsp;</label>
+                    <button class="btn btn-primary" onclick="orthogonalizeFactor()">执行正交化</button>
+                </div>
+            </div>
+            <div id="orthogonal-result" style="margin-top: 15px;"></div>
+        </div>
+        
+        <!-- PCA Analysis -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">📈 PCA主成分分析</span>
+                <button class="btn btn-secondary" onclick="loadPCA()">分析</button>
+            </div>
+            <div id="pca-result">
+                <div class="grid grid-3">
+                    <div class="stat">
+                        <div class="stat-value stat-info" id="pca-components">3</div>
+                        <div class="stat-label">主成分数</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value stat-success" id="pca-explained">--</div>
+                        <div class="stat-label">累计解释方差</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="pca-reduction">--</div>
+                        <div class="stat-label">维度压缩</div>
+                    </div>
+                </div>
+                <div id="pca-variance" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- Full Report -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">📋 完整因子质量报告</span>
+                <button class="btn btn-primary" onclick="generateReport()">生成报告</button>
+            </div>
+            <div id="quality-report" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAll();
+        });
+        
+        async function loadAll() {
+            await Promise.all([
+                loadCorrelation(),
+                loadHighCorrPairs(),
+                loadICDecay(),
+                loadEffectiveness()
+            ]);
+        }
+        
+        async function loadCorrelation() {
+            try {
+                const res = await fetch('/factor_analysis/api/correlation_matrix');
+                const data = await res.json();
+                
+                const factors = data.factors;
+                const corr = data.correlation_matrix;
+                const threshold = parseFloat(document.getElementById('corr-threshold').value);
+                
+                // Header
+                let thead = '<tr><th>因子</th>';
+                factors.forEach(f => thead += `<th>${f}</th>`);
+                thead += '</tr>';
+                document.getElementById('corr-thead').innerHTML = thead;
+                
+                // Body
+                let tbody = '';
+                factors.forEach(f1 => {
+                    tbody += `<tr><td><strong>${f1}</strong></td>`;
+                    factors.forEach(f2 => {
+                        const val = corr[f1]?.[f2] || 0;
+                        let cls = 'corr-low';
+                        if (Math.abs(val) >= threshold) cls = 'corr-high';
+                        else if (Math.abs(val) >= threshold * 0.7) cls = 'corr-medium';
+                        tbody += `<td><div class="correlation-cell ${cls}">${val.toFixed(2)}</div></td>`;
+                    });
+                    tbody += '</tr>';
+                });
+                document.getElementById('corr-tbody').innerHTML = tbody;
+                
+            } catch (error) {
+                console.error('Error loading correlation:', error);
+            }
+        }
+        
+        async function loadHighCorrPairs() {
+            try {
+                const threshold = parseFloat(document.getElementById('corr-threshold').value);
+                const res = await fetch(`/factor_analysis/api/high_correlation_pairs?threshold=${threshold}`);
+                const data = await res.json();
+                
+                document.getElementById('n-high-corr').textContent = data.n_pairs;
+                
+                if (data.pairs.length === 0) {
+                    document.getElementById('high-corr-pairs').innerHTML = '<div class="alert" style="background: #68d39133; border-color: #68d39166; color: #68d391;">✅ 无高相关性因子对</div>';
+                    return;
+                }
+                
+                let html = '';
+                data.pairs.forEach(pair => {
+                    html += `<div style="padding: 10px; background: #0f1419; border-radius: 6px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>${pair[0]} ↔ ${pair[1]}</span>
+                            <span class="badge badge-danger">${pair[2].toFixed(3)}</span>
+                        </div>
+                        <div style="margin-top: 5px; font-size: 12px; color: #a0aec0;">
+                            建议: ${Math.abs(pair[2]) > 0.7 ? '剔除其中一个因子' : '进行正交化处理'}
+                        </div>
+                    </div>`;
+                });
+                document.getElementById('high-corr-pairs').innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading high corr pairs:', error);
+            }
+        }
+        
+        async function loadICDecay() {
+            try {
+                const res = await fetch('/factor_analysis/api/ic_decay');
+                const data = await res.json();
+                
+                document.getElementById('decay-rate').textContent = (data.decay_rate * 100).toFixed(1) + '%';
+                document.getElementById('optimal-holding').textContent = data.optimal_holding_period + '天';
+                document.getElementById('optimal-period').textContent = data.optimal_holding_period + '天';
+                document.getElementById('ic-interpretation').textContent = data.interpretation;
+                
+            } catch (error) {
+                console.error('Error loading IC decay:', error);
+            }
+        }
+        
+        async function loadEffectiveness() {
+            try {
+                const res = await fetch('/factor_analysis/api/factor_effectiveness');
+                const data = await res.json();
+                
+                let significantCount = 0;
+                let tbody = '';
+                
+                const factorNames = {
+                    'momentum': '动量',
+                    'quality': '质量',
+                    'value': '价值',
+                    'low_vol': '低波动',
+                    'volume': '量价'
+                };
+                
+                for (const [factor, stats] of Object.entries(data)) {
+                    if (stats.is_significant) significantCount++;
+                    
+                    const badge = stats.is_significant 
+                        ? '<span class="badge badge-success">显著</span>' 
+                        : '<span class="badge badge-warning">不显著</span>';
+                    
+                    tbody += `<tr>
+                        <td>${factorNames[factor] || factor} (${factor})</td>
+                        <td>${(stats.mean_return * 100).toFixed(4)}%</td>
+                        <td>${stats.t_statistic.toFixed(2)}</td>
+                        <td>${stats.p_value.toFixed(4)}</td>
+                        <td>${stats.ir.toFixed(2)}</td>
+                        <td>${badge}</td>
+                    </tr>`;
+                }
+                
+                document.getElementById('effectiveness-tbody').innerHTML = tbody;
+                document.getElementById('n-significant').textContent = `${significantCount}/${Object.keys(data).length}`;
+                
+            } catch (error) {
+                console.error('Error loading effectiveness:', error);
+            }
+        }
+        
+        async function orthogonalizeFactor() {
+            const target = document.getElementById('target-factor').value;
+            const refSelect = document.getElementById('ref-factors');
+            const references = Array.from(refSelect.selectedOptions).map(o => o.value);
+            
+            if (references.length === 0) {
+                alert('请选择参考因子');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/factor_analysis/api/orthogonalize', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({target_factor: target, reference_factors: references})
+                });
+                const data = await res.json();
+                
+                if (data.status === 'ok') {
+                    document.getElementById('orthogonal-result').innerHTML = `
+                        <div class="alert" style="background: #68d39133; border-color: #68d39166; color: #68d391;">
+                            ✅ ${data.summary}<br>
+                            <small>前20个收益值: ${data.orthogonal_returns.slice(0, 5).join(', ')}...</small>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('orthogonal-result').innerHTML = `<div class="alert">❌ ${data.message}</div>`;
+                }
+                
+            } catch (error) {
+                console.error('Error orthogonalizing:', error);
+            }
+        }
+        
+        async function loadPCA() {
+            try {
+                const res = await fetch('/factor_analysis/api/pca_orthogonalize');
+                const data = await res.json();
+                
+                document.getElementById('pca-explained').textContent = (data.total_explained * 100).toFixed(1) + '%';
+                document.getElementById('pca-reduction').textContent = `${data.n_components}/${5}`;
+                
+                let varianceHtml = '<div style="margin-top: 15px;">';
+                data.explained_variance.forEach((v, i) => {
+                    varianceHtml += `<div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <span style="width: 60px;">PC${i+1}</span>
+                        <div style="flex: 1; height: 20px; background: #2d3748; border-radius: 4px;">
+                            <div style="width: ${v*100}%; height: 100%; background: linear-gradient(90deg, #63b3ed, #3182ce); border-radius: 4px;"></div>
+                        </div>
+                        <span style="margin-left: 10px; width: 50px;">${(v*100).toFixed(1)}%</span>
+                    </div>`;
+                });
+                varianceHtml += '</div>';
+                document.getElementById('pca-variance').innerHTML = varianceHtml;
+                
+            } catch (error) {
+                console.error('Error loading PCA:', error);
+            }
+        }
+        
+        async function generateReport() {
+            try {
+                const res = await fetch('/factor_analysis/api/factor_quality_report');
+                const data = await res.json();
+                
+                const recommendations = data.overall_assessment.recommendation.split('\n').filter(r => r.trim());
+                
+                let html = `
+                    <div class="alert" style="background: ${data.overall_assessment.has_correlation_issue ? '#f6ad5533' : '#68d39133'}; border-color: ${data.overall_assessment.has_correlation_issue ? '#f6ad5566' : '#68d39166'}; color: ${data.overall_assessment.has_correlation_issue ? '#f6ad55' : '#68d391'};">
+                        <strong>评估时间:</strong> ${data.generated_at}<br>
+                        <strong>显著因子:</strong> ${data.overall_assessment.n_significant}/${data.n_factors}<br>
+                        <strong>高相关对:</strong> ${data.correlation_analysis.n_high_corr_pairs}
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <strong>建议:</strong>
+                        <ul style="margin-top: 10px; padding-left: 20px;">
+                            ${recommendations.map(r => `<li style="margin-bottom: 5px;">${r}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+                
+                document.getElementById('quality-report').innerHTML = html;
+                document.getElementById('quality-report').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error generating report:', error);
+            }
+        }
+        
+        function refreshAll() {
+            loadAll();
+        }
+    </script>
+</body>
+</html>
