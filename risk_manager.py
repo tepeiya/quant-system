@@ -86,7 +86,7 @@ class PositionRisk:
         if total == 0:
             return True, "ok"
         pct = current / total * 100
-        if pct >= self.MAX_SECTOR_PCT / 100:
+        if pct >= self.MAX_SECTOR_PCT:
             return False, f"行业 {sector} 仓位 {pct:.0f}% 已达上限 {self.MAX_SECTOR_PCT:.0f}%"
         return True, "ok"
 
@@ -155,7 +155,7 @@ class PositionRisk:
             (ok: bool, msg: str)
         """
         symbol = signal_info.get("symbol", "")
-        sector = signal_info.get("sector", signal_info.get("sector", ""))
+        sector = signal_info.get("sector", "")
         position_value = signal_info.get("position_value", 0)
         entry_price = signal_info.get("entry_price", 0)
         total_equity = signal_info.get("total_equity", 0)

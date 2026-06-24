@@ -31,6 +31,7 @@ TRAILING_MIN = get_cfg("trailing_stop_min_pct", 8)
 def get_atr(symbol: str) -> float:
     """从本地缓存读取股票的ATR值"""
     try:
+        import pandas as pd
         from data_prod import load_price_cache
         cache = load_price_cache()
         df = cache.get(symbol)

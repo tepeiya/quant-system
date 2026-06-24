@@ -139,7 +139,7 @@ def write_message(strategy: str, msg_type: str, payload: dict, date: str = None)
     # 美东夏令时 = UTC-4, 北京=UTC+8 → 时差12小时
     # 美东9:30-16:00 = 北京时间21:30-04:00
     et_h = (h - 12) % 24  # 粗略转美东
-    if 9.5 <= et_h <= 16:
+    if 9.5 <= et_h < 16:
         market_hour = "regular"
     elif 4 <= et_h < 9.5:
         market_hour = "premarket"

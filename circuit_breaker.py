@@ -120,7 +120,20 @@ class CircuitBreaker:
 
     def is_tripped(self) -> bool:
         """是否处于熔断状态"""
-        return self.check(0, 0).get("should_stop", False)
+        if not self.breakers.get("tripped"):
+            return False
+        tripped_at = self.breakers.get("tripped_at")
+        if tripped_at:
+            try:
+                from system_config import get as get_cfg
+                cool_down = get_cfg("circuit_cooldown_hours", 24)
+                cooldown_end = datetime.fromisoformat(tripped_at) + timedelta(hours=cool_down)
+                if datetime.now() >= cooldown_end:
+                    self.reset()
+                    return False
+            except:
+                pass
+        return True
 
 
 if __name__ == "__main__":
