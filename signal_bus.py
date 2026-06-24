@@ -71,8 +71,23 @@ BUS_DB = os.path.join(BUS_DIR, "data", "signal_bus.db")
 def init_db():
     """创建消息总线表"""
     os.makedirs(os.path.dirname(BUS_DB), exist_ok=True)
-    conn = sqlite3.connect(BUS_DB)
-    c = conn.cursor()
+    try:
+        conn = sqlite3.connect(BUS_DB)
+        c = conn.cursor()
+    except sqlite3.DatabaseError:
+        # 数据库文件损坏，删除并重建
+        import shutil
+        backup = BUS_DB + ".corrupted"
+        try:
+            shutil.move(BUS_DB, backup)
+        except:
+            pass
+        try:
+            os.remove(BUS_DB)
+        except:
+            pass
+        conn = sqlite3.connect(BUS_DB)
+        c = conn.cursor()
 
     # 消息队列 — 各策略写入信号，执行器读取消费
     c.execute("""
