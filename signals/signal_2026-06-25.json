@@ -1,0 +1,193 @@
+{
+  "date": "2026-06-25",
+  "market": {
+    "spy": 163.83700000000002,
+    "rsi": 23.328052896204866,
+    "trend": "\u26aa \u9707\u8361",
+    "action": "\u90e8\u5206\u4ed3\u4f4d"
+  },
+  "top_scores": [
+    {
+      "ticker": "ADI",
+      "score": 55.9,
+      "price": 413.16,
+      "mom": 78.9,
+      "quality": 8.1,
+      "volume": 0,
+      "value_lv": 5.8,
+      "rsi": 43.0,
+      "atr": 4.9,
+      "enhance_score": 0.39
+    },
+    {
+      "ticker": "ABBV",
+      "score": 45.1,
+      "price": 234.89,
+      "mom": 27.8,
+      "quality": 7.9,
+      "volume": 3.6,
+      "value_lv": 7.6,
+      "rsi": 67.0,
+      "atr": 2.6,
+      "enhance_score": 0.33
+    },
+    {
+      "ticker": "AIZ",
+      "score": 43.5,
+      "price": 263.82,
+      "mom": 32.1,
+      "quality": 8.5,
+      "volume": 0,
+      "value_lv": 7.6,
+      "rsi": 70.0,
+      "atr": 2.1,
+      "enhance_score": 0.35
+    },
+    {
+      "ticker": "AEP",
+      "score": 34.6,
+      "price": 134.96,
+      "mom": 30.6,
+      "quality": 9.1,
+      "volume": 0,
+      "value_lv": 7.6,
+      "rsi": 75.0,
+      "atr": 1.8,
+      "enhance_score": 0.22
+    },
+    {
+      "ticker": "AEE",
+      "score": 28.3,
+      "price": 113.32,
+      "mom": 18.0,
+      "quality": 7.9,
+      "volume": 0,
+      "value_lv": 7.6,
+      "rsi": 72.0,
+      "atr": 1.9,
+      "enhance_score": 0.19
+    },
+    {
+      "ticker": "ABNB",
+      "score": 23.7,
+      "price": 144.4,
+      "mom": 10.6,
+      "quality": 4.7,
+      "volume": 0,
+      "value_lv": 7.6,
+      "rsi": 68.0,
+      "atr": 3.1,
+      "enhance_score": 0.19
+    },
+    {
+      "ticker": "AAPL",
+      "score": 21.6,
+      "price": 293.08,
+      "mom": 45.4,
+      "quality": 8.4,
+      "volume": 0,
+      "value_lv": 7.6,
+      "rsi": 33.0,
+      "atr": 2.7,
+      "enhance_score": -0.14
+    },
+    {
+      "ticker": "A",
+      "score": 18.5,
+      "price": 131.63,
+      "mom": 13.3,
+      "quality": 5.0,
+      "volume": 0,
+      "value_lv": 7.6,
+      "rsi": 41.0,
+      "atr": 2.9,
+      "enhance_score": -0.0
+    },
+    {
+      "ticker": "AFL",
+      "score": 17.4,
+      "price": 117.75,
+      "mom": 12.3,
+      "quality": 9.0,
+      "volume": 0,
+      "value_lv": 10.0,
+      "rsi": 59.0,
+      "atr": 2.0,
+      "enhance_score": -0.11
+    },
+    {
+      "ticker": "AES",
+      "score": 13.8,
+      "price": 14.68,
+      "mom": 44.6,
+      "quality": 4.3,
+      "volume": 0,
+      "value_lv": 10.0,
+      "rsi": 47.0,
+      "atr": 0.4,
+      "enhance_score": -0.33
+    }
+  ],
+  "buy_candidates": [
+    {
+      "ticker": "ADI",
+      "score": 55.9,
+      "price": 413.16,
+      "mom": 78.9,
+      "quality": 8.1,
+      "volume": 0,
+      "value_lv": 5.8,
+      "rsi": 43.0,
+      "atr": 4.9,
+      "enhance_score": 0.39
+    },
+    {
+      "ticker": "ABBV",
+      "score": 45.1,
+      "price": 234.89,
+      "mom": 27.8,
+      "quality": 7.9,
+      "volume": 3.6,
+      "value_lv": 7.6,
+      "rsi": 67.0,
+      "atr": 2.6,
+      "enhance_score": 0.33
+    },
+    {
+      "ticker": "AIZ",
+      "score": 43.5,
+      "price": 263.82,
+      "mom": 32.1,
+      "quality": 8.5,
+      "volume": 0,
+      "value_lv": 7.6,
+      "rsi": 70.0,
+      "atr": 2.1,
+      "enhance_score": 0.35
+    },
+    {
+      "ticker": "AEP",
+      "score": 34.6,
+      "price": 134.96,
+      "mom": 30.6,
+      "quality": 9.1,
+      "volume": 0,
+      "value_lv": 7.6,
+      "rsi": 75.0,
+      "atr": 1.8,
+      "enhance_score": 0.22
+    },
+    {
+      "ticker": "AEE",
+      "score": 28.3,
+      "price": 113.32,
+      "mom": 18.0,
+      "quality": 7.9,
+      "volume": 0,
+      "value_lv": 7.6,
+      "rsi": 72.0,
+      "atr": 1.9,
+      "enhance_score": 0.19
+    }
+  ]
+}
