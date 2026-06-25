@@ -2,10 +2,11 @@
 运维中心 - Blueprint
 一键操作：数据预热、回测、信号生成、因子进化、健康检查
 """
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, jsonify, render_template, request
 import os, sys, logging, subprocess, json, threading
 from datetime import datetime
 from api_response import ok, err
+from security import csrf_protect
 
 logger = logging.getLogger("quant.ops")
 bp = Blueprint("ops", __name__, url_prefix="/ops")
@@ -78,6 +79,7 @@ def api_status():
 
 
 @bp.route("/api/daemon_start", methods=["POST"])
+@csrf_protect
 def api_daemon_start():
     running, pid = _check_daemon()
     if running:
@@ -96,6 +98,7 @@ def api_daemon_start():
 
 
 @bp.route("/api/daemon_stop", methods=["POST"])
+@csrf_protect
 def api_daemon_stop():
     running, pid = _check_daemon()
     if not running:
@@ -106,19 +109,24 @@ def api_daemon_stop():
             __import__("time").sleep(1)
             running, _ = _check_daemon()
             if not running:
-                if os.path.exists(DAEMON_PID_FILE):
-                    os.remove(DAEMON_PID_FILE)
+                for pf in DAEMON_PID_FILES:
+                    if os.path.exists(pf):
+                        try: os.remove(pf)
+                        except: pass
                 return ok(message="守护进程已停止")
         os.kill(pid, 9)  # SIGKILL
         __import__("time").sleep(1)
-        if os.path.exists(DAEMON_PID_FILE):
-            os.remove(DAEMON_PID_FILE)
+        for pf in DAEMON_PID_FILES:
+            if os.path.exists(pf):
+                try: os.remove(pf)
+                except: pass
         return ok(message="守护进程已强制停止")
     except Exception as e:
         return err(f"停止失败: {str(e)}")
 
 
 @bp.route("/api/refresh_now", methods=["POST"])
+@csrf_protect
 def api_refresh_now():
     def task():
         from data_prod import refresh_cache
@@ -133,6 +141,7 @@ def api_refresh_now():
 
 
 @bp.route("/api/data_warmup", methods=["POST"])
+@csrf_protect
 def api_data_warmup():
     def task():
         from warmup_data import warmup
@@ -145,6 +154,7 @@ def api_data_warmup():
 
 
 @bp.route("/api/run_backtest", methods=["POST"])
+@csrf_protect
 def api_run_backtest():
     def task():
         import subprocess, time
@@ -165,6 +175,7 @@ def api_run_backtest():
 
 
 @bp.route("/api/run_event_backtest", methods=["POST"])
+@csrf_protect
 def api_run_event_backtest():
     """事件驱动回测（更真实的逐日模拟）"""
     def task():
@@ -217,6 +228,7 @@ def api_run_event_backtest():
 
 
 @bp.route("/api/run_signal", methods=["POST"])
+@csrf_protect
 def api_run_signal():
     def task():
         r = subprocess.run([sys.executable, "daily_signal.py"],
@@ -228,6 +240,7 @@ def api_run_signal():
 
 
 @bp.route("/api/evolve_factors", methods=["POST"])
+@csrf_protect
 def api_evolve_factors():
     def task():
         r = subprocess.run([sys.executable, "factor_learner.py"],
@@ -239,6 +252,7 @@ def api_evolve_factors():
 
 
 @bp.route("/api/run_weekly", methods=["POST"])
+@csrf_protect
 def api_run_weekly():
     def task():
         r = subprocess.run([sys.executable, "weekly_report.py"],
@@ -250,6 +264,7 @@ def api_run_weekly():
 
 
 @bp.route("/api/export_report", methods=["POST"])
+@csrf_protect
 def api_export_report():
     def task():
         r = subprocess.run([sys.executable, "backtest_report.py"],
@@ -261,26 +276,36 @@ def api_export_report():
 
 
 @bp.route("/api/intraday_scan", methods=["POST"])
+@csrf_protect
 def api_intraday_scan():
     def task():
-        subprocess.run([sys.executable, "intraday.py", "--scan"],
-            capture_output=True, timeout=60, env={**os.environ})
-        subprocess.run([sys.executable, "intraday_trader.py", "--auto"],
-            capture_output=True, timeout=60, env={**os.environ})
+        r1 = subprocess.run([sys.executable, "intraday.py", "--scan"],
+            capture_output=True, text=True, timeout=60, env={**os.environ})
+        r2 = subprocess.run([sys.executable, "intraday_trader.py", "--auto"],
+            capture_output=True, text=True, timeout=60, env={**os.environ})
+        with open("/tmp/intraday_scan_last.txt", "w") as f:
+            f.write("=== 日内扫描 ===\n")
+            f.write(r1.stdout + "\n" + r1.stderr)
+            f.write("\n\n=== 日内交易执行 ===\n")
+            f.write(r2.stdout + "\n" + r2.stderr)
     _run_bg(task, "intraday_scan")
     return ok(message="日内扫描已开始")
 
 
 @bp.route("/api/intraday_close", methods=["POST"])
+@csrf_protect
 def api_intraday_close():
     def task():
-        subprocess.run([sys.executable, "intraday_trader.py", "--close-all"],
-            capture_output=True, timeout=30, env={**os.environ})
+        r = subprocess.run([sys.executable, "intraday_trader.py", "--close-all"],
+            capture_output=True, text=True, timeout=30, env={**os.environ})
+        with open("/tmp/intraday_close_last.txt", "w") as f:
+            f.write(r.stdout + "\n" + r.stderr)
     _run_bg(task, "intraday_close")
     return ok(message="日内清仓指令已发送")
 
 
 @bp.route("/api/risk_check", methods=["POST"])
+@csrf_protect
 def api_risk_check():
     """执行风控检查 — 止损+熔断+仓位"""
     def task():
@@ -371,6 +396,7 @@ def api_risk_check_log():
 
 
 @bp.route("/api/git_pull", methods=["POST"])
+@csrf_protect
 def api_git_pull():
     """从 GitHub 拉取最新代码并重启 daemon"""
     def task():
@@ -420,6 +446,8 @@ def api_log(task_name):
         "daemon": "logs/daemon_web_start.log",
         "event_backtest": "/tmp/event_backtest_last.txt",
         "data_warmup": "/tmp/data_warmup_result.txt",
+        "intraday_scan": "/tmp/intraday_scan_last.txt",
+        "intraday_close": "/tmp/intraday_close_last.txt",
     }
     path = paths.get(task_name)
     if path and os.path.exists(path):

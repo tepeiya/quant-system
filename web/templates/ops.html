@@ -71,6 +71,7 @@ const TASKS = [
     {id:'run_event_backtest',name:'🎯 事件驱动回测',desc:'逐日模拟·含滑点佣金'},
     {id:'data_warmup',name:'📥 数据预热',desc:'下载全部股票历史数据'},
     {id:'evolve_factors',name:'🧬 因子进化',desc:'自动调整因子权重'},
+    {id:'run_weekly',name:'📰 生成周报',desc:'生成每周投资报告'},
     {id:'export_report',name:'📄 导出回测报告',desc:'生成SPY对比报告'},
     {id:'git_pull',name:'⬇️ 从GitHub更新',desc:'拉取最新代码并重启'},
 ];
@@ -92,7 +93,7 @@ async function loadStatus() {
         const list = document.getElementById('taskList');
         list.innerHTML = TASKS.map(t => {
             const st = (last&&last[t.id])||{}, isRunning = running && current === t.id;
-            let stText = '等待运行', stCls = 'status-idle', btnOff = running;
+            let stText = '等待运行', stCls = 'status-idle', btnOff = isRunning;
             if (t.id === 'daemon_start') {
                 if (daemon.running) { stText = '✅ 运行中'; stCls = 'status-ok'; btnOff = true; }
             } else if (t.id === 'daemon_stop') {
@@ -130,12 +131,22 @@ async function runTask(id) {
 }
 
 async function showLog(id) {
-    const map={daemon_start:'daemon',daemon_stop:'daemon',refresh_now:'refresh',data_warmup:'data_warmup',run_backtest:'backtest',run_signal:'signal',evolve_factors:'evolve',export_report:'export',run_event_backtest:'event_backtest'};
+    const map={daemon_start:'daemon',daemon_stop:'daemon',refresh_now:'refresh',data_warmup:'data_warmup',run_backtest:'backtest',run_signal:'signal',evolve_factors:'evolve',export_report:'export',run_event_backtest:'event_backtest',intraday_scan:'intraday_scan',intraday_close:'intraday_close',risk_check:'risk_check',git_pull:'git_pull',run_weekly:'weekly'};
     const key=map[id]||id, task=TASKS.find(t=>t.id===id);
     document.getElementById('logPanel').style.display='block';
     document.getElementById('logTitle').textContent=(task?task.name:id)+' — 日志';
     document.getElementById('logContent').textContent='加载中...';
-    try { const d=await apiFetch('/ops/api/log/'+key); document.getElementById('logContent').textContent=(d.data&&d.data.log)||'(暂无日志)'; }
+    try {
+        let d;
+        if (id === 'risk_check') {
+            d = await apiFetch('/ops/api/risk_check_log');
+        } else if (id === 'git_pull') {
+            d = await apiFetch('/ops/api/git_pull_log');
+        } else {
+            d = await apiFetch('/ops/api/log/'+key);
+        }
+        document.getElementById('logContent').textContent=(d.data&&d.data.log)||'(暂无日志)';
+    }
     catch(e) { document.getElementById('logContent').textContent='获取失败: '+e.message; }
 }
 function closeLog(){document.getElementById('logPanel').style.display='none';}
