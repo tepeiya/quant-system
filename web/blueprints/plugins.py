@@ -2,10 +2,14 @@
 插件管理 - Blueprint
 策略插件的Web管理面板
 """
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, jsonify, render_template, request
 from api_response import ok, err
 from security import csrf_protect
-import json, os, sys, signal_bus
+import json, os, signal_bus
+
+# 统一导入（项目根目录已在 sys.path 中）
+from plugin_loader import get_loader, run_all
+from strategy_broker import get_mapping_with_broker_names, set_broker_for_strategy
 
 bp = Blueprint("plugins", __name__, url_prefix="/plugins")
 
@@ -18,8 +22,6 @@ def plugins_page():
 @bp.route("/api/list")
 def api_list():
     """列出所有已加载的插件"""
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-    from plugin_loader import get_loader
     loader = get_loader()
     plugins = loader.get_all_plugins()
     result = []
@@ -32,8 +34,6 @@ def api_list():
 @bp.route("/api/discover")
 def api_discover():
     """扫描发现所有插件目录"""
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-    from plugin_loader import get_loader
     loader = get_loader()
     names = loader.discover()
     loaded_names = [p.name for p in loader.get_all_plugins()]
@@ -58,8 +58,6 @@ def api_discover():
 @csrf_protect
 def api_run(plugin_name):
     """手动执行单个插件"""
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-    from plugin_loader import get_loader
     loader = get_loader()
     plugin = loader.get_plugin(plugin_name)
     if not plugin:
@@ -76,8 +74,6 @@ def api_run(plugin_name):
 @csrf_protect
 def api_run_all():
     """执行所有已启用的插件"""
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-    from plugin_loader import get_loader, run_all
     results = run_all()
     total = sum(len(v) for v in results.values())
     return jsonify({"status": "ok", "results": results, "total": total})
@@ -86,8 +82,6 @@ def api_run_all():
 @bp.route("/api/status")
 def api_status():
     """插件系统状态"""
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-    from plugin_loader import get_loader
     loader = get_loader()
     plugins = loader.get_all_plugins()
     bus = signal_bus.get_bus_status()
@@ -100,7 +94,7 @@ def api_status():
             with open(daemon_file) as f:
                 ds = json.load(f)
                 daemon_status = ds.get("last_cycle", "unknown")
-        except:
+        except Exception:
             pass
 
     return jsonify({
@@ -115,8 +109,6 @@ def api_status():
 @bp.route("/api/broker_mapping")
 def api_broker_mapping():
     """获取策略-券商映射列表"""
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-    from strategy_broker import get_mapping_with_broker_names
     return jsonify(get_mapping_with_broker_names())
 
 
@@ -124,12 +116,10 @@ def api_broker_mapping():
 @csrf_protect
 def api_set_broker():
     """设置策略绑定的券商"""
-    data = __import__("flask").request.json or {}
+    data = request.json or {}
     strategy = data.get("strategy", "")
     broker_id = data.get("broker_id", "")
     if not strategy or not broker_id:
         return err("参数不完整")
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-    from strategy_broker import set_broker_for_strategy
     set_broker_for_strategy(strategy, broker_id)
     return ok(message=f"✅ {strategy} → {broker_id}")

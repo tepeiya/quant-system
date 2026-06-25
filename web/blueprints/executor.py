@@ -7,6 +7,9 @@ from api_response import ok, err
 from security import csrf_protect
 import json, os, signal_bus
 
+# 统一导入
+from trade_executor import TradeExecutor
+
 bp = Blueprint("executor", __name__, url_prefix="/executor")
 
 
@@ -32,10 +35,7 @@ def api_status():
 @csrf_protect
 def api_run_once():
     """手动执行一次"""
-    import sys
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     try:
-        from trade_executor import TradeExecutor
         ex = TradeExecutor()
         results = ex.run_once(dry_run=False)
         return jsonify({"status": "ok", "results": results})
@@ -47,10 +47,7 @@ def api_run_once():
 @csrf_protect
 def api_dry_run():
     """模拟执行一次"""
-    import sys
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     try:
-        from trade_executor import TradeExecutor
         ex = TradeExecutor()
         results = ex.run_once(dry_run=True)
         return jsonify({"status": "ok", "results": results})

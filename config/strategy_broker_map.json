@@ -1,5 +1,6 @@
 {
   "conservative": "alpaca_paper",
   "momentum": "alpaca_paper",
-  "intraday": "alpaca_paper_intraday"
+  "intraday": "alpaca_paper_intraday",
+  "test_strategy": "test_broker"
 }

@@ -64,6 +64,15 @@ try:
 except Exception as e:
     logger.warning(f"⚠️ 数据库初始化失败（功能可能受限）: {e}")
 
+# ====== 插件系统预初始化 ======
+try:
+    from plugin_loader import get_loader
+    # 预加载所有插件，避免第一个请求延迟
+    loader = get_loader()
+    logger.info(f"✅ 插件系统预初始化完成，已加载 {len(loader.get_all_plugins())} 个插件")
+except Exception as e:
+    logger.warning(f"⚠️ 插件系统初始化失败: {e}")
+
 
 def login_required(f):
     """未登录则跳转登录页"""

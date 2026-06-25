@@ -1,9 +1,0 @@
-{
-  "admin": {
-    "password": "$2b$12$j9VSLUOt.CWO5D8mv7P/2uUgbQXGuztpG.yYeoRjNAu5jIQp6SsH6",
-    "role": "user",
-    "created": "2026-06-25 04:12:49.987664",
-    "last_login": null,
-    "broker": "alpaca_paper"
-  }
-}

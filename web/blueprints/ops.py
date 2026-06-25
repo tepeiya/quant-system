@@ -35,8 +35,8 @@ def _check_daemon():
             logger.warning(f"daemon PID {pid} 进程不存在，清理 PID 文件")
             try:
                 os.remove(pid_file)
-            except:
-                pass
+            except OSError as e:
+                logger.debug(f"无法删除 PID 文件: {e}")
             continue
         except Exception as e:
             logger.warning(f"daemon 状态检查异常: {e}")
@@ -111,15 +111,19 @@ def api_daemon_stop():
             if not running:
                 for pf in DAEMON_PID_FILES:
                     if os.path.exists(pf):
-                        try: os.remove(pf)
-                        except: pass
+                        try:
+                            os.remove(pf)
+                        except OSError as e:
+                            logger.debug(f"无法删除 PID 文件 {pf}: {e}")
                 return ok(message="守护进程已停止")
         os.kill(pid, 9)  # SIGKILL
         __import__("time").sleep(1)
         for pf in DAEMON_PID_FILES:
             if os.path.exists(pf):
-                try: os.remove(pf)
-                except: pass
+                try:
+                    os.remove(pf)
+                except OSError as e:
+                    logger.debug(f"无法删除 PID 文件 {pf}: {e}")
         return ok(message="守护进程已强制停止")
     except Exception as e:
         return err(f"停止失败: {str(e)}")
@@ -357,8 +361,8 @@ def api_risk_check():
                 circuits = rm.check_circuit(daily_pnl_pct, [], 0)
                 report["circuits"] = circuits
                 report["daily_pnl_pct"] = round(daily_pnl_pct, 2)
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"熔断检查失败: {e}")
 
             # 3. 仓位统计
             try:
@@ -366,8 +370,8 @@ def api_risk_check():
                 report["position_count"] = len(positions)
                 total_mv = sum(float(p.market_value) for p in positions)
                 report["total_exposure"] = round(total_mv, 2)
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"仓位统计失败: {e}")
 
             # 保存报告
             os.makedirs("config", exist_ok=True)
@@ -497,7 +501,7 @@ def api_event_backtest_result():
             raw = f.read()
         try:
             data = json.loads(raw)
-        except:
+            return ok(data)
+        except json.JSONDecodeError:
             return ok({"log": raw})
-        return ok(data)
     return ok({})

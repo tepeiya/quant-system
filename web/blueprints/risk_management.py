@@ -83,8 +83,6 @@ def get_trades_from_db(username: str = "default", days: int = 90):
     """从数据库获取真实交易记录"""
     try:
         from database import db, Trade
-        import sys, os
-        sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
         
         database = db
         session = database.get_session()

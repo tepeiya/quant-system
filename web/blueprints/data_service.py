@@ -1,11 +1,16 @@
 """
 数据服务看板 - Blueprint
 """
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, jsonify, render_template, request
 from api_response import ok, err
 from security import csrf_protect
-import sys, os, signal_bus, threading, json, time
+import signal_bus, threading, json, time
 from datetime import datetime
+
+# 使用别名导入，避免与根目录 data_service.py 冲突
+import data_service as ds
+from warmup_data import warmup
+from data_prod import get_tickers, load_price_cache
 
 bp = Blueprint("data_service", __name__, url_prefix="/data")
 
@@ -33,14 +38,9 @@ def _run_warmup_bg(full):
     _progress["status"] = "running"
     _progress["error"] = None
 
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-
     try:
         if full:
             # 全量：循环预热直到所有股票补完
-            from warmup_data import warmup
-            from data_prod import get_tickers, load_price_cache
-
             all_t = get_tickers()
             total_need = len(all_t)
             _progress["type"] = "全量预热"
@@ -68,8 +68,7 @@ def _run_warmup_bg(full):
             # 增量：只刷新最近数据
             _progress["type"] = "增量更新"
             _add_log("📥 开始增量更新...")
-            from data_service import run_update
-            result = run_update(full=False)
+            result = ds.run_update(full=False)
             if result:
                 _add_log("✅ 增量更新完成")
             else:
@@ -98,9 +97,7 @@ def data_page():
 
 @bp.route("/api/health")
 def api_health():
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-    from data_service import check_health
-    return jsonify(check_health())
+    return jsonify(ds.check_health())
 
 
 @bp.route("/api/update", methods=["POST"])
@@ -111,7 +108,7 @@ def api_update():
     if _progress["running"]:
         return err("已有更新任务正在运行")
 
-    data = __import__("flask").request.json or {}
+    data = request.json or {}
     full = data.get("full", False)
 
     t = threading.Thread(target=_run_warmup_bg, args=(full,), daemon=True)

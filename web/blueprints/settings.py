@@ -1,13 +1,11 @@
 """
 设置 - Blueprint
 """
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, jsonify, render_template, request
 from api_response import ok, err
 import numpy as np
 
-# 集成配置数据库持久化
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# 统一导入（项目根目录已在 sys.path 中）
 import config_db
 config_db.ensure_initialized()
 
