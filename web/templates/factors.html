@@ -1,94 +1,468 @@
 {% extends "base.html" %}
-{% block title %}因子 - 量化系统{% endblock %}
+{% block title %}因子中心 - 量化系统{% endblock %}
 {% block content %}
 
-<div class="row-2">
-    <div class="panel">
-        <h2>🧬 因子权重配置</h2>
-        <div style="margin-bottom:12px;">
-            <label style="font-size:13px;color:#8b949e;">动量权重 <span id="momVal">55</span>%</label>
-            <input type="range" id="momSlider" min="10" max="70" value="55"
-                   style="width:100%;margin:6px 0;" oninput="updateSliders()">
-            <div style="font-size:10px;color:#484f58;">最近IC: <span id="momIc">-</span></div>
-        </div>
-        <div style="margin-bottom:12px;">
-            <label style="font-size:13px;color:#8b949e;">质量权重 <span id="qualVal">25</span>%</label>
-            <input type="range" id="qualSlider" min="10" max="70" value="25"
-                   style="width:100%;margin:6px 0;" oninput="updateSliders()">
-            <div style="font-size:10px;color:#484f58;">最近IC: <span id="qualIc">-</span></div>
-        </div>
-        <div style="margin-bottom:12px;">
-            <label style="font-size:13px;color:#8b949e;">趋势权重 <span id="trendVal">20</span>%</label>
-            <input type="range" id="trendSlider" min="10" max="70" value="20"
-                   style="width:100%;margin:6px 0;" oninput="updateSliders()">
-            <div style="font-size:10px;color:#484f58;">最近IC: <span id="trendIc">-</span></div>
-        </div>
-        <div style="margin-bottom:12px;">
-            <label style="font-size:13px;color:#8b949e;">价值权重 <span id="valVal">8</span>%</label>
-            <input type="range" id="valSlider" min="5" max="30" value="8"
-                   style="width:100%;margin:6px 0;" oninput="updateSliders()">
-            <div style="font-size:10px;color:#484f58;">最近IC: <span id="valIc">-</span></div>
-        </div>
-        <div style="margin-bottom:12px;">
-            <label style="font-size:13px;color:#8b949e;">低波权重 <span id="lvVal">7</span>%</label>
-            <input type="range" id="lvSlider" min="5" max="30" value="7"
-                   style="width:100%;margin:6px 0;" oninput="updateSliders()">
-            <div style="font-size:10px;color:#484f58;">最近IC: <span id="lvIc">-</span></div>
-        </div>
-        <div class="flex flex-wrap" style="gap:6px;">
-            <span style="font-size:13px;color:#8b949e;">总和: <span id="totalWeight">100</span>%</span>
-            <button class="btn primary" onclick="saveWeights()">💾 保存</button>
-            <button class="btn" id="btnEvolve" onclick="runEvolution()">🧠 自动进化</button>
-        </div>
-        <div id="weightResult" style="margin-top:8px;font-size:12px;"></div>
-    </div>
-    <div class="panel">
-        <div class="flex-between mb-8">
-            <h2>📈 因子IC历史</h2>
-            <button class="btn" onclick="loadIC()">🔄 刷新</button>
-        </div>
-        <canvas id="icChart" height="180"></canvas>
-        <div id="icNote" style="margin-top:8px;font-size:12px;color:#8b949e;"></div>
-    </div>
-</div>
-
-<!-- 进化历史 -->
-<div class="panel">
-    <div class="flex-between mb-8">
-        <h2>📊 进化历史</h2>
-        <span id="evolutionCount" style="font-size:11px;color:#8b949e;"></span>
-    </div>
-    <div class="table-wrapper">
-    <table>
-        <thead>
-            <tr><th>#</th><th>时间</th><th>动量</th><th>质量</th><th>趋势</th><th>价值</th><th>低波</th><th>IC动量</th><th>IC质量</th><th>IC趋势</th></tr>
-        </thead>
-        <tbody id="evolutionBody"></tbody>
-    </table>
-    </div>
-</div>
-
-<!-- 因子排名 -->
-<div class="panel">
-    <div class="flex-between mb-8">
-        <h2>🧬 因子排名</h2>
-        <div style="display:flex;gap:6px;">
-            <button class="btn" onclick="loadRanking()" style="font-size:11px;padding:4px 8px;">🔄 刷新</button>
-            <button class="btn primary" onclick="runRanking()" style="font-size:11px;padding:4px 8px;">⚡ 重新计算</button>
-        </div>
-    </div>
-    <div id="rankingContent" style="font-size:12px;color:#8b949e;">点击刷新加载因子排名...</div>
-</div>
-
 <style>
-.factor-row { display:flex;align-items:center;padding:5px 6px;border-bottom:1px solid #21262d;font-size:12px; }
-.factor-row:hover { background:#161b22; }
-.factor-bar { height:5px;border-radius:3px;margin-left:6px; }
+    .tab-nav {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #30363d;
+        padding-bottom: 0;
+        overflow-x: auto;
+    }
+    .tab-btn {
+        padding: 10px 20px;
+        border: none;
+        background: transparent;
+        color: #8b949e;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        white-space: nowrap;
+        font-size: 14px;
+        transition: all 0.2s;
+    }
+    .tab-btn:hover {
+        color: #e6edf3;
+        background: rgba(255,255,255,0.05);
+    }
+    .tab-btn.active {
+        color: #58a6ff;
+        border-bottom-color: #58a6ff;
+    }
+    .tab-content {
+        display: none;
+    }
+    .tab-content.active {
+        display: block;
+    }
+    
+    .factor-card {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #30363d;
+    }
+    .card-title { font-size: 16px; font-weight: 600; color: #e6edf3; }
+    
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    
+    .stat { text-align: center; padding: 15px; }
+    .stat-value { font-size: 28px; font-weight: 700; margin-bottom: 5px; }
+    .stat-label { font-size: 12px; color: #8b949e; text-transform: uppercase; }
+    .stat-success { color: #3fb950; }
+    .stat-warning { color: #d29922; }
+    .stat-danger { color: #f85149; }
+    .stat-info { color: #58a6ff; }
+    
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #30363d; }
+    th { color: #8b949e; font-weight: 500; font-size: 12px; text-transform: uppercase; }
+    td { color: #e6edf3; }
+    
+    .factor-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .badge-danger { background: rgba(248,81,73,0.2); color: #f85149; }
+    .badge-warning { background: rgba(210,153,34,0.2); color: #d29922; }
+    .badge-success { background: rgba(63,185,80,0.2); color: #3fb950; }
+    
+    .form-group { margin-bottom: 15px; }
+    .form-label { display: block; margin-bottom: 5px; color: #8b949e; font-size: 12px; }
+    .form-input {
+        width: 100%;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #30363d;
+        background: #0d1117;
+        color: #e6edf3;
+        font-size: 14px;
+    }
+    .form-input:focus { outline: none; border-color: #58a6ff; }
+    
+    .correlation-matrix-wrapper {
+        overflow-x: auto;
+        max-width: 100%;
+    }
+    #corr-table {
+        font-size: 11px;
+        min-width: 800px;
+    }
+    #corr-table th, #corr-table td {
+        padding: 4px 6px;
+        white-space: nowrap;
+    }
+    #corr-table th {
+        position: sticky;
+        top: 0;
+        background: #161b22;
+        z-index: 1;
+    }
+    #corr-table td:first-child {
+        position: sticky;
+        left: 0;
+        background: #161b22;
+        z-index: 1;
+        font-weight: 600;
+    }
+    .correlation-cell { padding: 4px; text-align: center; border-radius: 3px; font-weight: 500; font-size: 10px; }
+    .corr-high { background: rgba(248,81,73,0.2); color: #f85149; }
+    .corr-medium { background: rgba(210,153,34,0.2); color: #d29922; }
+    .corr-low { background: rgba(63,185,80,0.2); color: #3fb950; }
+    
+    .category-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+    .cat-动量 { background: rgba(88,166,255,0.2); color: #58a6ff; }
+    .cat-波动 { background: rgba(248,81,73,0.2); color: #f85149; }
+    .cat-相关 { background: rgba(163,113,247,0.2); color: #a371f7; }
+    .cat-成交量 { background: rgba(63,185,80,0.2); color: #3fb950; }
+    .cat-趋势 { background: rgba(210,153,34,0.2); color: #d29922; }
+    .cat-技术指标 { background: rgba(56,139,253,0.2); color: #388bfd; }
+    .cat-资金流 { background: rgba(255,128,200,0.2); color: #f778ba; }
+    .cat-期权 { background: rgba(120,200,255,0.2); color: #79c0ff; }
+    .cat-基本面 { background: rgba(88,204,150,0.2); color: #56d364; }
+    .cat-其他 { background: rgba(139,148,158,0.2); color: #8b949e; }
+    
+    .factor-select {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    
+    .factor-alert {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        background: rgba(88,166,255,0.2);
+        border: 1px solid rgba(88,166,255,0.4);
+        color: #58a6ff;
+    }
+    .alert-success {
+        background: rgba(63,185,80,0.2);
+        border-color: rgba(63,185,80,0.4);
+        color: #3fb950;
+    }
+    .alert-warning {
+        background: rgba(210,153,34,0.2);
+        border-color: rgba(210,153,34,0.4);
+        color: #d29922;
+    }
+    
+    .factor-row { display:flex;align-items:center;padding:5px 6px;border-bottom:1px solid #21262d;font-size:12px; }
+    .factor-row:hover { background:#161b22; }
+    .factor-bar { height:5px;border-radius:3px;margin-left:6px; }
 </style>
+
+<div class="page-header">
+    <div>
+        <h1>🧬 因子中心</h1>
+        <div class="subtitle">配置 · 分析 · 优化 — 一站式因子管理</div>
+    </div>
+    <div>
+        <button class="btn" onclick="refreshAll()">🔄 刷新</button>
+    </div>
+</div>
+
+<!-- Tab 导航 -->
+<div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('config')">🎛️ 因子配置</button>
+    <button class="tab-btn" onclick="switchTab('ranking')">📊 因子排名</button>
+    <button class="tab-btn" onclick="switchTab('correlation')">🔗 相关性</button>
+    <button class="tab-btn" onclick="switchTab('ic')">📉 IC分析</button>
+    <button class="tab-btn" onclick="switchTab('orthogonal')">⚡ 正交化</button>
+</div>
+
+<!-- ============ Tab 1: 因子配置 ============ -->
+<div id="tab-config" class="tab-content active">
+    <div class="grid grid-2">
+        <div class="factor-card">
+            <div class="card-header">
+                <span class="card-title">🧬 因子权重配置</span>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px;color:#8b949e;">动量权重 <span id="momVal">55</span>%</label>
+                <input type="range" id="momSlider" min="10" max="70" value="55"
+                       style="width:100%;margin:6px 0;" oninput="updateSliders()">
+                <div style="font-size:10px;color:#484f58;">最近IC: <span id="momIc">-</span></div>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px;color:#8b949e;">质量权重 <span id="qualVal">25</span>%</label>
+                <input type="range" id="qualSlider" min="10" max="70" value="25"
+                       style="width:100%;margin:6px 0;" oninput="updateSliders()">
+                <div style="font-size:10px;color:#484f58;">最近IC: <span id="qualIc">-</span></div>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px;color:#8b949e;">趋势权重 <span id="trendVal">20</span>%</label>
+                <input type="range" id="trendSlider" min="10" max="70" value="20"
+                       style="width:100%;margin:6px 0;" oninput="updateSliders()">
+                <div style="font-size:10px;color:#484f58;">最近IC: <span id="trendIc">-</span></div>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px;color:#8b949e;">价值权重 <span id="valVal">8</span>%</label>
+                <input type="range" id="valSlider" min="5" max="30" value="8"
+                       style="width:100%;margin:6px 0;" oninput="updateSliders()">
+                <div style="font-size:10px;color:#484f58;">最近IC: <span id="valIc">-</span></div>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px;color:#8b949e;">低波权重 <span id="lvVal">7</span>%</label>
+                <input type="range" id="lvSlider" min="5" max="30" value="7"
+                       style="width:100%;margin:6px 0;" oninput="updateSliders()">
+                <div style="font-size:10px;color:#484f58;">最近IC: <span id="lvIc">-</span></div>
+            </div>
+            <div class="flex flex-wrap" style="gap:6px;">
+                <span style="font-size:13px;color:#8b949e;">总和: <span id="totalWeight">100</span>%</span>
+                <button class="btn primary" onclick="saveWeights()">💾 保存</button>
+                <button class="btn" id="btnEvolve" onclick="runEvolution()">🧠 自动进化</button>
+            </div>
+            <div id="weightResult" style="margin-top:8px;font-size:12px;"></div>
+        </div>
+        <div class="factor-card">
+            <div class="card-header">
+                <span class="card-title">📈 因子IC历史</span>
+                <button class="btn" onclick="loadIC()">🔄 刷新</button>
+            </div>
+            <canvas id="icChart" height="180"></canvas>
+            <div id="icNote" style="margin-top:8px;font-size:12px;color:#8b949e;"></div>
+        </div>
+    </div>
+    
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">📊 进化历史</span>
+            <span id="evolutionCount" style="font-size:11px;color:#8b949e;"></span>
+        </div>
+        <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr><th>#</th><th>时间</th><th>动量</th><th>质量</th><th>趋势</th><th>价值</th><th>低波</th><th>IC动量</th><th>IC质量</th><th>IC趋势</th></tr>
+            </thead>
+            <tbody id="evolutionBody"></tbody>
+        </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============ Tab 2: 因子排名 ============ -->
+<div id="tab-ranking" class="tab-content">
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">🧬 33个因子有效性排名</span>
+            <div style="display:flex;gap:6px;">
+                <button class="btn" onclick="loadFactorRanking()" style="font-size:11px;padding:4px 8px;">🔄 刷新</button>
+                <button class="btn primary" onclick="runFactorRanking()" style="font-size:11px;padding:4px 8px;">⚡ 重新计算</button>
+            </div>
+        </div>
+        <div id="factor-ranking-content" style="font-size:12px;color:#8b949e;">点击刷新加载因子排名...</div>
+    </div>
+    
+    <div class="grid grid-4">
+        <div class="factor-card">
+            <div class="stat">
+                <div class="stat-value stat-info" id="n-factors">-</div>
+                <div class="stat-label">因子总数</div>
+            </div>
+        </div>
+        <div class="factor-card">
+            <div class="stat">
+                <div class="stat-value stat-success" id="n-significant">-</div>
+                <div class="stat-label">显著因子</div>
+            </div>
+        </div>
+        <div class="factor-card">
+            <div class="stat">
+                <div class="stat-value stat-warning" id="n-high-corr">-</div>
+                <div class="stat-label">高相关对</div>
+            </div>
+        </div>
+        <div class="factor-card">
+            <div class="stat">
+                <div class="stat-value" id="optimal-period">-</div>
+                <div class="stat-label">建议持仓</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">✅ 因子有效性检验详情</span>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>因子</th>
+                    <th>IC</th>
+                    <th>t统计量</th>
+                    <th>p值</th>
+                    <th>IR</th>
+                    <th>显著性</th>
+                </tr>
+            </thead>
+            <tbody id="effectiveness-tbody">
+                <tr><td colspan="6" style="text-align: center; color: #484f58;">正在加载...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ============ Tab 3: 相关性分析 ============ -->
+<div id="tab-correlation" class="tab-content">
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">📊 因子相关性矩阵</span>
+            <select class="form-input" style="width: auto;" id="corr-threshold" onchange="loadCorrelation()">
+                <option value="0.3">低阈值 0.3</option>
+                <option value="0.5" selected>中阈值 0.5</option>
+                <option value="0.7">高阈值 0.7</option>
+            </select>
+        </div>
+        <div class="correlation-matrix-wrapper">
+            <table id="corr-table">
+                <thead id="corr-thead"></thead>
+                <tbody id="corr-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">⚠️ 高相关性因子对</span>
+        </div>
+        <div id="high-corr-pairs">
+            <div class="factor-alert">正在加载...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ Tab 4: IC分析 ============ -->
+<div id="tab-ic" class="tab-content">
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">📉 IC衰减分析</span>
+        </div>
+        <div class="grid grid-2" style="gap: 15px; margin-bottom: 20px;">
+            <div class="stat">
+                <div class="stat-value stat-warning" id="decay-rate">--</div>
+                <div class="stat-label">IC衰减率</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value stat-success" id="optimal-holding">--</div>
+                <div class="stat-label">最优持仓周期</div>
+            </div>
+        </div>
+        <div id="ic-interpretation" style="margin-bottom: 15px; color: #8b949e; font-size: 13px;"></div>
+        <div style="height: 200px; background: #0d1117; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #484f58;" id="ic-decay-chart">
+            IC衰减曲线
+        </div>
+    </div>
+    
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">📋 完整因子质量报告</span>
+            <button class="btn" onclick="generateReport()">生成报告</button>
+        </div>
+        <div id="quality-report" style="display: none;"></div>
+    </div>
+</div>
+
+<!-- ============ Tab 5: 正交化工具 ============ -->
+<div id="tab-orthogonal" class="tab-content">
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">🔄 残差正交化</span>
+        </div>
+        <div class="grid grid-3">
+            <div class="form-group">
+                <label class="form-label">目标因子</label>
+                <select class="form-input" id="target-factor">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">参考因子（可多选）</label>
+                <select class="form-input factor-select" id="ref-factors" multiple size="6">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">&nbsp;</label>
+                <button class="btn primary" onclick="orthogonalizeFactor()">执行正交化</button>
+            </div>
+        </div>
+        <div id="orthogonal-result" style="margin-top: 15px;"></div>
+    </div>
+    
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">📈 PCA主成分分析</span>
+            <button class="btn secondary" onclick="loadPCA()">分析</button>
+        </div>
+        <div class="grid grid-3">
+            <div class="stat">
+                <div class="stat-value stat-info" id="pca-components">3</div>
+                <div class="stat-label">主成分数</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value stat-success" id="pca-explained">--</div>
+                <div class="stat-label">累计解释方差</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="pca-reduction">--</div>
+                <div class="stat-label">维度压缩</div>
+            </div>
+        </div>
+        <div id="pca-variance" style="margin-top: 15px;"></div>
+    </div>
+</div>
 
 <script>
 let currentWeights = {};
+let allFactors = [];
 
+// ========== 通用函数 ==========
+function $(id) { return document.getElementById(id); }
+
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    document.querySelector(`.tab-btn[onclick="switchTab('${tabName}')"]`).classList.add('active');
+    $('tab-' + tabName).classList.add('active');
+}
+
+function refreshAll() {
+    loadWeights();
+    loadIC();
+    loadEvolution();
+    loadFactorRanking();
+    loadEffectiveness();
+    loadCorrelation();
+    loadHighCorrPairs();
+    loadICDecay();
+    loadFactorList();
+}
+
+// ========== Tab 1: 因子配置 ==========
 async function loadWeights() {
     const w = await apiFetch('/factors/api/weights');
     currentWeights = w;
@@ -123,11 +497,6 @@ async function saveWeights() {
         lowvol: parseInt($('lvSlider').value),
     };
     try {
-        const r = await apiFetch('/factors/api/update_weights', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({weights})
-        });
         const d = await apiFetch('/factors/api/update_weights', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -163,10 +532,8 @@ async function runEvolution() {
 
 async function loadIC() {
     const icData = await apiFetch('/factors/api/ic_history');
-
     $('icNote').textContent = icData.length + ' 个月数据';
-
-    // 显示最近IC值
+    
     if (icData.length > 0) {
         const latest = icData[icData.length - 1];
         ['mom','qual','trend','val','lv'].forEach(p => {
@@ -174,32 +541,20 @@ async function loadIC() {
             const el = $(p + 'Ic');
             if (el) {
                 el.textContent = icVal.toFixed(4);
-                el.className = icVal > 0.02 ? 'positive' : icVal < -0.02 ? 'negative' : 'neutral';
             }
         });
     }
-
+    
     if (icData.length > 0 && window.Chart) {
         const canvas = document.getElementById('icChart');
-        // 销毁旧图表
         if (window.icChart) window.icChart.destroy();
         window.icChart = new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: {
                 labels: icData.map(d => d.month),
                 datasets: [
-                    {
-                        label: '动量IC',
-                        data: icData.map(d => (d.momentum_ic || 0).toFixed(4)),
-                        backgroundColor: icData.map(d => (d.momentum_ic || 0) >= 0 ? 'rgba(63,185,80,0.7)' : 'rgba(248,81,73,0.7)'),
-                        borderRadius: 2,
-                    },
-                    {
-                        label: '质量IC',
-                        data: icData.map(d => (d.quality_ic || 0).toFixed(4)),
-                        backgroundColor: icData.map(d => (d.quality_ic || 0) >= 0 ? 'rgba(88,166,255,0.7)' : 'rgba(248,81,73,0.7)'),
-                        borderRadius: 2,
-                    }
+                    { label: '动量IC', data: icData.map(d => (d.momentum_ic || 0).toFixed(4)), backgroundColor: 'rgba(63,185,80,0.7)', borderRadius: 2 },
+                    { label: '质量IC', data: icData.map(d => (d.quality_ic || 0).toFixed(4)), backgroundColor: 'rgba(88,166,255,0.7)', borderRadius: 2 }
                 ]
             },
             options: {
@@ -220,40 +575,31 @@ async function loadEvolution() {
     $('evolutionCount').textContent = '共 ' + history.length + ' 次进化';
     const body = $('evolutionBody');
     if (history.length === 0) {
-        body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#8b949e;">暂无进化历史，点击「自动进化」开始</td></tr>';
+        body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8b949e;">暂无进化历史，点击「自动进化」开始</td></tr>';
         return;
     }
     body.innerHTML = history.slice().reverse().map((h, i) => {
         const idx = history.length - i;
-        const oldW = h.old_weights || {};
         const newW = h.new_weights || {};
         const ic = h.weighted_ic || {};
-        const deltaClass = v => v > 0 ? 'positive' : (v < 0 ? 'negative' : 'muted');
-        const showDelta = (k) => {
-            const d = (newW[k] || 0) - (oldW[k] || 0);
-            return '<span class="' + deltaClass(d) + '" style="font-size:10px;">' + (d >= 0 ? '+' : '') + d + '</span>';
-        };
         return '<tr>' +
             '<td>' + idx + '</td>' +
             '<td>' + (h.timestamp || '').slice(0, 16) + '</td>' +
-            '<td>' + (newW.momentum || 0) + ' ' + showDelta('momentum') + '</td>' +
-            '<td>' + (newW.quality || 0) + ' ' + showDelta('quality') + '</td>' +
-            '<td>' + (newW.trend || 0) + ' ' + showDelta('trend') + '</td>' +
-            '<td>' + (newW.value || 0) + ' ' + showDelta('value') + '</td>' +
-            '<td>' + (newW.lowvol || 0) + ' ' + showDelta('lowvol') + '</td>' +
-            '<td class="' + ((ic.momentum || 0) > 0.02 ? 'positive' : 'neutral') + '">' + (ic.momentum || 0).toFixed(4) + '</td>' +
-            '<td class="' + ((ic.quality || 0) > 0.02 ? 'positive' : 'neutral') + '">' + (ic.quality || 0).toFixed(4) + '</td>' +
-            '<td class="' + ((ic.trend || 0) > 0.02 ? 'positive' : 'neutral') + '">' + (ic.trend || 0).toFixed(4) + '</td>' +
+            '<td>' + (newW.momentum || 0) + '</td>' +
+            '<td>' + (newW.quality || 0) + '</td>' +
+            '<td>' + (newW.trend || 0) + '</td>' +
+            '<td>' + (newW.value || 0) + '</td>' +
+            '<td>' + (newW.lowvol || 0) + '</td>' +
+            '<td>' + (ic.momentum || 0).toFixed(4) + '</td>' +
+            '<td>' + (ic.quality || 0).toFixed(4) + '</td>' +
+            '<td>' + (ic.trend || 0).toFixed(4) + '</td>' +
             '</tr>';
     }).join('');
 }
 
-loadWeights();
-loadIC();
-loadEvolution();
-
-async function loadRanking() {
-    const el = document.getElementById('rankingContent');
+// ========== Tab 2: 因子排名 ==========
+async function loadFactorRanking() {
+    const el = document.getElementById('factor-ranking-content');
     try {
         const d = await apiFetch('/factors/api/ranking');
         const data = d.data || d;
@@ -262,38 +608,269 @@ async function loadRanking() {
             return;
         }
         let html = '<div style="margin-bottom:6px;font-size:11px;color:#484f58;">已计算因子: ' + data.total_factors + ' | 有效因子: ' + (data.top_factors||[]).length + ' | ' + (data.timestamp||'').slice(0,16) + '</div>';
-        if (data.top_factors && data.top_factors.length > 0) {
-            html += '<div style="margin-bottom:6px;">';
-            data.top_factors.slice(0,8).forEach(function(f) {
-                html += '<span style="display:inline-block;font-size:10px;padding:1px 5px;background:#238636;color:#fff;border-radius:8px;margin:1px;">' + f + '</span>';
-            });
-            html += '</div>';
-        }
-        var maxAbs = Math.max(...data.factors.slice(0,20).map(function(f) { return Math.abs(f.ic_rank); }));
-        html += '<div style="display:flex;font-size:11px;color:#8b949e;padding:4px 6px;border-bottom:1px solid #30363d;"><span style="width:24px;">#</span><span style="flex:1;">因子</span><span style="width:70px;text-align:right;">IC秩</span></div>';
-        data.factors.slice(0,20).forEach(function(f, i) {
-            var pct = Math.abs(f.ic_rank) / maxAbs * 100;
-            var color = f.ic_rank >= 0 ? '#3fb950' : '#f85149';
-            html += '<div class="factor-row"><span style="width:24px;color:#484f58;">' + (i+1) + '</span><span style="flex:1;">' + f.factor + '</span><span style="width:70px;text-align:right;color:' + color + ';">' + (f.ic_rank>=0?'+':'') + f.ic_rank.toFixed(4) + '</span><div style="flex:1;"><div class="factor-bar" style="width:' + pct + '%;background:' + color + ';opacity:0.5;"></div></div></div>';
+        html += '<div class="table-wrapper"><table><thead><tr><th>#</th><th>因子</th><th>IC秩</th><th>IC皮尔逊</th><th>样本</th></tr></thead><tbody>';
+        data.factors.slice(0,33).forEach(function(f, i) {
+            const color = f.ic_rank >= 0 ? '#3fb950' : '#f85149';
+            html += '<tr><td>' + (i+1) + '</td><td>' + f.factor + '</td><td style="color:' + color + ';">' + (f.ic_rank>=0?'+':'') + f.ic_rank.toFixed(4) + '</td><td>' + f.ic_pearson.toFixed(4) + '</td><td>' + f.samples + '</td></tr>';
         });
+        html += '</tbody></table></div>';
         el.innerHTML = html;
+        
+        // 更新统计
+        $('n-factors').textContent = data.total_factors || data.factors.length;
     } catch(e) {
         el.innerHTML = '<div style="text-align:center;padding:20px;color:#f85149;">加载失败</div>';
     }
 }
 
-async function runRanking() {
-    const el = document.getElementById('rankingContent');
+async function runFactorRanking() {
+    const el = document.getElementById('factor-ranking-content');
     el.textContent = '⏳ 计算中（约1-2分钟）...';
     try {
         const d = await apiFetch('/factors/api/run_ranking', {method:'POST'});
         el.textContent = '✅ 计算完成';
-        setTimeout(loadRanking, 2000);
+        setTimeout(loadFactorRanking, 2000);
     } catch(e) {
-        el.textContent = '❌ ' + e.message;
+        el.textContent = '❌ ' + (e.message || '计算失败');
     }
 }
 
-loadRanking();
+// ========== 因子分析相关函数 ==========
+async function loadFactorList() {
+    try {
+        const data = await apiFetch('/factors/api/analysis/factor_list');
+        allFactors = data.factors || [];
+        
+        const targetSelect = $('target-factor');
+        const refSelect = $('ref-factors');
+        
+        targetSelect.innerHTML = '';
+        refSelect.innerHTML = '';
+        
+        allFactors.forEach(f => {
+            const cat = f.category || '其他';
+            const label = `${f.name} (${cat})`;
+            targetSelect.innerHTML += `<option value="${f.name}">${label}</option>`;
+            refSelect.innerHTML += `<option value="${f.name}">${label}</option>`;
+        });
+        
+    } catch (error) {
+        console.error('Error loading factor list:', error);
+    }
+}
+
+async function loadEffectiveness() {
+    try {
+        const data = await apiFetch('/factors/api/analysis/factor_effectiveness');
+        
+        let significantCount = 0;
+        let tbody = '';
+        
+        const factorCategoryMap = {};
+        allFactors.forEach(f => { factorCategoryMap[f.name] = f.category; });
+        
+        const sortedFactors = Object.entries(data).sort((a, b) => Math.abs(b[1].ic) - Math.abs(a[1].ic));
+        
+        for (const [factor, stats] of sortedFactors) {
+            if (stats.significant) significantCount++;
+            
+            const cat = factorCategoryMap[factor] || '其他';
+            const catBadge = `<span class="category-badge cat-${cat}">${cat}</span>`;
+            
+            const badge = stats.significant 
+                ? '<span class="factor-badge badge-success">显著</span>' 
+                : '<span class="factor-badge badge-warning">不显著</span>';
+            
+            const icDisplay = (stats.ic * 100).toFixed(2) + '%';
+            
+            tbody += `<tr>
+                <td>${factor}${catBadge}</td>
+                <td>${icDisplay}</td>
+                <td>${stats.t_stat.toFixed(2)}</td>
+                <td>${stats.p_value.toFixed(4)}</td>
+                <td>${stats.ir.toFixed(3)}</td>
+                <td>${badge}</td>
+            </tr>`;
+        }
+        
+        document.getElementById('effectiveness-tbody').innerHTML = tbody;
+        $('n-significant').textContent = `${significantCount}/${Object.keys(data).length}`;
+        
+    } catch (error) {
+        console.error('Error loading effectiveness:', error);
+    }
+}
+
+async function loadCorrelation() {
+    try {
+        const data = await apiFetch('/factors/api/analysis/correlation_matrix');
+        
+        const factors = data.factors;
+        const corr = data.correlation_matrix;
+        const threshold = parseFloat($('corr-threshold').value);
+        
+        let thead = '<tr><th>因子</th>';
+        factors.forEach(f => thead += `<th>${f}</th>`);
+        thead += '</tr>';
+        document.getElementById('corr-thead').innerHTML = thead;
+        
+        let tbody = '';
+        factors.forEach(f1 => {
+            tbody += `<tr><td><strong>${f1}</strong></td>`;
+            factors.forEach(f2 => {
+                const val = corr[f1]?.[f2] || 0;
+                let cls = 'corr-low';
+                if (Math.abs(val) >= threshold) cls = 'corr-high';
+                else if (Math.abs(val) >= threshold * 0.7) cls = 'corr-medium';
+                tbody += `<td><div class="correlation-cell ${cls}">${val.toFixed(2)}</div></td>`;
+            });
+            tbody += '</tr>';
+        });
+        document.getElementById('corr-tbody').innerHTML = tbody;
+        
+    } catch (error) {
+        console.error('Error loading correlation:', error);
+    }
+}
+
+async function loadHighCorrPairs() {
+    try {
+        const threshold = parseFloat($('corr-threshold').value);
+        const data = await apiFetch(`/factors/api/analysis/high_correlation_pairs?threshold=${threshold}`);
+        
+        $('n-high-corr').textContent = data.n_pairs || 0;
+        
+        if (!data.pairs || data.pairs.length === 0) {
+            document.getElementById('high-corr-pairs').innerHTML = '<div class="factor-alert alert-success">✅ 无高相关性因子对</div>';
+            return;
+        }
+        
+        let html = '';
+        data.pairs.forEach(pair => {
+            html += `<div style="padding: 10px; background: #0d1117; border-radius: 6px; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>${pair[0]} ↔ ${pair[1]}</span>
+                    <span class="factor-badge badge-danger">${pair[2].toFixed(3)}</span>
+                </div>
+                <div style="margin-top: 5px; font-size: 12px; color: #8b949e;">
+                    建议: ${Math.abs(pair[2]) > 0.7 ? '剔除其中一个因子' : '进行正交化处理'}
+                </div>
+            </div>`;
+        });
+        document.getElementById('high-corr-pairs').innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading high corr pairs:', error);
+    }
+}
+
+async function loadICDecay() {
+    try {
+        const data = await apiFetch('/factors/api/analysis/ic_decay');
+        
+        $('decay-rate').textContent = (data.decay_rate * 100).toFixed(1) + '%';
+        $('optimal-holding').textContent = data.optimal_holding_period + '天';
+        $('optimal-period').textContent = data.optimal_holding_period + '天';
+        $('ic-interpretation').textContent = data.interpretation;
+        
+    } catch (error) {
+        console.error('Error loading IC decay:', error);
+    }
+}
+
+async function orthogonalizeFactor() {
+    const target = $('target-factor').value;
+    const refSelect = $('ref-factors');
+    const references = Array.from(refSelect.selectedOptions).map(o => o.value);
+    
+    if (references.length === 0) {
+        alert('请选择参考因子');
+        return;
+    }
+    
+    try {
+        const data = await apiFetch('/factors/api/analysis/orthogonalize', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({target_factor: target, reference_factors: references})
+        });
+        
+        if (data.status === 'ok') {
+            $('orthogonal-result').innerHTML = `
+                <div class="factor-alert alert-success">
+                    ✅ ${data.summary}<br>
+                    <small>前5个收益值: ${(data.orthogonal_returns || []).slice(0, 5).join(', ')}...</small>
+                </div>
+            `;
+        } else {
+            $('orthogonal-result').innerHTML = `<div class="factor-alert">❌ ${data.message}</div>`;
+        }
+        
+    } catch (error) {
+        console.error('Error orthogonalizing:', error);
+    }
+}
+
+async function loadPCA() {
+    try {
+        const data = await apiFetch('/factors/api/analysis/pca_orthogonalize');
+        
+        $('pca-explained').textContent = (data.total_explained * 100).toFixed(1) + '%';
+        $('pca-reduction').textContent = `${data.n_components}/${data.n_factors || '?'}`;
+        
+        let varianceHtml = '<div style="margin-top: 15px;">';
+        data.explained_variance.forEach((v, i) => {
+            varianceHtml += `<div style="display: flex; align-items: center; margin-bottom: 8px;">
+                <span style="width: 60px;">PC${i+1}</span>
+                <div style="flex: 1; height: 20px; background: #30363d; border-radius: 4px;">
+                    <div style="width: ${v*100}%; height: 100%; background: linear-gradient(90deg, #58a6ff, #388bfd); border-radius: 4px;"></div>
+                </div>
+                <span style="margin-left: 10px; width: 60px; text-align: right;">${(v*100).toFixed(1)}%</span>
+            </div>`;
+        });
+        varianceHtml += '</div>';
+        $('pca-variance').innerHTML = varianceHtml;
+        
+    } catch (error) {
+        console.error('Error loading PCA:', error);
+    }
+}
+
+async function generateReport() {
+    try {
+        const data = await apiFetch('/factors/api/analysis/factor_quality_report');
+        
+        const recommendations = (data.overall_assessment?.recommendation || '').split('\n').filter(r => r.trim());
+        
+        let html = `
+            <div class="factor-alert ${data.overall_assessment?.has_correlation_issue ? 'alert-warning' : 'alert-success'}">
+                <strong>评估时间:</strong> ${data.generated_at || 'N/A'}<br>
+                <strong>显著因子:</strong> ${data.overall_assessment?.n_significant || 0}/${data.n_factors || 0}<br>
+                <strong>高相关对:</strong> ${data.correlation_analysis?.n_high_corr_pairs || 0}
+            </div>
+            <div style="margin-top: 15px;">
+                <strong>建议:</strong>
+                <ul style="margin-top: 10px; padding-left: 20px;">
+                    ${recommendations.map(r => `<li style="margin-bottom: 5px;">${r}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+        
+        $('quality-report').innerHTML = html;
+        $('quality-report').style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error generating report:', error);
+    }
+}
+
+// ========== 初始化 ==========
+document.addEventListener('DOMContentLoaded', function() {
+    loadWeights();
+    loadIC();
+    loadEvolution();
+    loadFactorRanking();
+    loadFactorList();
+});
 </script>
 {% endblock %}
