@@ -1,63 +1,7 @@
 {
   "strategy": "intraday",
-  "time": "2026-06-21 08:57:58.339893",
-  "date": "2026-06-21",
-  "candidates": [
-    {
-      "ticker": "EMR",
-      "score": 6.94,
-      "price": 148.81,
-      "today_chg": 1.56,
-      "week_chg": 4.49,
-      "vol_ratio": 1.55,
-      "atr": 2.75,
-      "rsi": 63.3,
-      "avg_vol": 2732183
-    },
-    {
-      "ticker": "WBA",
-      "score": 6.8,
-      "price": 11.98,
-      "today_chg": 0.5,
-      "week_chg": -1.8,
-      "vol_ratio": 12.49,
-      "atr": 1.14,
-      "rsi": 54.2,
-      "avg_vol": 36191940
-    },
-    {
-      "ticker": "K",
-      "score": 6.6,
-      "price": 83.44,
-      "today_chg": -0.01,
-      "week_chg": 0.36,
-      "vol_ratio": 9.0,
-      "atr": 0.14,
-      "rsi": 50.8,
-      "avg_vol": 4801876
-    },
-    {
-      "ticker": "MRO",
-      "score": 6.19,
-      "price": 28.55,
-      "today_chg": -1.28,
-      "week_chg": -1.04,
-      "vol_ratio": 4.92,
-      "atr": 1.92,
-      "rsi": 65.2,
-      "avg_vol": 7524872
-    },
-    {
-      "ticker": "PXD",
-      "score": 1.42,
-      "price": 269.62,
-      "today_chg": 0.73,
-      "week_chg": -2.01,
-      "vol_ratio": 2.28,
-      "atr": 1.99,
-      "rsi": 48.1,
-      "avg_vol": 2160396
-    }
-  ],
-  "all_scanned": 7
+  "time": "2026-06-24 23:43:41.710642",
+  "date": "2026-06-24",
+  "candidates": [],
+  "all_scanned": 0
 }
