@@ -1,0 +1,62 @@
+{
+  "alpaca_paper": {
+    "name": "Alpaca \u7eb8\u4ea4\u6613",
+    "enabled": true,
+    "type": "alpaca",
+    "paper": true,
+    "env_key_id": "ALPACA_API_KEY_ID",
+    "env_secret": "ALPACA_SECRET_KEY",
+    "base_url": "https://paper-api.alpaca.markets",
+    "data_url": "https://data.alpaca.markets",
+    "strategies": ["conservative", "momentum"]
+  },
+  "alpaca_paper_intraday": {
+    "name": "Alpaca \u65e5\u5185\u4e13\u7528",
+    "enabled": true,
+    "type": "alpaca",
+    "paper": true,
+    "env_key_id": "ALPACA_INTRADAY_KEY_ID",
+    "env_secret": "ALPACA_INTRADAY_SECRET",
+    "base_url": "https://paper-api.alpaca.markets",
+    "data_url": "https://data.alpaca.markets",
+    "strategies": ["intraday"]
+  },
+  "alpaca_live": {
+    "name": "\u2605 Alpaca \u5b9e\u76d8",
+    "enabled": false,
+    "type": "alpaca",
+    "paper": false,
+    "env_key_id": "ALPACA_LIVE_KEY_ID",
+    "env_secret": "ALPACA_LIVE_SECRET",
+    "base_url": "https://api.alpaca.markets",
+    "data_url": "https://data.alpaca.markets",
+    "strategies": ["conservative", "momentum"]
+  },
+  "alpaca_live_intraday": {
+    "name": "\u2605 Alpaca \u5b9e\u76d8\u65e5\u5185",
+    "enabled": false,
+    "type": "alpaca",
+    "paper": false,
+    "env_key_id": "ALPACA_LIVE_INTRADAY_KEY_ID",
+    "env_secret": "ALPACA_LIVE_INTRADAY_SECRET",
+    "base_url": "https://api.alpaca.markets",
+    "data_url": "https://data.alpaca.markets",
+    "strategies": ["intraday"]
+  },
+  "ibkr": {
+    "name": "\u76c8\u900f\u8bc1\u5238",
+    "enabled": false,
+    "type": "ibkr",
+    "env_key_id": "IBKR_ACCOUNT_ID",
+    "env_secret": "IBKR_TOKEN",
+    "host": "localhost",
+    "port": 7496
+  },
+  "longbridge": {
+    "name": "\u957f\u6865\u8bc1\u5238",
+    "enabled": false,
+    "type": "longbridge",
+    "env_key_id": "LONGBRIDGE_APP_KEY",
+    "env_secret": "LONGBRIDGE_APP_SECRET"
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "timestamp": "2026-06-19 21:47:34.711702",
+  "total_factors": 24,
+  "factors": [
+    {
+      "factor": "momentum_21d",
+      "ic_rank": 0.9008,
+      "ic_pearson": 0.9753,
+      "samples": 25,
+      "abs_ic": 0.9008
+    },
+    {
+      "factor": "momentum_accel",
+      "ic_rank": -0.8562,
+      "ic_pearson": -0.8766,
+      "samples": 25,
+      "abs_ic": 0.8562
+    },
+    {
+      "factor": "price_to_sma50",
+      "ic_rank": 0.7646,
+      "ic_pearson": 0.8401,
+      "samples": 25,
+      "abs_ic": 0.7646
+    },
+    {
+      "factor": "price_to_sma20",
+      "ic_rank": 0.6985,
+      "ic_pearson": 0.8467,
+      "samples": 25,
+      "abs_ic": 0.6985
+    },
+    {
+      "factor": "momentum_63d",
+      "ic_rank": 0.6446,
+      "ic_pearson": 0.7218,
+      "samples": 25,
+      "abs_ic": 0.6446
+    },
+    {
+      "factor": "momentum_126d",
+      "ic_rank": 0.6385,
+      "ic_pearson": 0.6956,
+      "samples": 25,
+      "abs_ic": 0.6385
+    },
+    {
+      "factor": "trend_strength",
+      "ic_rank": -0.6285,
+      "ic_pearson": -0.5682,
+      "samples": 25,
+      "abs_ic": 0.6285
+    },
+    {
+      "factor": "sma20_to_sma50",
+      "ic_rank": 0.6062,
+      "ic_pearson": 0.643,
+      "samples": 25,
+      "abs_ic": 0.6062
+    },
+    {
+      "factor": "momentum_10d",
+      "ic_rank": 0.5569,
+      "ic_pearson": 0.6781,
+      "samples": 25,
+      "abs_ic": 0.5569
+    },
+    {
+      "factor": "corr_spy_60d",
+      "ic_rank": 0.5185,
+      "ic_pearson": 0.4724,
+      "samples": 25,
+      "abs_ic": 0.5185
+    },
+    {
+      "factor": "beta_60d",
+      "ic_rank": -0.5146,
+      "ic_pearson": -0.4378,
+      "samples": 25,
+      "abs_ic": 0.5146
+    },
+    {
+      "factor": "rsi",
+      "ic_rank": -0.4792,
+      "ic_pearson": -0.4668,
+      "samples": 25,
+      "abs_ic": 0.4792
+    },
+    {
+      "factor": "momentum_252d",
+      "ic_rank": 0.4415,
+      "ic_pearson": 0.4475,
+      "samples": 25,
+      "abs_ic": 0.4415
+    },
+    {
+      "factor": "corr_spy_20d",
+      "ic_rank": -0.3454,
+      "ic_pearson": -0.3456,
+      "samples": 25,
+      "abs_ic": 0.3454
+    },
+    {
+      "factor": "sma50_to_sma200",
+      "ic_rank": 0.3438,
+      "ic_pearson": 0.4638,
+      "samples": 25,
+      "abs_ic": 0.3438
+    },
+    {
+      "factor": "volume_ratio_20",
+      "ic_rank": 0.3031,
+      "ic_pearson": 0.2229,
+      "samples": 25,
+      "abs_ic": 0.3031
+    },
+    {
+      "factor": "volatility_ratio",
+      "ic_rank": -0.2469,
+      "ic_pearson": -0.2852,
+      "samples": 25,
+      "abs_ic": 0.2469
+    },
+    {
+      "factor": "atr_pct",
+      "ic_rank": -0.2185,
+      "ic_pearson": -0.1292,
+      "samples": 25,
+      "abs_ic": 0.2185
+    },
+    {
+      "factor": "atr_ratio",
+      "ic_rank": -0.2008,
+      "ic_pearson": -0.1038,
+      "samples": 25,
+      "abs_ic": 0.2008
+    },
+    {
+      "factor": "atr_zscore",
+      "ic_rank": -0.1977,
+      "ic_pearson": -0.1003,
+      "samples": 25,
+      "abs_ic": 0.1977
+    },
+    {
+      "factor": "volume_ratio_1",
+      "ic_rank": -0.1946,
+      "ic_pearson": -0.3451,
+      "samples": 25,
+      "abs_ic": 0.1946
+    },
+    {
+      "factor": "volatility_20d",
+      "ic_rank": 0.1831,
+      "ic_pearson": 0.0418,
+      "samples": 25,
+      "abs_ic": 0.1831
+    },
+    {
+      "factor": "momentum_5d",
+      "ic_rank": 0.1815,
+      "ic_pearson": 0.3305,
+      "samples": 25,
+      "abs_ic": 0.1815
+    },
+    {
+      "factor": "vpr",
+      "ic_rank": 0.1469,
+      "ic_pearson": 0.0582,
+      "samples": 25,
+      "abs_ic": 0.1469
+    }
+  ],
+  "top_factors": [
+    "momentum_21d",
+    "momentum_accel",
+    "price_to_sma50",
+    "price_to_sma20",
+    "momentum_63d",
+    "momentum_126d",
+    "trend_strength",
+    "sma20_to_sma50",
+    "momentum_10d",
+    "corr_spy_60d"
+  ],
+  "stock_count": 25
+}
