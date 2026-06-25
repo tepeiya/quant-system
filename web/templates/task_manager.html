@@ -1,0 +1,800 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="main-container">
+    <div class="content-wrapper">
+        <div class="page-header">
+            <div>
+                <h2>任务管理中心</h2>
+                <p class="subtitle">管理和监控后台任务执行</p>
+            </div>
+            <button onclick="showCreateTaskModal()" class="btn btn-primary">
+                + 创建任务
+            </button>
+        </div>
+
+        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
+            <div class="stat-card">
+                <div class="stat-label">运行中</div>
+                <div class="stat-value" id="runningCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">已完成</div>
+                <div class="stat-value" id="completedCount" style="color: #10b981;">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">失败</div>
+                <div class="stat-value" id="failedCount" style="color: #ef4444;">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">等待中</div>
+                <div class="stat-value" id="pendingCount" style="color: #f59e0b;">0</div>
+            </div>
+        </div>
+
+        <div class="filter-bar">
+            <div class="filter-group">
+                <button class="filter-btn active" onclick="filterTasks('all')">全部</button>
+                <button class="filter-btn" onclick="filterTasks('running')">运行中</button>
+                <button class="filter-btn" onclick="filterTasks('completed')">已完成</button>
+                <button class="filter-btn" onclick="filterTasks('failed')">失败</button>
+                <button class="filter-btn" onclick="filterTasks('pending')">等待中</button>
+            </div>
+            <button onclick="refreshTasks()" class="btn btn-secondary">🔄 刷新</button>
+        </div>
+
+        <div class="task-list" id="taskList">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>加载任务列表...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 创建任务弹窗 -->
+<div id="createTaskModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>创建新任务</h3>
+            <button onclick="closeCreateTaskModal()" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>任务类型</label>
+                <select id="taskType" class="form-input">
+                    <option value="backtest">回测任务</option>
+                    <option value="stress_test">压力测试</option>
+                    <option value="factor_calculation">因子计算</option>
+                    <option value="data_update">数据更新</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>任务名称</label>
+                <input type="text" id="taskName" class="form-input" placeholder="自定义任务名称">
+            </div>
+            <div id="taskParamsArea">
+                <div class="form-group">
+                    <label>股票代码</label>
+                    <input type="text" id="tickerInput" class="form-input" value="SPY">
+                </div>
+                <div class="form-group">
+                    <label>回测天数</label>
+                    <input type="number" id="daysInput" class="form-input" value="252">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button onclick="closeCreateTaskModal()" class="btn btn-secondary">取消</button>
+            <button onclick="createTask()" class="btn btn-primary">创建</button>
+        </div>
+    </div>
+</div>
+
+<!-- 任务详情弹窗 -->
+<div id="taskDetailModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>任务详情</h3>
+            <button onclick="closeTaskDetailModal()" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body" id="taskDetailContent">
+            <p>加载中...</p>
+        </div>
+        <div class="modal-footer">
+            <button onclick="closeTaskDetailModal()" class="btn btn-secondary">关闭</button>
+            <button id="retryBtn" onclick="retryCurrentTask()" class="btn btn-warning" style="display:none;">
+                🔄 重试
+            </button>
+            <button id="cancelBtn" onclick="cancelCurrentTask()" class="btn btn-danger" style="display:none;">
+                ❌ 取消
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.stats-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.stat-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+}
+
+.stat-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.filter-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.filter-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filter-btn:hover {
+    border-color: var(--primary-color);
+}
+
+.filter-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.task-item {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.task-item:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+}
+
+.task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.task-title {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--text-primary);
+}
+
+.task-status {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-running { background: #dbeafe; color: #1d4ed8; }
+.status-completed { background: #d1fae5; color: #065f46; }
+.status-failed { background: #fee2e2; color: #991b1b; }
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-cancelled { background: #e5e7eb; color: #374151; }
+
+.task-info {
+    display: flex;
+    gap: 24px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), #60a5fa);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.task-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--primary-light);
+    color: var(--primary-color);
+    border-radius: 4px;
+    font-size: 12px;
+    margin-right: 8px;
+}
+
+.loading-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    margin: 0 auto 12px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-state .icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+/* 弹窗样式 */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-primary);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-body {
+    padding: 20px 24px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border-color);
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.form-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    opacity: 0.9;
+}
+
+.btn-secondary {
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background: var(--hover-bg);
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-warning {
+    background: #f59e0b;
+    color: white;
+}
+
+.detail-section {
+    margin-bottom: 20px;
+}
+
+.detail-section h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 14px;
+}
+
+.detail-row .label {
+    color: var(--text-secondary);
+}
+
+.log-container {
+    background: #1a1a1a;
+    color: #e0e0e0;
+    padding: 12px;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.result-box {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 13px;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.error-msg {
+    color: #ef4444;
+    background: #fef2f2;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+</style>
+
+<script>
+let currentFilter = 'all';
+let currentTaskId = null;
+let refreshTimer = null;
+
+// 页面加载完成
+document.addEventListener('DOMContentLoaded', function() {
+    loadTasks();
+    // 每5秒自动刷新
+    refreshTimer = setInterval(loadTasks, 5000);
+});
+
+// 离开页面时清除定时器
+window.addEventListener('beforeunload', function() {
+    if (refreshTimer) clearInterval(refreshTimer);
+});
+
+async function loadTasks() {
+    try {
+        const status = currentFilter === 'all' ? null : currentFilter;
+        const params = new URLSearchParams();
+        if (status) params.set('status', status);
+        
+        const res = await apiFetch(`/tasks/api/list?${params}`);
+        
+        if (res.success) {
+            renderTasks(res.tasks);
+            updateStats(res.tasks);
+        }
+    } catch (e) {
+        console.error('加载任务失败:', e);
+    }
+}
+
+function renderTasks(tasks) {
+    const container = document.getElementById('taskList');
+    
+    if (!tasks.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="icon">📋</div>
+                <h3>暂无任务</h3>
+                <p>点击右上角创建第一个任务</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = tasks.map(task => `
+        <div class="task-item" onclick="showTaskDetail('${task.task_id}')">
+            <div class="task-header">
+                <div>
+                    <span class="task-type-badge">${task.task_type}</span>
+                    <span class="task-title">${task.name}</span>
+                </div>
+                <span class="task-status status-${task.status}">${getStatusText(task.status)}</span>
+            </div>
+            <div class="task-info">
+                <span>📅 ${formatTime(task.created_at)}</span>
+                <span>📊 进度: ${task.progress.toFixed(0)}%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: ${task.progress}%"></div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateStats(tasks) {
+    const running = tasks.filter(t => t.status === 'running').length;
+    const completed = tasks.filter(t => t.status === 'completed').length;
+    const failed = tasks.filter(t => t.status === 'failed').length;
+    const pending = tasks.filter(t => t.status === 'pending').length;
+    
+    document.getElementById('runningCount').textContent = running;
+    document.getElementById('completedCount').textContent = completed;
+    document.getElementById('failedCount').textContent = failed;
+    document.getElementById('pendingCount').textContent = pending;
+}
+
+function getStatusText(status) {
+    const map = {
+        'running': '运行中',
+        'completed': '已完成',
+        'failed': '失败',
+        'pending': '等待中',
+        'cancelled': '已取消'
+    };
+    return map[status] || status;
+}
+
+function formatTime(isoTime) {
+    if (!isoTime) return '-';
+    const d = new Date(isoTime);
+    return d.toLocaleString('zh-CN');
+}
+
+function filterTasks(status) {
+    currentFilter = status;
+    
+    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    loadTasks();
+}
+
+function refreshTasks() {
+    loadTasks();
+}
+
+function showCreateTaskModal() {
+    document.getElementById('createTaskModal').classList.add('active');
+}
+
+function closeCreateTaskModal() {
+    document.getElementById('createTaskModal').classList.remove('active');
+}
+
+async function createTask() {
+    const taskType = document.getElementById('taskType').value;
+    const taskName = document.getElementById('taskName').value || taskType;
+    
+    let params = {};
+    
+    if (taskType === 'backtest') {
+        params = {
+            ticker: document.getElementById('tickerInput').value,
+            days: parseInt(document.getElementById('daysInput').value)
+        };
+    }
+    
+    try {
+        const res = await apiFetch('/tasks/api/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task_type: taskType,
+                name: taskName,
+                params: params
+            })
+        });
+        
+        if (res.success) {
+            closeCreateTaskModal();
+            loadTasks();
+        }
+    } catch (e) {
+        alert('创建任务失败: ' + e.message);
+    }
+}
+
+async function showTaskDetail(taskId) {
+    currentTaskId = taskId;
+    
+    try {
+        const res = await apiFetch(`/tasks/api/${taskId}`);
+        
+        if (res.success) {
+            renderTaskDetail(res.task);
+            document.getElementById('taskDetailModal').classList.add('active');
+        }
+    } catch (e) {
+        console.error('加载任务详情失败:', e);
+    }
+}
+
+function renderTaskDetail(task) {
+    const content = document.getElementById('taskDetailContent');
+    
+    let resultHtml = '';
+    if (task.result) {
+        resultHtml = `
+            <div class="detail-section">
+                <h4>执行结果</h4>
+                <div class="result-box">
+                    <pre>${JSON.stringify(task.result, null, 2)}</pre>
+                </div>
+            </div>
+        `;
+    }
+    
+    let errorHtml = '';
+    if (task.error) {
+        errorHtml = `
+            <div class="detail-section">
+                <h4>错误信息</h4>
+                <div class="error-msg">${task.error}</div>
+            </div>
+        `;
+    }
+    
+    let logsHtml = '';
+    if (task.logs && task.logs.length) {
+        logsHtml = `
+            <div class="detail-section">
+                <h4>执行日志</h4>
+                <div class="log-container">
+                    ${task.logs.map(log => `<div>${log}</div>`).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    content.innerHTML = `
+        <div class="detail-section">
+            <h4>基本信息</h4>
+            <div class="detail-row">
+                <span class="label">任务ID</span>
+                <span>${task.task_id}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">任务类型</span>
+                <span>${task.task_type}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">任务名称</span>
+                <span>${task.name}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">状态</span>
+                <span class="task-status status-${task.status}">${getStatusText(task.status)}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">进度</span>
+                <span>${task.progress.toFixed(1)}%</span>
+            </div>
+            <div class="progress-bar" style="margin-top: 8px;">
+                <div class="progress-fill" style="width: ${task.progress}%"></div>
+            </div>
+        </div>
+        
+        <div class="detail-section">
+            <h4>时间信息</h4>
+            <div class="detail-row">
+                <span class="label">创建时间</span>
+                <span>${formatTime(task.created_at)}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">开始时间</span>
+                <span>${formatTime(task.started_at) || '-'}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">完成时间</span>
+                <span>${formatTime(task.completed_at) || '-'}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">重试次数</span>
+                <span>${task.retries} / ${task.max_retries}</span>
+            </div>
+        </div>
+        
+        ${resultHtml}
+        ${errorHtml}
+        ${logsHtml}
+    `;
+    
+    // 显示/隐藏按钮
+    const retryBtn = document.getElementById('retryBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    
+    retryBtn.style.display = (task.status === 'failed') ? 'inline-block' : 'none';
+    cancelBtn.style.display = (task.status === 'pending') ? 'inline-block' : 'none';
+}
+
+function closeTaskDetailModal() {
+    document.getElementById('taskDetailModal').classList.remove('active');
+    currentTaskId = null;
+}
+
+async function retryCurrentTask() {
+    if (!currentTaskId) return;
+    
+    try {
+        const res = await apiFetch(`/tasks/api/${currentTaskId}/retry`, {
+            method: 'POST'
+        });
+        
+        if (res.success) {
+            closeTaskDetailModal();
+            loadTasks();
+        }
+    } catch (e) {
+        alert('重试失败: ' + e.message);
+    }
+}
+
+async function cancelCurrentTask() {
+    if (!currentTaskId) return;
+    
+    if (!confirm('确定要取消这个任务吗？')) return;
+    
+    try {
+        const res = await apiFetch(`/tasks/api/${currentTaskId}/cancel`, {
+            method: 'POST'
+        });
+        
+        if (res.success) {
+            closeTaskDetailModal();
+            loadTasks();
+        }
+    } catch (e) {
+        alert('取消失败: ' + e.message);
+    }
+}
+
+// 任务类型切换时更新参数区
+document.addEventListener('DOMContentLoaded', function() {
+    const taskTypeSelect = document.getElementById('taskType');
+    if (taskTypeSelect) {
+        taskTypeSelect.addEventListener('change', function(e) {
+            updateParamsArea(e.target.value);
+        });
+    }
+});
+
+function updateParamsArea(taskType) {
+    const paramsArea = document.getElementById('taskParamsArea');
+    
+    if (taskType === 'backtest') {
+        paramsArea.innerHTML = `
+            <div class="form-group">
+                <label>股票代码</label>
+                <input type="text" id="tickerInput" class="form-input" value="SPY">
+            </div>
+            <div class="form-group">
+                <label>回测天数</label>
+                <input type="number" id="daysInput" class="form-input" value="252">
+            </div>
+        `;
+    } else if (taskType === 'stress_test') {
+        paramsArea.innerHTML = `
+            <div class="form-group">
+                <label>持仓配置 (JSON)</label>
+                <textarea id="positionsInput" class="form-input" rows="4">{"AAPL": 50000, "MSFT": 40000, "GOOGL": 30000}</textarea>
+            </div>
+        `;
+    } else {
+        paramsArea.innerHTML = `<p style="color: var(--text-secondary); font-size: 14px;">该任务无需额外参数</p>`;
+    }
+}
+</script>
+{% endblock %}

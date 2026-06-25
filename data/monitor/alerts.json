@@ -1,0 +1,17 @@
+{
+  "alerts": [
+    {
+      "alert_id": "ALERT_20260625131706_8258",
+      "level": "info",
+      "category": "test",
+      "title": "系统启动",
+      "message": "系统正常启动",
+      "details": {},
+      "timestamp": "2026-06-25T13:17:06.958651",
+      "resolved": false,
+      "resolved_at": "",
+      "acknowledge": false
+    }
+  ],
+  "updated_at": "2026-06-25T13:17:06.958783"
+}

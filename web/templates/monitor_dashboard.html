@@ -1,0 +1,692 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="main-container">
+    <div class="content-wrapper">
+        <div class="page-header">
+            <div>
+                <h2>监控中心</h2>
+                <p class="subtitle">系统监控与告警管理</p>
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <button onclick="refreshAll()" class="btn btn-secondary">🔄 刷新</button>
+                <span class="status-badge" id="systemStatusBadge">
+                    <span class="status-dot"></span>
+                    系统正常
+                </span>
+            </div>
+        </div>
+
+        <!-- 告警概览 -->
+        <div class="alert-overview">
+            <div class="alert-card critical" onclick="showAlerts('critical')">
+                <div class="alert-icon">🚨</div>
+                <div>
+                    <div class="alert-count" id="criticalCount">0</div>
+                    <div class="alert-label">严重告警</div>
+                </div>
+            </div>
+            <div class="alert-card error" onclick="showAlerts('error')">
+                <div class="alert-icon">❌</div>
+                <div>
+                    <div class="alert-count" id="errorCount">0</div>
+                    <div class="alert-label">错误告警</div>
+                </div>
+            </div>
+            <div class="alert-card warning" onclick="showAlerts('warning')">
+                <div class="alert-icon">⚠️</div>
+                <div>
+                    <div class="alert-count" id="warningCount">0</div>
+                    <div class="alert-label">警告</div>
+                </div>
+            </div>
+            <div class="alert-card info" onclick="showAlerts('info')">
+                <div class="alert-icon">ℹ️</div>
+                <div>
+                    <div class="alert-count" id="infoCount">0</div>
+                    <div class="alert-label">信息</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- 系统资源 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🖥️ 系统资源</h3>
+                    <span class="refresh-time" id="systemTime"></span>
+                </div>
+                <div class="card-body">
+                    <div class="resource-item">
+                        <div class="resource-header">
+                            <span>CPU使用率</span>
+                            <span id="cpuValue">-</span>
+                        </div>
+                        <div class="resource-bar">
+                            <div class="resource-fill cpu" id="cpuBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="resource-item">
+                        <div class="resource-header">
+                            <span>内存使用率</span>
+                            <span id="memoryValue">-</span>
+                        </div>
+                        <div class="resource-bar">
+                            <div class="resource-fill memory" id="memoryBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="resource-item">
+                        <div class="resource-header">
+                            <span>磁盘使用率</span>
+                            <span id="diskValue">-</span>
+                        </div>
+                        <div class="resource-bar">
+                            <div class="resource-fill disk" id="diskBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 应用指标 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>📊 应用指标</h3>
+                </div>
+                <div class="card-body">
+                    <div class="metric-grid">
+                        <div class="metric-item">
+                            <div class="metric-value" id="responseTime">-</div>
+                            <div class="metric-label">响应时间 (ms)</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="errorRate">-</div>
+                            <div class="metric-label">错误率 (%)</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="activeUsers">-</div>
+                            <div class="metric-label">活跃用户</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="uptime">99.9%</div>
+                            <div class="metric-label">可用率</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 告警列表 -->
+            <div class="card alert-list-card">
+                <div class="card-header">
+                    <h3>🚨 最新告警</h3>
+                    <button onclick="showAlerts()" class="btn btn-sm">查看全部</button>
+                </div>
+                <div class="card-body">
+                    <div id="alertList">
+                        <div class="empty-text">暂无告警</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 告警列表弹窗 -->
+<div id="alertsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>告警列表</h3>
+            <button onclick="closeAlertsModal()" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="filter-bar">
+                <div class="filter-group">
+                    <button class="filter-btn active" onclick="filterAlerts(null)">全部</button>
+                    <button class="filter-btn" onclick="filterAlerts('critical')">严重</button>
+                    <button class="filter-btn" onclick="filterAlerts('error')">错误</button>
+                    <button class="filter-btn" onclick="filterAlerts('warning')">警告</button>
+                    <button class="filter-btn" onclick="filterAlerts('info')">信息</button>
+                </div>
+            </div>
+            <div id="alertsModalList" style="margin-top: 16px;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.alert-overview {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.alert-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.alert-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.alert-card.critical { border-left: 4px solid #dc2626; }
+.alert-card.error { border-left: 4px solid #ef4444; }
+.alert-card.warning { border-left: 4px solid #f59e0b; }
+.alert-card.info { border-left: 4px solid #3b82f6; }
+
+.alert-icon {
+    font-size: 32px;
+}
+
+.alert-count {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.alert-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.card-body {
+    padding: 20px;
+}
+
+.refresh-time {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.resource-item {
+    margin-bottom: 16px;
+}
+
+.resource-item:last-child {
+    margin-bottom: 0;
+}
+
+.resource-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.resource-bar {
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.resource-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.resource-fill.cpu { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+.resource-fill.memory { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+.resource-fill.disk { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.metric-item {
+    text-align: center;
+    padding: 16px;
+    background: var(--bg-primary);
+    border-radius: 8px;
+}
+
+.metric-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.metric-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.alert-list-card {
+    grid-column: span 2;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.empty-text {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 20px;
+    font-size: 14px;
+}
+
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: #d1fae5;
+    color: #065f46;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.alert-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: var(--bg-primary);
+    border-left: 3px solid var(--border-color);
+}
+
+.alert-item.critical { border-left-color: #dc2626; background: #fef2f2; }
+.alert-item.error { border-left-color: #ef4444; background: #fef2f2; }
+.alert-item.warning { border-left-color: #f59e0b; background: #fffbeb; }
+.alert-item.info { border-left-color: #3b82f6; background: #eff6ff; }
+
+.alert-item-icon {
+    font-size: 20px;
+}
+
+.alert-item-content {
+    flex: 1;
+}
+
+.alert-item-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.alert-item-message {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.alert-item-time {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.alert-item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.action-btn.resolve {
+    background: #10b981;
+    color: white;
+}
+
+.action-btn.ack {
+    background: #3b82f6;
+    color: white;
+}
+
+.filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.filter-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-primary);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+}
+
+.btn-primary { background: var(--primary-color); color: white; }
+.btn-secondary { background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--border-color); }
+</style>
+
+<script>
+let currentAlertFilter = null;
+let refreshInterval = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadSystemStatus();
+    loadAlerts();
+    
+    // 每10秒刷新
+    refreshInterval = setInterval(function() {
+        loadSystemStatus();
+        loadAlerts();
+    }, 10000);
+});
+
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) clearInterval(refreshInterval);
+});
+
+async function loadSystemStatus() {
+    try {
+        const res = await apiFetch('/monitor/api/status');
+        
+        if (res.success) {
+            updateSystemStatus(res.status);
+        }
+    } catch (e) {
+        console.error('加载系统状态失败:', e);
+    }
+}
+
+function updateSystemStatus(status) {
+    // 更新时间
+    const now = new Date();
+    document.getElementById('systemTime').textContent = now.toLocaleTimeString('zh-CN');
+    
+    // CPU
+    const cpu = status.system.cpu || 0;
+    document.getElementById('cpuValue').textContent = cpu.toFixed(1) + '%';
+    document.getElementById('cpuBar').style.width = cpu + '%';
+    
+    // 内存
+    const memory = status.system.memory || 0;
+    document.getElementById('memoryValue').textContent = memory.toFixed(1) + '%';
+    document.getElementById('memoryBar').style.width = memory + '%';
+    
+    // 磁盘
+    const disk = status.system.disk || 0;
+    document.getElementById('diskValue').textContent = disk.toFixed(1) + '%';
+    document.getElementById('diskBar').style.width = disk + '%';
+    
+    // 应用指标
+    document.getElementById('responseTime').textContent = status.app.response_time_ms
+        ? status.app.response_time_ms.toFixed(0) : '-';
+    document.getElementById('errorRate').textContent = status.app.error_rate
+        ? (status.app.error_rate * 100).toFixed(2) : '-';
+    document.getElementById('activeUsers').textContent = status.app.active_users || '-';
+    
+    // 更新系统状态徽章
+    updateStatusBadge(status);
+}
+
+function updateStatusBadge(status) {
+    const badge = document.getElementById('systemStatusBadge');
+    const dot = badge.querySelector('.status-dot');
+    
+    let hasIssue = false;
+    if (status.system.cpu > 90 || status.system.memory > 90) {
+        hasIssue = true;
+    }
+    
+    if (hasIssue) {
+        badge.style.background = '#fef2f2';
+        badge.style.color = '#991b1b';
+        dot.style.background = '#ef4444';
+        badge.innerHTML = '<span class="status-dot"></span>系统告警';
+    } else {
+        badge.style.background = '#d1fae5';
+        badge.style.color = '#065f46';
+        dot.style.background = '#10b981';
+        badge.innerHTML = '<span class="status-dot"></span>系统正常';
+    }
+}
+
+async function loadAlerts() {
+    try {
+        const res = await apiFetch('/monitor/api/alerts/summary');
+        
+        if (res.success) {
+            updateAlertCounts(res.summary);
+        }
+    } catch (e) {
+        console.error('加载告警失败:', e);
+    }
+    
+    // 加载最新告警
+    try {
+        const res = await apiFetch('/monitor/api/alerts?limit=10');
+        
+        if (res.success) {
+            renderAlertList(res.alerts, 'alertList');
+        }
+    } catch (e) {
+        console.error('加载告警列表失败:', e);
+    }
+}
+
+function updateAlertCounts(summary) {
+    const byLevel = summary.by_level || {};
+    document.getElementById('criticalCount').textContent = byLevel.critical || 0;
+    document.getElementById('errorCount').textContent = byLevel.error || 0;
+    document.getElementById('warningCount').textContent = byLevel.warning || 0;
+    document.getElementById('infoCount').textContent = byLevel.info || 0;
+}
+
+function renderAlertList(alerts, containerId) {
+    const container = document.getElementById(containerId);
+    
+    if (!alerts.length) {
+        container.innerHTML = '<div class="empty-text">暂无告警</div>';
+        return;
+    }
+    
+    container.innerHTML = alerts.map(alert => `
+        <div class="alert-item ${alert.level}">
+            <div class="alert-item-icon">${getAlertIcon(alert.level)}</div>
+            <div class="alert-item-content">
+                <div class="alert-item-title">${alert.title}</div>
+                <div class="alert-item-message">${alert.message}</div>
+                <div class="alert-item-time">${formatTime(alert.timestamp)} · ${alert.category}</div>
+            </div>
+            ${!alert.resolved ? `
+            <div class="alert-item-actions">
+                <button class="action-btn resolve" onclick="resolveAlert('${alert.alert_id}')">已解决</button>
+            </div>
+            ` : '<span style="font-size:12px; color:#10b981;">✓ 已解决</span>'}
+        </div>
+    `).join('');
+}
+
+function getAlertIcon(level) {
+    const icons = {
+        'critical': '🚨',
+        'error': '❌',
+        'warning': '⚠️',
+        'info': 'ℹ️'
+    };
+    return icons[level] || '📢';
+}
+
+function formatTime(isoTime) {
+    if (!isoTime) return '-';
+    const d = new Date(isoTime);
+    return d.toLocaleString('zh-CN');
+}
+
+function showAlerts(level) {
+    currentAlertFilter = level;
+    loadModalAlerts();
+    document.getElementById('alertsModal').classList.add('active');
+}
+
+function closeAlertsModal() {
+    document.getElementById('alertsModal').classList.remove('active');
+}
+
+async function loadModalAlerts() {
+    try {
+        const params = new URLSearchParams();
+        if (currentAlertFilter) params.set('level', currentAlertFilter);
+        params.set('limit', 50);
+        
+        const res = await apiFetch(`/monitor/api/alerts?${params}`);
+        
+        if (res.success) {
+            renderAlertList(res.alerts, 'alertsModalList');
+        }
+    } catch (e) {
+        console.error('加载告警失败:', e);
+    }
+}
+
+function filterAlerts(level) {
+    currentAlertFilter = level;
+    
+    document.querySelectorAll('#alertsModal .filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    loadModalAlerts();
+}
+
+async function resolveAlert(alertId) {
+    try {
+        const res = await apiFetch(`/monitor/api/alerts/${alertId}/resolve`, {
+            method: 'POST'
+        });
+        
+        if (res.success) {
+            loadAlerts();
+            if (document.getElementById('alertsModal').classList.contains('active')) {
+                loadModalAlerts();
+            }
+        }
+    } catch (e) {
+        alert('操作失败: ' + e.message);
+    }
+}
+
+function refreshAll() {
+    loadSystemStatus();
+    loadAlerts();
+}
+</script>
+{% endblock %}
