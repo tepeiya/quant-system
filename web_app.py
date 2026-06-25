@@ -56,6 +56,14 @@ from security import apply_security_fixes, log_audit
 from security_policy import PUBLIC_PATHS
 apply_security_fixes(app)
 
+# ====== 数据库初始化 ======
+try:
+    from database import init_database
+    init_database(with_migration=True)
+    logger.info("✅ 数据库初始化完成")
+except Exception as e:
+    logger.warning(f"⚠️ 数据库初始化失败（功能可能受限）: {e}")
+
 
 def login_required(f):
     """未登录则跳转登录页"""

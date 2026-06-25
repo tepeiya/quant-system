@@ -1,24 +1,25 @@
 """
-用户认证系统 v2 — 多用户 + 券商绑定
-==================================
+用户认证系统 v3 — 多用户 + 数据库支持
+==========================================
 功能：
 1. 注册/登录/注销
 2. 每个用户可绑定自己的Alpaca/IBKR Key
 3. 下单、持仓、交易记录按用户隔离
 4. 管理员可管理所有用户
+5. 支持SQLite数据库 + JSON文件双存储
 
-数据文件：config/users.json
-每次用户独立券商配置：config/users/{username}/broker_keys.json
+数据存储：
+- SQLite数据库: data/quant_system.db
+- JSON文件备份: config/users.json
 """
 
 import os
 import json
-import shutil
 import logging
 from datetime import datetime
-from flask import Blueprint, request, jsonify, render_template, session, redirect, url_for
+from flask import Blueprint, request, jsonify, render_template, session, redirect
 import bcrypt
-from security import login_rate_limit, csrf_protect, encrypt_key, decrypt_key, log_audit, is_registration_allowed
+from security import login_rate_limit, log_audit, is_registration_allowed
 from api_response import ok, err
 
 logger = logging.getLogger("quant.auth")
@@ -29,10 +30,26 @@ USERS_DIR = "config/users"
 os.makedirs("config", exist_ok=True)
 os.makedirs(USERS_DIR, exist_ok=True)
 
+# 数据库支持
+_db = None
+
+def get_db():
+    """获取数据库连接"""
+    global _db
+    if _db is None:
+        try:
+            from database import db as database_instance
+            _db = database_instance
+        except Exception as e:
+            logger.warning(f"数据库连接失败: {e}")
+            _db = None
+    return _db
+
 
 # ===== 用户数据管理 =====
 
 def load_users() -> dict:
+    """从JSON加载用户（兼容旧数据）"""
     if os.path.exists(USERS_FILE):
         try:
             with open(USERS_FILE) as f:
@@ -43,16 +60,73 @@ def load_users() -> dict:
 
 
 def save_users(users: dict):
+    """保存用户到JSON（兼容旧数据）"""
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, indent=2)
-    # 持久化到数据库
+
+
+def load_users_from_db() -> dict:
+    """从数据库加载用户"""
+    database = get_db()
+    if database is None:
+        return {}
+    
+    session_db = database.get_session()
     try:
-        import sys, os
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-        import config_db
-        config_db.set_config("users", users)
-    except Exception:
-        pass
+        from database import User
+        users = session_db.query(User).all()
+        result = {}
+        for u in users:
+            result[u.username] = {
+                "password": u.password_hash,
+                "role": u.role,
+                "created": u.created_at.isoformat() if u.created_at else str(datetime.now()),
+                "last_login": u.last_login.isoformat() if u.last_login else None,
+                "broker": u.broker_type,
+                "db_id": u.id
+            }
+        return result
+    finally:
+        session_db.close()
+
+
+def save_user_to_db(username: str, user_data: dict):
+    """保存用户到数据库"""
+    database = get_db()
+    if database is None:
+        return False
+    
+    session_db = database.get_session()
+    try:
+        from database import User
+        user = session_db.query(User).filter_by(username=username).first()
+        if user:
+            # 更新现有用户
+            if "role" in user_data:
+                user.role = user_data["role"]
+            if "broker" in user_data:
+                user.broker_type = user_data["broker"]
+            if "last_login" in user_data:
+                user.last_login = datetime.fromisoformat(user_data["last_login"]) if user_data["last_login"] else None
+        else:
+            # 创建新用户
+            user = User(
+                username=username,
+                password_hash=user_data.get("password", ""),
+                role=user_data.get("role", "user"),
+                broker_type=user_data.get("broker", "alpaca_paper"),
+                created_at=datetime.fromisoformat(user_data["created"]) if user_data.get("created") else datetime.now()
+            )
+            session_db.add(user)
+        
+        session_db.commit()
+        return True
+    except Exception as e:
+        session_db.rollback()
+        logger.error(f"保存用户到数据库失败: {e}")
+        return False
+    finally:
+        session_db.close()
 
 
 def get_user_dir(username: str) -> str:
@@ -72,6 +146,7 @@ def get_user_broker_keys(username: str) -> dict:
 
 
 def save_user_broker_keys(username: str, keys: dict):
+    """保存用户的券商Key"""
     path = os.path.join(get_user_dir(username), "broker_keys.json")
     with open(path, "w") as f:
         json.dump(keys, f, indent=2)
@@ -87,6 +162,7 @@ def get_user_signals_dir(username: str) -> str:
 # ===== 登录状态 =====
 
 def get_current_username() -> str:
+    """获取当前登录用户名"""
     return session.get("user", "")
 
 
@@ -121,6 +197,7 @@ def admin_required(f):
 @bp.route("/login", methods=["GET", "POST"])
 @login_rate_limit
 def login():
+    """登录"""
     if request.method == "GET":
         return render_template("login.html")
 
@@ -131,22 +208,36 @@ def login():
     if not username or not password:
         return err("用户名和密码不能为空")
 
-    users = load_users()
+    # 优先从数据库读取
+    users = load_users_from_db()
+    
+    # 如果数据库为空，尝试从JSON读取
+    if not users:
+        users = load_users()
+    
     user = users.get(username)
 
     if not user:
         return err("用户不存在")
 
-    if not bcrypt.checkpw(password.encode(), user["password"].encode()):
-        return err("密码错误")
+    # 检查密码
+    password_hash = user.get("password", "")
+    try:
+        if not bcrypt.checkpw(password.encode(), password_hash.encode()):
+            return err("密码错误")
+    except Exception:
+        return err("密码验证失败")
+
+    # 更新最后登录时间
+    user["last_login"] = str(datetime.now())
+    
+    # 保存到数据库和JSON
+    save_user_to_db(username, user)
+    save_users(users)
 
     session["user"] = username
     session["role"] = user.get("role", "user")
     session["login_time"] = str(datetime.now())
-
-    # 更新最后登录
-    users[username]["last_login"] = str(datetime.now())
-    save_users(users)
 
     log_audit("LOGIN", username, "登录成功")
 
@@ -161,6 +252,7 @@ def login():
 
 @bp.route("/register", methods=["GET", "POST"])
 def register():
+    """注册新用户"""
     if request.method == "GET":
         return render_template("register.html")
 
@@ -181,18 +273,28 @@ def register():
     if password != confirm:
         return err("两次密码不一致")
 
-    users = load_users()
+    # 优先从数据库检查
+    users = load_users_from_db()
+    if not users:
+        users = load_users()
+    
     if username in users:
         return err("用户已存在")
 
+    # 创建新用户
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-    users[username] = {
+    new_user = {
         "password": hashed,
         "role": "user",
         "created": str(datetime.now()),
         "last_login": None,
         "broker": "alpaca_paper",
     }
+    
+    users[username] = new_user
+    
+    # 同时保存到数据库和JSON
+    save_user_to_db(username, new_user)
     save_users(users)
 
     # 创建用户目录
@@ -215,12 +317,14 @@ def register():
 
 @bp.route("/logout")
 def logout():
+    """登出"""
     session.clear()
     return redirect("/login")
 
 
 @bp.route("/api/current_user")
 def api_current_user():
+    """获取当前用户信息"""
     if "user" not in session:
         return err("未登录", 401)
     return ok({
@@ -234,6 +338,7 @@ def api_current_user():
 @bp.route("/api/broker_keys", methods=["GET", "POST"])
 @login_required
 def api_broker_keys():
+    """获取/保存用户的券商Key"""
     username = get_current_username()
     
     if request.method == "GET":
@@ -261,7 +366,12 @@ def api_broker_keys():
 @bp.route("/api/admin/users")
 @admin_required
 def api_admin_users():
-    users = load_users()
+    """获取所有用户列表"""
+    # 优先从数据库读取
+    users = load_users_from_db()
+    if not users:
+        users = load_users()
+    
     result = []
     for name, info in users.items():
         result.append({
@@ -277,6 +387,7 @@ def api_admin_users():
 @bp.route("/api/admin/set_role", methods=["POST"])
 @admin_required
 def api_admin_set_role():
+    """设置用户角色"""
     data = request.json or {}
     username = data.get("username", "")
     role = data.get("role", "user")
@@ -284,10 +395,18 @@ def api_admin_set_role():
     if role not in ("user", "admin"):
         return jsonify({"status": "error", "message": "无效角色"})
     
-    users = load_users()
+    # 优先从数据库读取
+    users = load_users_from_db()
+    if not users:
+        users = load_users()
+    
     if username not in users:
         return jsonify({"status": "error", "message": "用户不存在"})
     
     users[username]["role"] = role
+    
+    # 保存到数据库和JSON
+    save_user_to_db(username, users[username])
     save_users(users)
+    
     return jsonify({"status": "ok", "message": f"{username} 角色已设为 {role}"})
