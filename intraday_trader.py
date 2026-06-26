@@ -155,6 +155,45 @@ def cancel_cloud_stops(client, sym: str = None):
         pass
 
 
+def check_daily_loss_limit() -> bool:
+    """检查单日亏损限制，触发则强制清仓。返回True表示已触发清仓。"""
+    client = get_alpaca()
+    if not client:
+        return False
+
+    cfg = load_intraday_config()
+    max_loss_pct = float(cfg.get("max_daily_loss_pct", 3.0))
+    if max_loss_pct <= 0:
+        return False
+
+    try:
+        acct = client.get_account()
+        equity = float(acct.equity)
+        last_equity = float(acct.last_equity)
+        if last_equity <= 0:
+            return False
+        daily_pnl_pct = (equity - last_equity) / last_equity * 100
+
+        if daily_pnl_pct <= -max_loss_pct:
+            logger.warning(f"🚨 触发单日亏损限制: {daily_pnl_pct:.2f}% <= -{max_loss_pct}%，强制清仓！")
+            close_all(auto=True)
+            # 记录到交易日志
+            trade_log = load_trade_log()
+            trade_log["trades"].append({
+                "time": str(datetime.now()),
+                "action": "daily_loss_circuit_breaker",
+                "daily_pnl_pct": round(daily_pnl_pct, 2),
+                "limit_pct": max_loss_pct,
+                "message": "单日亏损触发熔断，已强制清仓"
+            })
+            save_trade_log(trade_log)
+            return True
+    except Exception as e:
+        logger.error(f"检查单日亏损失败: {e}")
+
+    return False
+
+
 def check_stop_loss():
     """检查持仓：云端止损+移动止损+ATR自适应止盈止损"""
     client = get_alpaca()
@@ -170,8 +209,11 @@ def check_stop_loss():
 
     # 默认值（当信号中没有时回退）
     default_stop = 1.5
-    default_tp = 2.5
-    trailing_enabled = cfg.get("trailing_stop_enabled", False)
+    default_tp = 3.2  # 提高止盈倍数
+    default_atr_pct = 2.0
+    trailing_enabled = cfg.get("trailing_stop_enabled", True)  # 默认开启
+    trail_atr_mult = float(cfg.get("trailing_stop_atr_multiple", 0.8))
+    trail_activation_atr = float(cfg.get("trailing_stop_activation_atr", 1.0))
 
     from alpaca.trading.requests import MarketOrderRequest
     from alpaca.trading.enums import OrderSide, TimeInForce
@@ -192,17 +234,19 @@ def check_stop_loss():
         ci = candidate_map.get(sym, {})
         sl_pct = float(ci.get("stop_loss_pct", default_stop))
         tp_pct = float(ci.get("take_profit_pct", default_tp))
-        trail_pct = float(cfg.get("trailing_stop_atr_multiple", 1.0)) * float(ci.get("atr_pct", 1.0))
+        atr_pct = float(ci.get("atr_pct", default_atr_pct))
+        trail_pct = trail_atr_mult * atr_pct
+        activation_pct = trail_activation_atr * atr_pct  # 启动追踪的盈利门槛
 
-        # 更新最高价（用于移动止损）
-        if trailing_enabled:
+        # 更新最高价（用于移动止损，只有盈利后才跟踪）
+        if trailing_enabled and pnl > 0:
             old_high = highs.get(sym, entry)
             if cur > old_high:
                 highs[sym] = cur
 
         # 止盈（ATR自适应）
         if pnl >= tp_pct:
-            logger.info(f"  [止盈] {sym} {pnl:+.2f}% >= {tp_pct}% (ATR自适应)")
+            logger.info(f"  [止盈] {sym} {pnl:+.2f}% >= {tp_pct:.1f}% (ATR自适应)")
             try:
                 cancel_cloud_stops(client, sym)
                 client.submit_order(MarketOrderRequest(
@@ -214,18 +258,20 @@ def check_stop_loss():
                 logger.error(f"    止盈失败: {e}")
             continue
 
-        # 移动止损（从最高点回落，ATR自适应）
-        if trailing_enabled:
+        # 移动止损（盈利达到 activation_pct 后才启动，从最高点回落）
+        if trailing_enabled and pnl >= activation_pct:
             peak = highs.get(sym, entry)
             if peak > entry and cur < peak * (1 - trail_pct / 100):
-                logger.info(f"  [移动止损] {sym} {pnl:+.2f}% 从最高{peak:.2f}回落{(peak-cur)/peak*100:.2f}% (ATR: {trail_pct:.1f}%)")
+                pullback_pct = (peak - cur) / peak * 100
+                logger.info(f"  [移动止损] {sym} {pnl:+.2f}% 最高${peak:.2f} 回落{pullback_pct:.2f}% "
+                           f"(追踪{trail_pct:.1f}%, 启动门槛{activation_pct:.1f}%)")
                 try:
                     cancel_cloud_stops(client, sym)
                     client.submit_order(MarketOrderRequest(
                         symbol=sym, qty=pos["qty"], side=OrderSide.SELL,
                         time_in_force=TimeInForce.DAY))
                     closed.append({"symbol": sym, "reason": "trailing_stop", "pnl_pct": pnl})
-                    logger.info(f"    移动止损卖出 {sym}")
+                    logger.info(f"    移动止损卖出 {sym} (锁定利润 {pnl:+.2f}%)")
                 except Exception as e:
                     logger.error(f"    移动止损失败: {e}")
                 continue
@@ -259,6 +305,11 @@ def check_stop_loss():
 
 def execute_intraday(auto: bool = False):
     """执行日内交易"""
+    # 第一步：检查单日亏损熔断
+    if check_daily_loss_limit():
+        logger.warning("日内交易已暂停：触发单日亏损熔断")
+        return
+
     client = get_alpaca()
     if not client:
         return
@@ -289,6 +340,30 @@ def execute_intraday(auto: bool = False):
 
     check_stop_loss()
     positions = get_positions(client)
+
+    # 止盈止损后再次检查单日亏损
+    if check_daily_loss_limit():
+        logger.warning("日内交易已暂停：止盈止损后触发单日亏损熔断")
+        return
+
+    # 入场时间过滤
+    from datetime import datetime as dt, time
+    now = dt.now().time()
+    entry_start_str = cfg.get("entry_start_time", "10:00")
+    entry_end_str = cfg.get("entry_end_time", "14:30")
+    try:
+        h1, m1 = map(int, entry_start_str.split(":"))
+        h2, m2 = map(int, entry_end_str.split(":"))
+        entry_start = time(h1, m1)
+        entry_end = time(h2, m2)
+        if now < entry_start:
+            logger.info(f"  ⏳ 未到入场时间 {entry_start_str}，跳过买入")
+            return
+        if now > entry_end:
+            logger.info(f"  ⏰ 已过入场时间 {entry_end_str}，只卖不买")
+            return
+    except Exception:
+        pass
 
     # 如果已达最大持仓数，不再买入
     if len(positions) >= max_pos:

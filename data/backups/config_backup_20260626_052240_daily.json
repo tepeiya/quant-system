@@ -1,0 +1,374 @@
+{
+  "broker_config": {
+    "alpaca_paper": {
+      "name": "Alpaca 纸交易",
+      "enabled": true,
+      "type": "alpaca",
+      "paper": true,
+      "env_key_id": "ALPACA_API_KEY_ID",
+      "env_secret": "ALPACA_SECRET_KEY",
+      "base_url": "https://paper-api.alpaca.markets",
+      "data_url": "https://data.alpaca.markets",
+      "strategies": [
+        "conservative",
+        "momentum"
+      ]
+    },
+    "alpaca_paper_intraday": {
+      "name": "Alpaca 日内专用",
+      "enabled": true,
+      "type": "alpaca",
+      "paper": true,
+      "env_key_id": "ALPACA_INTRADAY_KEY_ID",
+      "env_secret": "ALPACA_INTRADAY_SECRET",
+      "base_url": "https://paper-api.alpaca.markets",
+      "data_url": "https://data.alpaca.markets",
+      "strategies": [
+        "intraday"
+      ]
+    },
+    "alpaca_live": {
+      "name": "★ Alpaca 实盘",
+      "enabled": false,
+      "type": "alpaca",
+      "paper": false,
+      "env_key_id": "ALPACA_LIVE_KEY_ID",
+      "env_secret": "ALPACA_LIVE_SECRET",
+      "base_url": "https://api.alpaca.markets",
+      "data_url": "https://data.alpaca.markets",
+      "strategies": [
+        "conservative",
+        "momentum"
+      ]
+    },
+    "alpaca_live_intraday": {
+      "name": "★ Alpaca 实盘日内",
+      "enabled": false,
+      "type": "alpaca",
+      "paper": false,
+      "env_key_id": "ALPACA_LIVE_INTRADAY_KEY_ID",
+      "env_secret": "ALPACA_LIVE_INTRADAY_SECRET",
+      "base_url": "https://api.alpaca.markets",
+      "data_url": "https://data.alpaca.markets",
+      "strategies": [
+        "intraday"
+      ]
+    },
+    "ibkr": {
+      "name": "盈透证券",
+      "enabled": false,
+      "type": "ibkr",
+      "env_key_id": "IBKR_ACCOUNT_ID",
+      "env_secret": "IBKR_TOKEN",
+      "host": "localhost",
+      "port": 7496
+    },
+    "longbridge": {
+      "name": "长桥证券",
+      "enabled": false,
+      "type": "longbridge",
+      "env_key_id": "LONGBRIDGE_APP_KEY",
+      "env_secret": "LONGBRIDGE_APP_SECRET"
+    }
+  },
+  "intraday_config": {
+    "enabled": true,
+    "max_positions": 5,
+    "per_position_pct": 0.18,
+    "capital_pct": 0.2,
+    "stop_loss_pct": 1.5,
+    "take_profit_pct": 2.5,
+    "trailing_stop_pct": 1.0,
+    "trailing_stop_enabled": false,
+    "scan_interval_minutes": 15,
+    "close_time": "15:50",
+    "momentum_windows": [
+      5,
+      15,
+      30
+    ],
+    "min_price": 5,
+    "max_price": 500,
+    "min_volume_ratio": 1.5,
+    "min_avg_volume": 500000,
+    "rsi_overbought": 82,
+    "rsi_oversold": 25,
+    "max_daily_loss_pct": 3.0,
+    "backtest_result": {
+      "total_return_pct": 0,
+      "max_drawdown": 0,
+      "win_rate": 0,
+      "total_trades": 0
+    },
+    "stop_loss_atr_multiple": 1.5,
+    "take_profit_atr_multiple": 2.5,
+    "trailing_stop_atr_multiple": 1.0,
+    "stop_loss_min_pct": 0.5,
+    "stop_loss_max_pct": 4.0
+  },
+  "system_config": {
+    "stop_loss_pct": 14,
+    "stop_loss_atr_multiple": 2.8,
+    "stop_loss_min_pct": 5,
+    "stop_loss_max_pct": 25,
+    "trailing_stop_activate_pct": 12,
+    "trailing_stop_atr_multiple": 1.8,
+    "trailing_stop_min_pct": 6,
+    "rsi_exit": 90,
+    "rsi_entry": 82,
+    "market_overheat_rsi": 81,
+    "market_extreme_rsi": 86,
+    "market_reduce_ratio": 0.3,
+    "max_positions": 10,
+    "score_threshold": 52,
+    "mom_rank_top_pct": 0.6,
+    "max_position_pct": 0.14,
+    "max_sector_pct": 0.38,
+    "semi_single_limit": 0.08,
+    "semi_total_limit": 0.25,
+    "atr_low_threshold": 2.5,
+    "atr_medium_threshold": 4.0,
+    "atr_high_threshold": 6.0,
+    "atr_cap_low": 0.15,
+    "atr_cap_medium": 0.12,
+    "atr_cap_high": 0.08,
+    "atr_cap_extreme": 0.06,
+    "buy_cash_ratio": 0.95,
+    "max_share_price": 300,
+    "momentum_weight": 50,
+    "quality_weight": 20,
+    "trend_weight": 15,
+    "volume_weight": 5,
+    "bond_weight": 0.3,
+    "dollar_weight": 0.2,
+    "gold_weight": 0.2,
+    "inflation_weight": 0.3,
+    "notify_on_trade": true,
+    "notify_on_alert": true,
+    "daily_report": true,
+    "push_to_phone": true,
+    "alert_total_drawdown": 10,
+    "alert_single_loss": 15,
+    "min_hold_days": 5,
+    "churn_keep_score": 40,
+    "split_buy_first": 0.6,
+    "split_buy_drop": 2.0,
+    "split_sell_first": 0.5,
+    "split_sell_rise": 3.0,
+    "split_min_wait": 120,
+    "circuit_daily_loss": 10.0,
+    "circuit_consecutive_loss": 5.0,
+    "circuit_max_drawdown": 25.0,
+    "circuit_cooldown_hours": 24,
+    "hedge_spy_ma200": true,
+    "hedge_vix_trigger": 30,
+    "hedge_ratio_base": 0.5,
+    "hedge_ratio_max": 0.75,
+    "hedge_signal_timeout": 3,
+    "timezone": "Asia/Shanghai",
+    "language": "zh"
+  },
+  "factor_weights": {
+    "momentum": 45,
+    "quality": 26,
+    "trend": 13,
+    "value": 8,
+    "lowvol": 6,
+    "volume": 6
+  },
+  "trade_mode": {
+    "mode": "paper"
+  },
+  "factor_ranking": {
+    "timestamp": "2026-06-19 21:47:34.711702",
+    "total_factors": 24,
+    "factors": [
+      {
+        "factor": "momentum_21d",
+        "ic_rank": 0.9008,
+        "ic_pearson": 0.9753,
+        "samples": 25,
+        "abs_ic": 0.9008
+      },
+      {
+        "factor": "momentum_accel",
+        "ic_rank": -0.8562,
+        "ic_pearson": -0.8766,
+        "samples": 25,
+        "abs_ic": 0.8562
+      },
+      {
+        "factor": "price_to_sma50",
+        "ic_rank": 0.7646,
+        "ic_pearson": 0.8401,
+        "samples": 25,
+        "abs_ic": 0.7646
+      },
+      {
+        "factor": "price_to_sma20",
+        "ic_rank": 0.6985,
+        "ic_pearson": 0.8467,
+        "samples": 25,
+        "abs_ic": 0.6985
+      },
+      {
+        "factor": "momentum_63d",
+        "ic_rank": 0.6446,
+        "ic_pearson": 0.7218,
+        "samples": 25,
+        "abs_ic": 0.6446
+      },
+      {
+        "factor": "momentum_126d",
+        "ic_rank": 0.6385,
+        "ic_pearson": 0.6956,
+        "samples": 25,
+        "abs_ic": 0.6385
+      },
+      {
+        "factor": "trend_strength",
+        "ic_rank": -0.6285,
+        "ic_pearson": -0.5682,
+        "samples": 25,
+        "abs_ic": 0.6285
+      },
+      {
+        "factor": "sma20_to_sma50",
+        "ic_rank": 0.6062,
+        "ic_pearson": 0.643,
+        "samples": 25,
+        "abs_ic": 0.6062
+      },
+      {
+        "factor": "momentum_10d",
+        "ic_rank": 0.5569,
+        "ic_pearson": 0.6781,
+        "samples": 25,
+        "abs_ic": 0.5569
+      },
+      {
+        "factor": "corr_spy_60d",
+        "ic_rank": 0.5185,
+        "ic_pearson": 0.4724,
+        "samples": 25,
+        "abs_ic": 0.5185
+      },
+      {
+        "factor": "beta_60d",
+        "ic_rank": -0.5146,
+        "ic_pearson": -0.4378,
+        "samples": 25,
+        "abs_ic": 0.5146
+      },
+      {
+        "factor": "rsi",
+        "ic_rank": -0.4792,
+        "ic_pearson": -0.4668,
+        "samples": 25,
+        "abs_ic": 0.4792
+      },
+      {
+        "factor": "momentum_252d",
+        "ic_rank": 0.4415,
+        "ic_pearson": 0.4475,
+        "samples": 25,
+        "abs_ic": 0.4415
+      },
+      {
+        "factor": "corr_spy_20d",
+        "ic_rank": -0.3454,
+        "ic_pearson": -0.3456,
+        "samples": 25,
+        "abs_ic": 0.3454
+      },
+      {
+        "factor": "sma50_to_sma200",
+        "ic_rank": 0.3438,
+        "ic_pearson": 0.4638,
+        "samples": 25,
+        "abs_ic": 0.3438
+      },
+      {
+        "factor": "volume_ratio_20",
+        "ic_rank": 0.3031,
+        "ic_pearson": 0.2229,
+        "samples": 25,
+        "abs_ic": 0.3031
+      },
+      {
+        "factor": "volatility_ratio",
+        "ic_rank": -0.2469,
+        "ic_pearson": -0.2852,
+        "samples": 25,
+        "abs_ic": 0.2469
+      },
+      {
+        "factor": "atr_pct",
+        "ic_rank": -0.2185,
+        "ic_pearson": -0.1292,
+        "samples": 25,
+        "abs_ic": 0.2185
+      },
+      {
+        "factor": "atr_ratio",
+        "ic_rank": -0.2008,
+        "ic_pearson": -0.1038,
+        "samples": 25,
+        "abs_ic": 0.2008
+      },
+      {
+        "factor": "atr_zscore",
+        "ic_rank": -0.1977,
+        "ic_pearson": -0.1003,
+        "samples": 25,
+        "abs_ic": 0.1977
+      },
+      {
+        "factor": "volume_ratio_1",
+        "ic_rank": -0.1946,
+        "ic_pearson": -0.3451,
+        "samples": 25,
+        "abs_ic": 0.1946
+      },
+      {
+        "factor": "volatility_20d",
+        "ic_rank": 0.1831,
+        "ic_pearson": 0.0418,
+        "samples": 25,
+        "abs_ic": 0.1831
+      },
+      {
+        "factor": "momentum_5d",
+        "ic_rank": 0.1815,
+        "ic_pearson": 0.3305,
+        "samples": 25,
+        "abs_ic": 0.1815
+      },
+      {
+        "factor": "vpr",
+        "ic_rank": 0.1469,
+        "ic_pearson": 0.0582,
+        "samples": 25,
+        "abs_ic": 0.1469
+      }
+    ],
+    "top_factors": [
+      "momentum_21d",
+      "momentum_accel",
+      "price_to_sma50",
+      "price_to_sma20",
+      "momentum_63d",
+      "momentum_126d",
+      "trend_strength",
+      "sma20_to_sma50",
+      "momentum_10d",
+      "corr_spy_60d"
+    ],
+    "stock_count": 25
+  },
+  "__meta__": {
+    "backup_at": "2026-06-26 05:22:40",
+    "label": "daily",
+    "version": "1.0"
+  }
+}
