@@ -30,7 +30,57 @@ def page():
 
 
 # ============================================================
-# Alpha Zoo API
+# Alpha Manager API (4大因子库统一接口)
+# ============================================================
+
+@bp.route("/api/libraries")
+def api_libraries():
+    """获取所有因子库信息"""
+    try:
+        from alpha_manager import get_alpha_manager
+        manager = get_alpha_manager()
+        libs = manager.get_libraries()
+        return jsonify(_fix({
+            "libraries": libs,
+            "total_count": manager.get_total_count(),
+        }))
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+@bp.route("/api/compute_all")
+def api_compute_all():
+    """计算所有因子库的因子"""
+    try:
+        from alpha_manager import get_alpha_manager
+        symbol = request.args.get("symbol", "AAPL")
+        library = request.args.get("library")  # 可选: alpha101/gtja191/qlib158/academic
+
+        import yfinance as yf
+        df = yf.download(symbol, period="2y", progress=False)
+        if len(df) == 0:
+            return jsonify({"error": f"无法获取 {symbol} 的数据"})
+
+        manager = get_alpha_manager()
+        if library:
+            factors = manager.compute_by_library(df, library)
+        else:
+            factors = manager.compute_all(df)
+
+        valid = sum(1 for v in factors.values() if v is not None and not (isinstance(v, float) and np.isnan(v)))
+        return jsonify(_fix({
+            "symbol": symbol,
+            "library": library or "all",
+            "total_factors": len(factors),
+            "valid_factors": valid,
+            "factors": factors,
+        }))
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+# ============================================================
+# Alpha Zoo API (学术因子)
 # ============================================================
 
 @bp.route("/api/alpha_zoo/categories")
