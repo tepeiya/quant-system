@@ -1,7 +1,7 @@
 """
 因子追踪 - Blueprint
 """
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, jsonify, render_template, request
 import numpy as np
 from datetime import datetime, timedelta
 
@@ -28,6 +28,81 @@ def _fix(obj):
 def page():
     return render_template("factors.html")
 
+
+# ============================================================
+# Alpha Zoo API
+# ============================================================
+
+@bp.route("/api/alpha_zoo/categories")
+def api_alpha_zoo_categories():
+    """获取Alpha Zoo因子类别"""
+    try:
+        from alpha_zoo import get_all_categories
+        categories = get_all_categories()
+        return jsonify(_fix(categories))
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+@bp.route("/api/alpha_zoo/factors")
+def api_alpha_zoo_factors():
+    """获取Alpha Zoo因子列表"""
+    try:
+        from alpha_zoo import get_alpha_zoo
+        zoo = get_alpha_zoo()
+        category = request.args.get("category")
+        
+        if category:
+            factors = zoo.get_factors_by_category(category)
+        else:
+            factors = list(zoo.factors.keys())
+        
+        result = []
+        for name in factors:
+            info = zoo.get_factor_info(name)
+            result.append({
+                "name": name,
+                "category": info.get("category", ""),
+                "description": info.get("description", ""),
+            })
+        
+        return jsonify(_fix({
+            "factors": result,
+            "total": len(result),
+            "category": category
+        }))
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+@bp.route("/api/alpha_zoo/compute")
+def api_alpha_zoo_compute():
+    """计算Alpha Zoo因子"""
+    try:
+        from alpha_zoo import compute_factors
+        symbol = request.args.get("symbol", "AAPL")
+        factor_names = request.args.getlist("factors")
+        
+        import yfinance as yf
+        df = yf.download(symbol, period="2y", progress=False)
+        
+        if len(df) == 0:
+            return jsonify({"error": f"无法获取 {symbol} 的数据"})
+        
+        factors = compute_factors(df, factor_names)
+        
+        return jsonify(_fix({
+            "symbol": symbol,
+            "factors": factors,
+            "date": str(datetime.now())
+        }))
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+# ============================================================
+# 原有因子权重和进化 API
+# ============================================================
 
 @bp.route("/api/weights")
 def api_weights():
