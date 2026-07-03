@@ -111,17 +111,27 @@ class PluginLoader:
 
     def load_plugin(self, plugin_name: str) -> StrategyPlugin | None:
         """加载单个插件"""
-        # 把 plugins 目录加入 sys.path
-        if PLUGINS_DIR not in sys.path:
-            sys.path.insert(0, PLUGINS_DIR)
+        # 把项目根目录加入 sys.path，使 plugins 包可导入
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        if root_dir not in sys.path:
+            sys.path.insert(0, root_dir)
 
         try:
-            # 直接 import plugin 子模块
-            plugin_mod = f"plugins.{plugin_name}.plugin"
-            try:
-                mod = importlib.import_module(plugin_mod)
-            except ImportError:
+            plugin_path = os.path.join(PLUGINS_DIR, plugin_name)
+            plugin_file = os.path.join(plugin_path, "plugin.py")
+            init_file = os.path.join(plugin_path, "__init__.py")
+            
+            if os.path.exists(plugin_file):
+                spec = importlib.util.spec_from_file_location(f"plugins.{plugin_name}.plugin", plugin_file)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+            elif os.path.exists(init_file):
+                spec = importlib.util.spec_from_file_location(f"plugins.{plugin_name}", init_file)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+            else:
                 mod = importlib.import_module(f"plugins.{plugin_name}")
+            
             self._modules[plugin_name] = mod
 
             # 直接取 Plugin 属性
