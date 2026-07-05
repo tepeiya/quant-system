@@ -26,6 +26,13 @@ except:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [INTRADAY] %(message)s")
 logger = logging.getLogger("quant.intraday")
 
+_alpha_manager_loaded = False
+try:
+    from alpha_manager import get_alpha_manager
+    _alpha_manager_loaded = True
+except Exception:
+    pass
+
 SIGNAL_FILE = "signals/intraday_signal.json"
 TRADE_LOG = "signals/intraday_trades.json"
 BACKTEST_FILE = "signals/intraday_backtest.json"
@@ -376,6 +383,40 @@ def scan_intraday_signals() -> list[dict]:
             bonus = min(vr * 0.3, 1.5)
             s["micro_volume_confirm"] = round(bonus, 2)
             s["score"] += bonus
+
+    # === AlphaManager 339因子增强 ===
+    if _alpha_manager_loaded and signals and len(signals) >= 5:
+        try:
+            alpha_mgr = get_alpha_manager()
+            alpha_scores = {}
+            count_valid = 0
+            top_n = min(20, len(signals))
+            for i in range(top_n):
+                tkr = signals[i]["ticker"]
+                df = cache.get(tkr)
+                if df is None or len(df) < 60:
+                    continue
+                try:
+                    factors = alpha_mgr.compute_all(df)
+                    valid_vals = [v for v in factors.values() if v is not None and not pd.isna(v) and isinstance(v, (int, float)) and not np.isinf(v)]
+                    if len(valid_vals) > 10:
+                        vals_arr = np.array(valid_vals)
+                        z_scores = (vals_arr - vals_arr.mean()) / (vals_arr.std() + 1e-8) if vals_arr.std() > 0 else np.zeros_like(vals_arr)
+                        alpha_scores[tkr] = float(np.nanmean(z_scores))
+                        count_valid += 1
+                except Exception:
+                    continue
+            if count_valid >= 3:
+                all_z = [v for v in alpha_scores.values() if not pd.isna(v)]
+                max_abs = max(abs(v) for v in all_z) if all_z else 1
+                for s in signals:
+                    if s["ticker"] in alpha_scores and max_abs > 0:
+                        normalized_alpha = alpha_scores[s["ticker"]] / max_abs
+                        s["alpha_score"] = round(normalized_alpha, 3)
+                        s["score"] = s["score"] * 0.8 + normalized_alpha * 20
+                logger.info(f"AlphaManager因子增强: {count_valid}只有效, 权重20%")
+        except Exception as e:
+            logger.debug(f"AlphaManager因子增强跳过: {e}")
 
     # === 评分归一化（z-score 标准化到 0-100 分） ===
     if signals and len(signals) >= 5:

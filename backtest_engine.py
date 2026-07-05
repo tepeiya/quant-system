@@ -22,6 +22,13 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger("quant.backtest")
 
+_attribution_loaded = False
+try:
+    from backtest_attribution import analyze_backtest
+    _attribution_loaded = True
+except Exception:
+    pass
+
 # 回测配置
 DEFAULT_CONFIG = {
     "initial_capital": 100000,  # 初始资金
@@ -387,7 +394,18 @@ class BacktestEngine:
                 for t in trades[-20:]  # 最近20笔交易
             ]
         }
-    
+
+        # 归因分析
+        if _attribution_loaded:
+            try:
+                attribution = analyze_backtest(result)
+                if attribution:
+                    result["attribution"] = attribution.get("summary", {})
+            except Exception as e:
+                logger.debug(f"归因分析跳过: {e}")
+
+        return result
+
     def _calculate_sharpe(self, returns: np.ndarray, risk_free_rate: float = 0.02) -> float:
         """计算夏普比率"""
         if len(returns) < 2:

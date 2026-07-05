@@ -33,6 +33,13 @@ logging.basicConfig(
 logger = logging.getLogger("quant.daemon")
 logger.info(f"日志目录: {LOG_DIR}")
 
+_monitoring_loaded = False
+try:
+    from monitoring import record_metric, create_alert
+    _monitoring_loaded = True
+except Exception:
+    pass
+
 # ====== PID/STATUS 文件：优先用 /tmp/ 避免权限问题 ======
 PID_FILE = "/tmp/quant_daemon.pid"
 STATUS_FILE = "/tmp/quant_daemon_status.json"
@@ -258,6 +265,30 @@ def run_daily_cycle():
                     last_pnl_record=str(datetime.now()),
                 )
                 logger.info(f"  权益: ${equity:.2f}, 现金: ${cash_amt:.2f}, 持仓: {positions_count}只")
+
+                # 记录监控指标
+                if _monitoring_loaded:
+                    try:
+                        from broker_manager import get_default_broker_id
+                        broker_id = get_default_broker_id()
+                        record_metric("equity", equity, {"broker": broker_id})
+                        record_metric("cash", cash_amt, {"broker": broker_id})
+                        record_metric("position_count", positions_count, {"broker": broker_id})
+                        
+                        # 计算日收益率并检查告警
+                        last_equity = float(acct.last_equity) if hasattr(acct, 'last_equity') else equity
+                        daily_pnl_pct = (equity - last_equity) / last_equity * 100 if last_equity > 0 else 0
+                        
+                        if daily_pnl_pct < -5:
+                            create_alert(
+                                "warning", "risk",
+                                f"日亏损 {daily_pnl_pct:.1f}%",
+                                f"当前权益 ${equity:.2f}，日跌幅超过5%",
+                                {"equity": equity, "daily_pnl_pct": daily_pnl_pct}
+                            )
+                            logger.warning(f"⚠️ 告警触发: 日亏损 {daily_pnl_pct:.1f}%")
+                    except Exception as mon_e:
+                        logger.debug(f"监控记录跳过: {mon_e}")
 
                 # 收盘后发送微信通知
                 try:

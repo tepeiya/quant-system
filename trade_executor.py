@@ -29,6 +29,13 @@ import order_manager as om
 from broker_manager import BrokerManager
 from risk_manager import RiskManager
 
+_circuit_breaker_loaded = False
+try:
+    from circuit_breaker import CircuitBreaker
+    _circuit_breaker_loaded = True
+except Exception:
+    pass
+
 
 # ============================================================
 # 执行策略
@@ -43,6 +50,7 @@ class TradeExecutor:
         self.broker_id = broker_id or get_default_broker_id()
         self.risk = None
         self._client = None
+        self._circuit_breaker = CircuitBreaker() if _circuit_breaker_loaded else None
 
     def get_client(self):
         """获取当前券商的交易客户端 (BrokerInterface)"""
@@ -245,6 +253,20 @@ class TradeExecutor:
 
     def run_once(self, dry_run: bool = False):
         """单次执行：读总线 → 处理信号 → 执行"""
+        if self._circuit_breaker:
+            try:
+                client = self.get_client()
+                if client:
+                    acct = client.get_account()
+                    current_equity = float(acct.get("equity", acct.get("portfolio_value", 0)))
+                    initial_equity = float(acct.get("equity", 100000))
+                    cb_result = self._circuit_breaker.check(current_equity, initial_equity)
+                    if cb_result.get("should_stop"):
+                        logger.warning(f"⛔ 熔断触发: {cb_result.get('reason')}，停止本次执行")
+                        return [{"status": "circuit_breaker", "reason": cb_result["reason"]}]
+            except Exception as e:
+                logger.debug(f"熔断检查跳过: {e}")
+
         msgs = signal_bus.read_pending_messages(consumer="executor", limit=20)
 
         all_intents = []

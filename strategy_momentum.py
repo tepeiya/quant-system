@@ -26,6 +26,13 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger("quant.strategy_momentum")
 
+_alpha_manager_loaded = False
+try:
+    from alpha_manager import get_alpha_manager
+    _alpha_manager_loaded = True
+except Exception:
+    pass
+
 OUTPUT_DIR = "signals"
 
 
@@ -271,6 +278,45 @@ def generate_signals(prices: dict[str, pd.DataFrame], top_n: int = 15) -> list[s
 
     mom_scores.sort(key=lambda x: x[1], reverse=True)
     top_tickers = [t for t, s in mom_scores[:top_n]]
+
+    # AlphaManager 339因子增强
+    if _alpha_manager_loaded:
+        try:
+            alpha_mgr = get_alpha_manager()
+            alpha_scores = {}
+            count_valid = 0
+            enhance_n = min(top_n, len(mom_scores))
+            for i in range(enhance_n):
+                tkr, mom_score = mom_scores[i]
+                df = prices.get(tkr)
+                if df is None or len(df) < 60:
+                    continue
+                try:
+                    factors = alpha_mgr.compute_all(df)
+                    valid_vals = [v for v in factors.values() if v is not None and not pd.isna(v) and isinstance(v, (int, float)) and not np.isinf(v)]
+                    if len(valid_vals) > 10:
+                        vals_arr = np.array(valid_vals)
+                        z_scores = (vals_arr - vals_arr.mean()) / (vals_arr.std() + 1e-8) if vals_arr.std() > 0 else np.zeros_like(vals_arr)
+                        alpha_scores[tkr] = float(np.nanmean(z_scores))
+                        count_valid += 1
+                except Exception:
+                    continue
+            if count_valid >= 3:
+                all_z = [v for v in alpha_scores.values() if not pd.isna(v)]
+                max_abs = max(abs(v) for v in all_z) if all_z else 1
+                enhanced = []
+                for tkr, mom_s in mom_scores:
+                    if tkr in alpha_scores and max_abs > 0:
+                        normalized_alpha = alpha_scores[tkr] / max_abs
+                        final_score = mom_s * 0.8 + normalized_alpha * 0.2
+                        enhanced.append((tkr, final_score))
+                    else:
+                        enhanced.append((tkr, mom_s))
+                enhanced.sort(key=lambda x: x[1], reverse=True)
+                top_tickers = [t for t, s in enhanced[:top_n]]
+                logger.info(f"AlphaManager因子增强: {count_valid}只有效, 权重20%")
+        except Exception as e:
+            logger.debug(f"AlphaManager因子增强跳过: {e}")
 
     # 保存信号
     signal_file = f"{OUTPUT_DIR}/signal_momentum.json"

@@ -18,6 +18,19 @@ from data_prod import load_price_cache, compute_indicators
 from quality_factor import compute_quality_scores
 from multi_asset import multi_asset_signal
 
+_alpha_manager_loaded = False
+_fred_loaded = False
+try:
+    from alpha_manager import get_alpha_manager
+    _alpha_manager_loaded = True
+except Exception:
+    pass
+try:
+    from fred_data import get_macro_temperature
+    _fred_loaded = True
+except Exception:
+    pass
+
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "signals")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -257,6 +270,61 @@ def generate_signals(use_cached_quality=True):
         })
     scores.sort(key=lambda x: -x["score"])
 
+    # 4.6 AlphaManager 339因子增强 — 对Top20候选股票计算全因子并融合
+    if _alpha_manager_loaded:
+        try:
+            alpha_mgr = get_alpha_manager()
+            top_n = min(20, len(scores))
+            alpha_scores = {}
+            count_valid = 0
+            for i in range(top_n):
+                tkr = scores[i]["ticker"]
+                df = cache.get(tkr)
+                if df is None or len(df) < 60:
+                    continue
+                try:
+                    factors = alpha_mgr.compute_all(df)
+                    valid_vals = [v for v in factors.values() if v is not None and not pd.isna(v) and isinstance(v, (int, float)) and not np.isinf(v)]
+                    if len(valid_vals) > 10:
+                        vals_arr = np.array(valid_vals)
+                        z_scores = (vals_arr - vals_arr.mean()) / (vals_arr.std() + 1e-8) if vals_arr.std() > 0 else np.zeros_like(vals_arr)
+                        alpha_scores[tkr] = float(np.nanmean(z_scores))
+                        count_valid += 1
+                except Exception:
+                    continue
+            if count_valid >= 3:
+                all_z = [v for v in alpha_scores.values() if not pd.isna(v)]
+                max_abs = max(abs(v) for v in all_z) if all_z else 1
+                for s in scores:
+                    if s["ticker"] in alpha_scores and max_abs > 0:
+                        normalized_alpha = alpha_scores[s["ticker"]] / max_abs
+                        s["alpha_score"] = round(normalized_alpha, 3)
+                        s["score"] = round(s["score"] * 0.75 + normalized_alpha * 25, 1)
+                scores.sort(key=lambda x: -x["score"])
+                logger.info(f"AlphaManager因子增强: {count_valid}只有效, 权重25%")
+        except Exception as e:
+            logger.debug(f"AlphaManager因子增强跳过: {e}")
+
+    # 4.7 FRED宏观温度过滤 — 根据宏观环境动态调整仓位
+    macro_info = None
+    macro_temp = 50
+    macro_position_adjust = 1.0
+    if _fred_loaded:
+        try:
+            macro_info = get_macro_temperature()
+            macro_temp = macro_info.get("macro_temperature", 50)
+            if macro_temp < 25:
+                macro_position_adjust = 0.4
+            elif macro_temp < 40:
+                macro_position_adjust = 0.7
+            elif macro_temp < 60:
+                macro_position_adjust = 1.0
+            else:
+                macro_position_adjust = 1.0
+            logger.info(f"FRED宏观温度: {macro_temp:.0f}/100, 仓位系数: {macro_position_adjust}")
+        except Exception as e:
+            logger.debug(f"FRED宏观温度获取跳过: {e}")
+
     # 4.5 因子排名增强 — 用当前最有效的因子重新调整Top候选
     try:
         ranking_file = "config/factor_ranking.json"
@@ -375,6 +443,11 @@ def generate_signals(use_cached_quality=True):
     output = {
         "date": dt_str,
         "market": {"spy": float(spy_price), "rsi": float(rsi), "trend": ml, "action": ma},
+        "macro": {
+            "temperature": float(macro_temp),
+            "position_adjust": float(macro_position_adjust),
+            "info": macro_info,
+        } if macro_info else None,
         "top_scores": scores[:10],
         "buy_candidates": cand,
     }

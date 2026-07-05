@@ -1,211 +1,215 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>数据源管理</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-</head>
-<body>
-    <div class="content-container">
-        <h1>🌐 统一数据源管理</h1>
-        <p class="subtitle">整合 6 大数据源，自动路由 + 智能降级</p>
+{% extends "base.html" %}
+{% block title %}数据源管理 - 量化系统{% endblock %}
+{% block content %}
 
-        <!-- 数据源状态卡片 -->
-        <div class="card">
-            <h2>📊 数据源状态</h2>
-            <div id="sources-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
-                <p class="placeholder">加载中...</p>
-            </div>
-        </div>
+<style>
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th, .data-table td { padding: 8px; text-align: left; border-bottom: 1px solid #30363d; font-size: 12px; }
+    .data-table th { color: #8b949e; }
+    .placeholder { color: #484f58; text-align: center; padding: 40px; }
+    .error { color: #f85149; }
+    
+    .form-row { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+    .form-row label { color: #8b949e; font-size: 13px; white-space: nowrap; }
+    .form-row input, .form-row select { padding: 8px; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #e6edf3; font-size: 13px; }
+    .form-row input:focus, .form-row select:focus { outline: none; border-color: #58a6ff; }
+    
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 15px; color: #e6edf3; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    code { background: #0d1117; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+</style>
 
-        <!-- 市场路由配置 -->
-        <div class="card">
-            <h2>🗺️ 市场路由优先级</h2>
-            <div id="routing-table">
-                <p class="placeholder">加载中...</p>
-            </div>
-        </div>
-
-        <!-- 数据查询 -->
-        <div class="card">
-            <h2>🔍 数据查询</h2>
-            <div class="form-row">
-                <label>股票/代码:</label>
-                <input type="text" id="symbol-input" placeholder="如: AAPL / 000001.SZ / 0700.HK / BTC-USDT" style="flex:1;">
-                <button onclick="detectMarket()" class="btn btn-secondary">检测市场</button>
-                <button onclick="fetchData()" class="btn btn-primary">获取数据</button>
-            </div>
-            <div id="market-info" style="margin-top:8px;"></div>
-        </div>
-
-        <!-- 查询结果 -->
-        <div class="card">
-            <h2>📋 查询结果</h2>
-            <div id="result-area" style="min-height:200px;">
-                <p class="placeholder">输入代码并点击获取数据</p>
-            </div>
-        </div>
-
-        <!-- 配置 -->
-        <div class="card">
-            <h2>⚙️ 配置</h2>
-            <div class="form-row">
-                <label>Tushare Token:</label>
-                <input type="text" id="tushare-token" placeholder="可选" style="flex:1;">
-            </div>
-            <div class="form-row">
-                <label>CCXT 交易所:</label>
-                <input type="text" id="ccxt-exchange" placeholder="binance" value="binance" style="flex:1;">
-            </div>
-            <div class="form-row">
-                <label>Futu OpenD 地址:</label>
-                <input type="text" id="futu-host" placeholder="127.0.0.1" value="127.0.0.1" style="flex:1;">
-                <input type="text" id="futu-port" placeholder="11111" value="11111" style="width:80px;">
-            </div>
-            <div class="form-row">
-                <button onclick="saveConfig()" class="btn btn-primary">保存配置</button>
-            </div>
-        </div>
+<div class="page-header">
+    <div>
+        <h1>🌐 数据源管理</h1>
+        <div class="subtitle">整合 6 大数据源，自动路由 + 智能降级</div>
     </div>
+</div>
 
-    <script>
-        // 加载数据源状态
-        async function loadSources() {
-            const resp = await fetch('/data_hub/api/info');
-            const info = await resp.json();
+<div class="card">
+    <h2>📊 数据源状态</h2>
+    <div id="sources-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+        <p class="placeholder">加载中...</p>
+    </div>
+</div>
 
-            // 数据源卡片
-            const sourceMap = {
-                tushare: { name: 'Tushare', icon: '🇨🇳', desc: 'A股价格、财务报表、财务指标' },
-                akshare: { name: 'AKShare', icon: '🆓', desc: 'A股/港股/美股/期货/外汇（免费聚合）' },
-                yfinance: { name: 'yfinance', icon: 'yahoo', desc: '港股/美股/ETF/指数（免费）' },
-                okx: { name: 'OKX', icon: '₿', desc: '加密货币（免费）' },
-                ccxt: { name: 'CCXT', icon: '⛓️', desc: '100+加密货币交易所（免费）' },
-                futu: { name: 'Futu', icon: '🇭🇰', desc: '港股/A股（需本地OpenD）' },
-            };
+<div class="card">
+    <h2>🗺️ 市场路由优先级</h2>
+    <div id="routing-table">
+        <p class="placeholder">加载中...</p>
+    </div>
+</div>
 
-            let html = '';
-            for (const [name, status] of Object.entries(info.sources)) {
-                const meta = sourceMap[name] || { name: name, icon: '📡', desc: '' };
-                const icon = status.available ? '✅' : '❌';
-                const keyTag = status.requires_api_key ? '<span class="badge" style="font-size:10px;background:#f85149;">需Key</span>' : '<span class="badge" style="font-size:10px;background:#238636;">免费</span>';
-                html += `
-                    <div style="padding:12px;border:1px solid #30363d;border-radius:8px;background:#0f1115;">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                            <span style="font-size:20px;">${icon}</span>
-                            <strong>${meta.name}</strong>
-                            ${keyTag}
-                        </div>
-                        <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">${meta.desc}</div>
-                        <div style="font-size:10px;color:#6e7681;">市场: ${status.markets.join(', ')}</div>
+<div class="card">
+    <h2>🔍 数据查询</h2>
+    <div class="form-row">
+        <label>股票/代码:</label>
+        <input type="text" id="symbol-input" placeholder="如: AAPL / 000001.SZ / 0700.HK / BTC-USDT" style="flex:1;">
+        <button onclick="detectMarket()" class="btn btn-secondary">检测市场</button>
+        <button onclick="fetchData()" class="btn btn-primary">获取数据</button>
+    </div>
+    <div id="market-info" style="margin-top:8px;"></div>
+</div>
+
+<div class="card">
+    <h2>📋 查询结果</h2>
+    <div id="result-area" style="min-height:200px;">
+        <p class="placeholder">输入代码并点击获取数据</p>
+    </div>
+</div>
+
+<div class="card">
+    <h2>⚙️ 配置</h2>
+    <div class="form-row">
+        <label>Tushare Token:</label>
+        <input type="text" id="tushare-token" placeholder="可选" style="flex:1;">
+    </div>
+    <div class="form-row">
+        <label>CCXT 交易所:</label>
+        <input type="text" id="ccxt-exchange" placeholder="binance" value="binance" style="flex:1;">
+    </div>
+    <div class="form-row">
+        <label>Futu OpenD 地址:</label>
+        <input type="text" id="futu-host" placeholder="127.0.0.1" value="127.0.0.1" style="flex:1;">
+        <input type="text" id="futu-port" placeholder="11111" value="11111" style="width:80px;">
+    </div>
+    <div class="form-row">
+        <button onclick="saveConfig()" class="btn btn-primary">保存配置</button>
+    </div>
+</div>
+
+<script>
+    async function loadSources() {
+        const resp = await fetch('/data_hub/api/info');
+        const info = await resp.json();
+
+        const sourceMap = {
+            tushare: { name: 'Tushare', icon: '🇨🇳', desc: 'A股价格、财务报表、财务指标' },
+            akshare: { name: 'AKShare', icon: '🆓', desc: 'A股/港股/美股/期货/外汇（免费聚合）' },
+            yfinance: { name: 'yfinance', icon: '📈', desc: '港股/美股/ETF/指数（免费）' },
+            okx: { name: 'OKX', icon: '₿', desc: '加密货币（免费）' },
+            ccxt: { name: 'CCXT', icon: '⛓️', desc: '100+加密货币交易所（免费）' },
+            futu: { name: 'Futu', icon: '🇭🇰', desc: '港股/A股（需本地OpenD）' },
+        };
+
+        let html = '';
+        for (const [name, status] of Object.entries(info.sources)) {
+            const meta = sourceMap[name] || { name: name, icon: '📡', desc: '' };
+            const icon = status.available ? '✅' : '❌';
+            const keyTag = status.requires_api_key 
+                ? '<span class="badge" style="background:rgba(248,81,73,0.2);color:#f85149;">需Key</span>' 
+                : '<span class="badge" style="background:rgba(35,134,54,0.2);color:#3fb950;">免费</span>';
+            html += `
+                <div style="padding:12px;border:1px solid #30363d;border-radius:8px;background:#0f1115;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        <span style="font-size:20px;">${icon}</span>
+                        <strong>${meta.name}</strong>
+                        ${keyTag}
                     </div>
-                `;
-            }
-            document.getElementById('sources-grid').innerHTML = html;
-
-            // 路由表
-            const marketNames = { ashare:'A股', us:'美股', hk:'港股', crypto:'加密货币', futures:'期货', forex:'外汇' };
-            let routeHtml = '<table class="data-table"><thead><tr><th>市场</th><th>数据源优先级（→ 降级）</th></tr></thead><tbody>';
-            for (const [market, sources] of Object.entries(info.source_priority)) {
-                routeHtml += `<tr><td><strong>${marketNames[market] || market}</strong></td><td>${sources.join(' → ')}</td></tr>`;
-            }
-            routeHtml += '</tbody></table>';
-            document.getElementById('routing-table').innerHTML = routeHtml;
-        }
-
-        // 检测市场
-        async function detectMarket() {
-            const symbol = document.getElementById('symbol-input').value.trim();
-            if (!symbol) return;
-
-            const resp = await fetch(`/data_hub/api/detect_market?symbol=${encodeURIComponent(symbol)}`);
-            const data = await resp.json();
-
-            if (data.error) {
-                document.getElementById('market-info').innerHTML = `<span class="error">${data.error}</span>`;
-                return;
-            }
-
-            const sourcesResp = await fetch(`/data_hub/api/sources_for?symbol=${encodeURIComponent(symbol)}`);
-            const sourcesData = await sourcesResp.json();
-
-            document.getElementById('market-info').innerHTML = `
-                <div style="padding:8px;background:#161b22;border-radius:6px;">
-                    <strong>${data.symbol}</strong> → ${data.market_name} (${data.market})<br>
-                    标准化代码: <code>${data.normalized}</code><br>
-                    可用数据源: ${sourcesData.sources.join(' → ') || '无'}
+                    <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">${meta.desc}</div>
+                    <div style="font-size:10px;color:#6e7681;">市场: ${status.markets.join(', ')}</div>
                 </div>
             `;
         }
+        document.getElementById('sources-grid').innerHTML = html;
 
-        // 获取数据
-        async function fetchData() {
-            const symbol = document.getElementById('symbol-input').value.trim();
-            if (!symbol) { alert('请输入代码'); return; }
+        const marketNames = { ashare:'A股', us:'美股', hk:'港股', crypto:'加密货币', futures:'期货', forex:'外汇' };
+        let routeHtml = '<table class="data-table"><thead><tr><th>市场</th><th>数据源优先级（→ 降级）</th></tr></thead><tbody>';
+        for (const [market, sources] of Object.entries(info.source_priority)) {
+            routeHtml += `<tr><td><strong>${marketNames[market] || market}</strong></td><td>${sources.join(' → ')}</td></tr>`;
+        }
+        routeHtml += '</tbody></table>';
+        document.getElementById('routing-table').innerHTML = routeHtml;
+    }
 
-            document.getElementById('result-area').innerHTML = '<p class="placeholder">加载中...</p>';
+    async function detectMarket() {
+        const symbol = document.getElementById('symbol-input').value.trim();
+        if (!symbol) return;
 
-            const resp = await fetch(`/data_hub/api/fetch?symbol=${encodeURIComponent(symbol)}`);
-            const data = await resp.json();
+        const resp = await fetch(`/data_hub/api/detect_market?symbol=${encodeURIComponent(symbol)}`);
+        const data = await resp.json();
 
-            if (data.error) {
-                document.getElementById('result-area').innerHTML = `<p class="error">${data.error}</p>`;
-                return;
-            }
+        if (data.error) {
+            document.getElementById('market-info').innerHTML = `<span class="error">${data.error}</span>`;
+            return;
+        }
 
-            let html = `<h3>${data.symbol} (${data.rows}条) — 尝试源: ${data.sources_tried.join(', ')}</h3>`;
-            html += '<table class="data-table"><thead><tr>';
-            data.columns.forEach(c => html += `<th>${c}</th>`);
-            html += '</tr></thead><tbody>';
+        const sourcesResp = await fetch(`/data_hub/api/sources_for?symbol=${encodeURIComponent(symbol)}`);
+        const sourcesData = await sourcesResp.json();
 
-            data.data.slice(0, 20).forEach(row => {
-                html += '<tr>';
-                data.columns.forEach(c => {
-                    let v = row[c];
-                    if (typeof v === 'number') v = v.toFixed(2);
-                    html += `<td>${v}</td>`;
-                });
-                html += '</tr>';
+        document.getElementById('market-info').innerHTML = `
+            <div style="padding:8px;background:#161b22;border-radius:6px;">
+                <strong>${data.symbol}</strong> → ${data.market_name} (${data.market})<br>
+                标准化代码: <code>${data.normalized}</code><br>
+                可用数据源: ${sourcesData.sources.join(' → ') || '无'}
+            </div>
+        `;
+    }
+
+    async function fetchData() {
+        const symbol = document.getElementById('symbol-input').value.trim();
+        if (!symbol) { alert('请输入代码'); return; }
+
+        document.getElementById('result-area').innerHTML = '<p class="placeholder">加载中...</p>';
+
+        const resp = await fetch(`/data_hub/api/fetch?symbol=${encodeURIComponent(symbol)}`);
+        const data = await resp.json();
+
+        if (data.error) {
+            document.getElementById('result-area').innerHTML = `<p class="error">${data.error}</p>`;
+            return;
+        }
+
+        let html = `<h3>${data.symbol} (${data.rows}条) — 尝试源: ${data.sources_tried.join(', ')}</h3>`;
+        html += '<table class="data-table"><thead><tr>';
+        data.columns.forEach(c => html += `<th>${c}</th>`);
+        html += '</tr></thead><tbody>';
+
+        data.data.slice(0, 20).forEach(row => {
+            html += '<tr>';
+            data.columns.forEach(c => {
+                let v = row[c];
+                if (typeof v === 'number') v = v.toFixed(2);
+                html += `<td>${v}</td>`;
             });
-            html += '</tbody></table>';
-            if (data.rows > 20) html += `<p>... 还有 ${data.rows - 20} 条</p>`;
-
-            document.getElementById('result-area').innerHTML = html;
-        }
-
-        // 保存配置
-        async function saveConfig() {
-            const config = {
-                tushare_token: document.getElementById('tushare-token').value,
-                ccxt_exchange: document.getElementById('ccxt-exchange').value,
-                futu_open_d_host: document.getElementById('futu-host').value,
-                futu_open_d_port: parseInt(document.getElementById('futu-port').value),
-            };
-            const resp = await fetch('/data_hub/api/config/update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config),
-            });
-            const result = await resp.json();
-            alert(result.message);
-            loadSources();
-        }
-
-        // 加载配置
-        async function loadConfig() {
-            const resp = await fetch('/data_hub/api/config');
-            const config = await resp.json();
-            document.getElementById('tushare-token').value = config.tushare_token || '';
-            document.getElementById('ccxt-exchange').value = config.ccxt_exchange || 'binance';
-            document.getElementById('futu-host').value = config.futu_open_d_host || '127.0.0.1';
-            document.getElementById('futu-port').value = config.futu_open_d_port || 11111;
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            loadSources();
-            loadConfig();
+            html += '</tr>';
         });
-    </script>
-</body>
-</html>
+        html += '</tbody></table>';
+        if (data.rows > 20) html += `<p style="margin-top:10px;font-size:12px;color:#8b949e;">... 还有 ${data.rows - 20} 条</p>`;
+
+        document.getElementById('result-area').innerHTML = html;
+    }
+
+    async function saveConfig() {
+        const config = {
+            tushare_token: document.getElementById('tushare-token').value,
+            ccxt_exchange: document.getElementById('ccxt-exchange').value,
+            futu_open_d_host: document.getElementById('futu-host').value,
+            futu_open_d_port: parseInt(document.getElementById('futu-port').value),
+        };
+        const resp = await fetch('/data_hub/api/config/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+        });
+        const result = await resp.json();
+        alert(result.message);
+        loadSources();
+    }
+
+    async function loadConfig() {
+        const resp = await fetch('/data_hub/api/config');
+        const config = await resp.json();
+        document.getElementById('tushare-token').value = config.tushare_token || '';
+        document.getElementById('ccxt-exchange').value = config.ccxt_exchange || 'binance';
+        document.getElementById('futu-host').value = config.futu_open_d_host || '127.0.0.1';
+        document.getElementById('futu-port').value = config.futu_open_d_port || 11111;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSources();
+        loadConfig();
+    });
+</script>
+{% endblock %}
