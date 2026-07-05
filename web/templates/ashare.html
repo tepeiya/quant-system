@@ -1,231 +1,232 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>A股数据服务</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-</head>
-<body>
-    <div class="content-container">
+{% extends "base.html" %}
+{% block title %}A股数据服务 - 量化系统{% endblock %}
+{% block content %}
+
+<style>
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th, .data-table td { padding: 8px; text-align: left; border-bottom: 1px solid #30363d; font-size: 12px; }
+    .data-table th { color: #8b949e; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+    .grid-item { padding: 8px; background: #161b22; border-radius: 6px; font-size: 12px; }
+    .placeholder { color: #484f58; text-align: center; padding: 40px; }
+    .error { color: #f85149; }
+    
+    .form-row { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+    .form-row label { color: #8b949e; font-size: 13px; white-space: nowrap; }
+    .form-row input, .form-row select { padding: 8px; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #e6edf3; font-size: 13px; }
+    .form-row input:focus, .form-row select:focus { outline: none; border-color: #58a6ff; }
+    
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 15px; color: #e6edf3; }
+</style>
+
+<div class="page-header">
+    <div>
         <h1>📈 A股数据服务</h1>
-        <p class="subtitle">支持 tushare / 东方财富 / 新浪财经 多数据源</p>
-        
-        <!-- 数据源配置 -->
-        <div class="card">
-            <h2>⚙️ 数据源配置</h2>
-            <div id="config-panel">
-                <div class="form-row">
-                    <label>主数据源:</label>
-                    <select id="primary-source">
-                        <option value="tushare">tushare（数据最全）</option>
-                        <option value="eastmoney">东方财富（免费）</option>
-                        <option value="sina">新浪财经（免费）</option>
-                    </select>
-                </div>
-                <div class="form-row">
-                    <label>tushare Token:</label>
-                    <input type="text" id="tushare-token" placeholder="输入tushare token">
-                </div>
-                <div class="form-row">
-                    <button onclick="saveConfig()" class="btn btn-primary">保存配置</button>
-                </div>
-            </div>
+        <div class="subtitle">支持 tushare / 东方财富 / 新浪财经 多数据源</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>⚙️ 数据源配置</h2>
+    <div id="config-panel">
+        <div class="form-row">
+            <label>主数据源:</label>
+            <select id="primary-source">
+                <option value="tushare">tushare（数据最全）</option>
+                <option value="eastmoney">东方财富（免费）</option>
+                <option value="sina">新浪财经（免费）</option>
+            </select>
         </div>
-        
-        <!-- 数据查询 -->
-        <div class="card">
-            <h2>🔍 数据查询</h2>
-            <div class="form-row">
-                <label>股票代码:</label>
-                <input type="text" id="stock-symbol" placeholder="如: 000001.SZ 或 600000">
-                <button onclick="fetchDaily()" class="btn btn-primary">获取日线</button>
-                <button onclick="fetchFactors()" class="btn btn-secondary">计算因子</button>
-            </div>
-            
-            <!-- 指数成分股 -->
-            <div class="form-row">
-                <label>指数:</label>
-                <select id="index-select">
-                    <option value="000300.SH">沪深300</option>
-                    <option value="000905.SH">中证500</option>
-                </select>
-                <button onclick="fetchConstituents()" class="btn btn-secondary">获取成分股</button>
-            </div>
+        <div class="form-row">
+            <label>tushare Token:</label>
+            <input type="text" id="tushare-token" placeholder="输入tushare token">
         </div>
-        
-        <!-- 结果展示 -->
-        <div class="card">
-            <h2>📊 查询结果</h2>
-            <div id="result-area" style="min-height: 200px;">
-                <p class="placeholder">请选择股票代码并点击查询</p>
-            </div>
-        </div>
-        
-        <!-- Alpha Zoo 因子 -->
-        <div class="card">
-            <h2>🧬 Alpha Zoo 因子计算</h2>
-            <div class="form-row">
-                <label>因子类别:</label>
-                <select id="factor-category" onchange="loadFactors()">
-                    <option value="">所有类别</option>
-                </select>
-            </div>
-            <div id="factor-list" style="max-height: 200px; overflow-y: auto;">
-                <p class="placeholder">加载因子列表中...</p>
-            </div>
+        <div class="form-row">
+            <button onclick="saveConfig()" class="btn btn-primary">保存配置</button>
         </div>
     </div>
+</div>
+
+<div class="card">
+    <h2>🔍 数据查询</h2>
+    <div class="form-row">
+        <label>股票代码:</label>
+        <input type="text" id="stock-symbol" placeholder="如: 000001.SZ 或 600000">
+        <button onclick="fetchDaily()" class="btn btn-primary">获取日线</button>
+        <button onclick="fetchFactors()" class="btn btn-secondary">计算因子</button>
+    </div>
     
-    <script>
-        // 初始化配置
-        async function initConfig() {
-            const resp = await fetch('/ashare/api/config');
-            const config = await resp.json();
-            document.getElementById('primary-source').value = config.primary_source || 'tushare';
-            document.getElementById('tushare-token').value = config.tushare_token || '';
-        }
-        
-        // 保存配置
-        async function saveConfig() {
-            const config = {
-                primary_source: document.getElementById('primary-source').value,
-                tushare_token: document.getElementById('tushare-token').value,
-            };
-            const resp = await fetch('/ashare/api/config/update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config),
-            });
-            const result = await resp.json();
-            alert(result.message);
-        }
-        
-        // 获取日线数据
-        async function fetchDaily() {
-            const symbol = document.getElementById('stock-symbol').value.trim();
-            if (!symbol) {
-                alert('请输入股票代码');
-                return;
-            }
-            
-            const resp = await fetch(`/ashare/api/daily?symbol=${encodeURIComponent(symbol)}`);
-            const data = await resp.json();
-            
-            if (data.error) {
-                document.getElementById('result-area').innerHTML = `<p class="error">${data.error}</p>`;
-                return;
-            }
-            
-            let html = `<h3>${data.symbol} (${data.rows}条数据)</h3>`;
-            html += `<table class="data-table"><thead><tr>`;
-            data.columns.forEach(col => html += `<th>${col}</th>`);
-            html += `</tr></thead><tbody>`;
-            
-            const rows = data.data.slice(0, 20);
-            rows.forEach(row => {
-                html += `<tr>`;
-                data.columns.forEach(col => {
-                    let val = row[col];
-                    if (typeof val === 'number') val = val.toFixed(2);
-                    html += `<td>${val}</td>`;
-                });
-                html += `</tr>`;
-            });
-            html += `</tbody></table>`;
-            
-            document.getElementById('result-area').innerHTML = html;
-        }
-        
-        // 获取指数成分股
-        async function fetchConstituents() {
-            const index = document.getElementById('index-select').value;
-            const resp = await fetch(`/ashare/api/index/constituents?index=${index}`);
-            const data = await resp.json();
-            
-            let html = `<h3>${index} 成分股 (${data.count}只)</h3>`;
-            html += `<div style="max-height: 300px; overflow-y: auto;">`;
-            html += `<div class="grid">${data.constituents.slice(0, 50).map(s => `<div class="grid-item">${s}</div>`).join('')}</div>`;
-            if (data.count > 50) html += `<p>... 还有 ${data.count - 50} 只</p>`;
-            html += `</div>`;
-            
-            document.getElementById('result-area').innerHTML = html;
-        }
-        
-        // 计算因子
-        async function fetchFactors() {
-            const symbol = document.getElementById('stock-symbol').value.trim();
-            if (!symbol) {
-                alert('请输入股票代码');
-                return;
-            }
-            
-            const resp = await fetch(`/ashare/api/factors?symbol=${encodeURIComponent(symbol)}`);
-            const data = await resp.json();
-            
-            if (data.error) {
-                document.getElementById('result-area').innerHTML = `<p class="error">${data.error}</p>`;
-                return;
-            }
-            
-            let html = `<h3>${data.symbol} 因子计算结果</h3>`;
-            html += `<table class="data-table"><thead><tr><th>因子名称</th><th>值</th></tr></thead><tbody>`;
-            
-            for (const [name, value] of Object.entries(data.factors)) {
-                if (!isNaN(value)) {
-                    html += `<tr><td>${name}</td><td>${value.toFixed(4)}</td></tr>`;
-                }
-            }
-            html += `</tbody></table>`;
-            
-            document.getElementById('result-area').innerHTML = html;
-        }
-        
-        // 加载因子类别
-        async function loadFactorCategories() {
-            const resp = await fetch('/factors/api/alpha_zoo/categories');
-            const categories = await resp.json();
-            
-            const select = document.getElementById('factor-category');
-            categories.forEach(cat => {
-                const option = document.createElement('option');
-                option.value = cat;
-                option.textContent = cat;
-                select.appendChild(option);
-            });
-            
-            loadFactors();
-        }
-        
-        // 加载因子列表
-        async function loadFactors() {
-            const category = document.getElementById('factor-category').value;
-            const url = category ? `/factors/api/alpha_zoo/factors?category=${category}` : '/factors/api/alpha_zoo/factors';
-            const resp = await fetch(url);
-            const data = await resp.json();
-            
-            if (data.error) {
-                document.getElementById('factor-list').innerHTML = `<p class="error">${data.error}</p>`;
-                return;
-            }
-            
-            let html = `<div class="grid">`;
-            data.factors.forEach(f => {
-                html += `<div class="grid-item" style="text-align: left;">
-                    <strong>${f.name}</strong><br>
-                    <small>${f.category} - ${f.description}</small>
-                </div>`;
-            });
-            html += `</div>`;
-            
-            document.getElementById('factor-list').innerHTML = html;
-        }
-        
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', () => {
-            initConfig();
-            loadFactorCategories();
+    <div class="form-row">
+        <label>指数:</label>
+        <select id="index-select">
+            <option value="000300.SH">沪深300</option>
+            <option value="000905.SH">中证500</option>
+        </select>
+        <button onclick="fetchConstituents()" class="btn btn-secondary">获取成分股</button>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📊 查询结果</h2>
+    <div id="result-area" style="min-height: 200px;">
+        <p class="placeholder">请选择股票代码并点击查询</p>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🧬 Alpha Zoo 因子计算</h2>
+    <div class="form-row">
+        <label>因子类别:</label>
+        <select id="factor-category" onchange="loadFactors()">
+            <option value="">所有类别</option>
+        </select>
+    </div>
+    <div id="factor-list" style="max-height: 200px; overflow-y: auto;">
+        <p class="placeholder">加载因子列表中...</p>
+    </div>
+</div>
+
+<script>
+    async function initConfig() {
+        const resp = await fetch('/ashare/api/config');
+        const config = await resp.json();
+        document.getElementById('primary-source').value = config.primary_source || 'tushare';
+        document.getElementById('tushare-token').value = config.tushare_token || '';
+    }
+    
+    async function saveConfig() {
+        const config = {
+            primary_source: document.getElementById('primary-source').value,
+            tushare_token: document.getElementById('tushare-token').value,
+        };
+        const resp = await fetch('/ashare/api/config/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
         });
-    </script>
-</body>
-</html>
+        const result = await resp.json();
+        alert(result.message);
+    }
+    
+    async function fetchDaily() {
+        const symbol = document.getElementById('stock-symbol').value.trim();
+        if (!symbol) {
+            alert('请输入股票代码');
+            return;
+        }
+        
+        const resp = await fetch(`/ashare/api/daily?symbol=${encodeURIComponent(symbol)}`);
+        const data = await resp.json();
+        
+        if (data.error) {
+            document.getElementById('result-area').innerHTML = `<p class="error">${data.error}</p>`;
+            return;
+        }
+        
+        let html = `<h3>${data.symbol} (${data.rows}条数据)</h3>`;
+        html += `<table class="data-table"><thead><tr>`;
+        data.columns.forEach(col => html += `<th>${col}</th>`);
+        html += `</tr></thead><tbody>`;
+        
+        const rows = data.data.slice(0, 20);
+        rows.forEach(row => {
+            html += `<tr>`;
+            data.columns.forEach(col => {
+                let val = row[col];
+                if (typeof val === 'number') val = val.toFixed(2);
+                html += `<td>${val}</td>`;
+            });
+            html += `</tr>`;
+        });
+        html += `</tbody></table>`;
+        
+        document.getElementById('result-area').innerHTML = html;
+    }
+    
+    async function fetchConstituents() {
+        const index = document.getElementById('index-select').value;
+        const resp = await fetch(`/ashare/api/index/constituents?index=${index}`);
+        const data = await resp.json();
+        
+        let html = `<h3>${index} 成分股 (${data.count}只)</h3>`;
+        html += `<div style="max-height: 300px; overflow-y: auto;">`;
+        html += `<div class="grid">${data.constituents.slice(0, 50).map(s => `<div class="grid-item">${s}</div>`).join('')}</div>`;
+        if (data.count > 50) html += `<p>... 还有 ${data.count - 50} 只</p>`;
+        html += `</div>`;
+        
+        document.getElementById('result-area').innerHTML = html;
+    }
+    
+    async function fetchFactors() {
+        const symbol = document.getElementById('stock-symbol').value.trim();
+        if (!symbol) {
+            alert('请输入股票代码');
+            return;
+        }
+        
+        const resp = await fetch(`/ashare/api/factors?symbol=${encodeURIComponent(symbol)}`);
+        const data = await resp.json();
+        
+        if (data.error) {
+            document.getElementById('result-area').innerHTML = `<p class="error">${data.error}</p>`;
+            return;
+        }
+        
+        let html = `<h3>${data.symbol} 因子计算结果</h3>`;
+        html += `<table class="data-table"><thead><tr><th>因子名称</th><th>值</th></tr></thead><tbody>`;
+        
+        for (const [name, value] of Object.entries(data.factors)) {
+            if (!isNaN(value)) {
+                html += `<tr><td>${name}</td><td>${value.toFixed(4)}</td></tr>`;
+            }
+        }
+        html += `</tbody></table>`;
+        
+        document.getElementById('result-area').innerHTML = html;
+    }
+    
+    async function loadFactorCategories() {
+        const resp = await fetch('/factors/api/alpha_zoo/categories');
+        const categories = await resp.json();
+        
+        const select = document.getElementById('factor-category');
+        categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat;
+            option.textContent = cat;
+            select.appendChild(option);
+        });
+        
+        loadFactors();
+    }
+    
+    async function loadFactors() {
+        const category = document.getElementById('factor-category').value;
+        const url = category ? `/factors/api/alpha_zoo/factors?category=${category}` : '/factors/api/alpha_zoo/factors';
+        const resp = await fetch(url);
+        const data = await resp.json();
+        
+        if (data.error) {
+            document.getElementById('factor-list').innerHTML = `<p class="error">${data.error}</p>`;
+            return;
+        }
+        
+        let html = `<div class="grid">`;
+        data.factors.forEach(f => {
+            html += `<div class="grid-item" style="text-align: left;">
+                <strong>${f.name}</strong><br>
+                <small>${f.category} - ${f.description}</small>
+            </div>`;
+        });
+        html += `</div>`;
+        
+        document.getElementById('factor-list').innerHTML = html;
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        initConfig();
+        loadFactorCategories();
+    });
+</script>
+{% endblock %}

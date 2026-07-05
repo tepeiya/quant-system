@@ -187,6 +187,7 @@
 <!-- Tab 导航 -->
 <div class="tab-nav">
     <button class="tab-btn active" onclick="switchTab('config')">🎛️ 因子配置</button>
+    <button class="tab-btn" onclick="switchTab('library')">📚 因子库</button>
     <button class="tab-btn" onclick="switchTab('ranking')">📊 因子排名</button>
     <button class="tab-btn" onclick="switchTab('correlation')">🔗 相关性</button>
     <button class="tab-btn" onclick="switchTab('ic')">📉 IC分析</button>
@@ -263,7 +264,69 @@
     </div>
 </div>
 
-<!-- ============ Tab 2: 因子排名 ============ -->
+<!-- ============ Tab 2: 因子库（339个因子） ============ -->
+<div id="tab-library" class="tab-content">
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">📚 四大因子库总览</span>
+            <button class="btn" onclick="loadFactorLibrary()" style="font-size:11px;padding:4px 8px;">🔄 刷新</button>
+        </div>
+        <div class="grid grid-4">
+            <div class="stat">
+                <div class="stat-value stat-info" id="lib-total">-</div>
+                <div class="stat-label">因子总数</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="lib-alpha101">-</div>
+                <div class="stat-label">Alpha101</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="lib-gtja191">-</div>
+                <div class="stat-label">GTJA191</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="lib-qlib">-</div>
+                <div class="stat-label">Qlib158</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">🧬 因子计算器</span>
+            <div style="display:flex;gap:6px;">
+                <input type="text" id="calc-symbol" placeholder="股票代码 (如: AAPL)" style="padding:4px 8px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#e6edf3;font-size:12px;width:150px;">
+                <select id="calc-library" style="padding:4px 8px;border:1px solid #30363d;border-radius:4px;background:#0d1117;color:#e6edf3;font-size:12px;">
+                    <option value="">全部因子库</option>
+                    <option value="alpha101">Alpha101</option>
+                    <option value="gtja191">GTJA191</option>
+                    <option value="qlib158">Qlib158</option>
+                    <option value="academic">Academic</option>
+                </select>
+                <button class="btn primary" onclick="computeFactors()" style="font-size:11px;padding:4px 8px;">⚡ 计算</button>
+            </div>
+        </div>
+        <div id="calc-result" style="font-size:12px;color:#8b949e;">输入股票代码，点击计算获取因子值...</div>
+    </div>
+
+    <div class="factor-card">
+        <div class="card-header">
+            <span class="card-title">📋 因子列表</span>
+            <select class="form-input" style="width: auto;" id="library-filter" onchange="loadFactorLibrary()">
+                <option value="">全部因子库</option>
+                <option value="alpha101">Alpha101 (WorldQuant)</option>
+                <option value="gtja191">GTJA191 (国泰君安)</option>
+                <option value="qlib158">Qlib158 (微软)</option>
+                <option value="academic">Academic (学术)</option>
+            </select>
+        </div>
+        <div id="factor-library-list" style="max-height: 400px; overflow-y: auto;">
+            <div style="text-align:center;padding:40px;color:#484f58;">点击刷新加载因子库...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ Tab 3: 因子排名 ============ -->
 <div id="tab-ranking" class="tab-content">
     <div class="factor-card">
         <div class="card-header">
@@ -460,6 +523,7 @@ function refreshAll() {
     loadHighCorrPairs();
     loadICDecay();
     loadFactorList();
+    loadFactorLibrary();
 }
 
 // ========== Tab 1: 因子配置 ==========
@@ -597,7 +661,115 @@ async function loadEvolution() {
     }).join('');
 }
 
-// ========== Tab 2: 因子排名 ==========
+// ========== Tab 2: 因子库 ==========
+async function loadFactorLibrary() {
+    const filter = $('library-filter').value;
+    try {
+        const data = await apiFetch('/factors/api/libraries');
+        const libs = data.libraries || {};
+        const total = data.total_count || 0;
+        
+        $('lib-total').textContent = total;
+        $('lib-alpha101').textContent = libs.alpha101?.count || '-';
+        $('lib-gtja191').textContent = libs.gtja191?.count || '-';
+        $('lib-qlib').textContent = libs.qlib158?.count || '-';
+        
+        let allFactors = [];
+        for (const [libName, libInfo] of Object.entries(libs)) {
+            if (filter && libName !== filter) continue;
+            if (libInfo.factors) {
+                libInfo.factors.forEach(f => {
+                    allFactors.push({
+                        name: f,
+                        library: libName,
+                        library_label: {
+                            'alpha101': 'Alpha101',
+                            'gtja191': 'GTJA191',
+                            'qlib158': 'Qlib158',
+                            'academic': 'Academic'
+                        }[libName] || libName
+                    });
+                });
+            }
+        }
+        
+        const listEl = $('factor-library-list');
+        if (allFactors.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:40px;color:#484f58;">暂无因子数据</div>';
+            return;
+        }
+        
+        let html = '<table><thead><tr><th>因子名称</th><th>所属因子库</th></tr></thead><tbody>';
+        allFactors.slice(0, 100).forEach(f => {
+            html += `<tr>
+                <td>${f.name}</td>
+                <td><span class="category-badge" style="background:rgba(88,166,255,0.2);color:#58a6ff;">${f.library_label}</span></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        
+        if (allFactors.length > 100) {
+            html += `<div style="text-align:center;padding:10px;color:#8b949e;font-size:12px;">显示前100个，共 ${allFactors.length} 个因子</div>`;
+        }
+        
+        listEl.innerHTML = html;
+        
+    } catch(e) {
+        console.error('Error loading factor library:', e);
+        $('factor-library-list').innerHTML = '<div style="text-align:center;padding:40px;color:#f85149;">加载失败</div>';
+    }
+}
+
+async function computeFactors() {
+    const symbol = $('calc-symbol').value.trim() || 'AAPL';
+    const library = $('calc-library').value;
+    
+    const resultEl = $('calc-result');
+    resultEl.innerHTML = '<span style="color:#d29922;">⏳ 计算中...</span>';
+    
+    try {
+        let url = `/factors/api/compute_all?symbol=${encodeURIComponent(symbol)}`;
+        if (library) {
+            url += `&library=${library}`;
+        }
+        
+        const data = await apiFetch(url);
+        
+        if (data.error) {
+            resultEl.innerHTML = `<span style="color:#f85149;">❌ ${data.error}</span>`;
+            return;
+        }
+        
+        const valid = data.valid_factors || 0;
+        const total = data.total_factors || 0;
+        
+        let html = `<div style="margin-bottom:10px;">
+            <strong style="color:#58a6ff;">${data.symbol}</strong> - ${data.library}
+            <span style="margin-left:10px;color:#8b949e;">有效因子: ${valid}/${total}</span>
+        </div>`;
+        
+        html += '<table><thead><tr><th>因子</th><th>值</th></tr></thead><tbody>';
+        const factors = data.factors || {};
+        const sorted = Object.entries(factors).slice(0, 20);
+        sorted.forEach(([name, value]) => {
+            if (value !== null && !isNaN(value)) {
+                html += `<tr><td>${name}</td><td>${typeof value === 'number' ? value.toFixed(6) : value}</td></tr>`;
+            }
+        });
+        html += '</tbody></table>';
+        
+        if (Object.keys(factors).length > 20) {
+            html += `<div style="margin-top:10px;font-size:12px;color:#8b949e;">显示前20个，共 ${Object.keys(factors).length} 个</div>`;
+        }
+        
+        resultEl.innerHTML = html;
+        
+    } catch(e) {
+        resultEl.innerHTML = `<span style="color:#f85149;">❌ 计算失败: ${e.message}</span>`;
+    }
+}
+
+// ========== Tab 3: 因子排名 ==========
 async function loadFactorRanking() {
     const el = document.getElementById('factor-ranking-content');
     try {
