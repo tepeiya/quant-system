@@ -71,6 +71,10 @@ def update_prices(tickers: list[str] = None, days_back: int = 10):
     if tickers is None:
         tickers = fetch_all_tickers()
 
+    # 增量更新的起始日期
+    start = (datetime.now() - timedelta(days=days_back + 10)).strftime("%Y-%m-%d")
+    end = datetime.now().strftime("%Y-%m-%d")
+
     # 分批获取，每次50只，避免被限流
     batch_size = 50
     total = len(tickers)
@@ -79,7 +83,7 @@ def update_prices(tickers: list[str] = None, days_back: int = 10):
     for i in range(0, total, batch_size):
         batch = tickers[i:i + batch_size]
         try:
-            prices = fetch_prices(batch)
+            prices = fetch_prices(batch, start=start, end=end)
             if prices:
                 # 计算指标
                 for tkr, df in prices.items():
@@ -108,9 +112,9 @@ def update_prices(tickers: list[str] = None, days_back: int = 10):
 def update_spy():
     """更新 SPY 基准数据"""
     try:
-        from spy_source import fetch_spy
-        spy = fetch_spy()
-        if spy is not None:
+        from spy_source import get_spy
+        spy = get_spy()
+        if spy is not None and len(spy) > 30:
             from data_prod import compute_indicators
             spy = compute_indicators(spy)
             # 保存到特定位置
@@ -120,6 +124,8 @@ def update_spy():
                 pickle.dump(spy, f)
             logger.info(f"  SPY 更新完成: {len(spy)} 行")
             return True
+        else:
+            logger.warning("  SPY 数据获取失败，所有数据源均不可用")
     except Exception as e:
         logger.warning(f"  SPY 更新失败: {e}")
     return False
@@ -169,24 +175,34 @@ def run_update(full: bool = False):
 
 def check_health() -> dict:
     """数据服务健康检查"""
-    from cache_manager import check_cache_health
-    health = check_cache_health()
-
     # 检查缓存年龄
     cache_path = os.path.join(CACHE_DIR, "prices.pkl")
     cache_age = None
     cache_size = 0
+    stocks_count = 0
     if os.path.exists(cache_path):
         mtime = os.path.getmtime(cache_path)
         cache_age = (time.time() - mtime) / 3600  # 小时
         cache_size = os.path.getsize(cache_path)
 
+    # 统计缓存中的股票数量
+    try:
+        from data_prod import load_price_cache
+        stocks_count = len(load_price_cache())
+    except Exception:
+        pass
+
+    # 检查SPY缓存
+    spy_path = os.path.join(CACHE_DIR, "spy.pkl")
+    spy_ok = os.path.exists(spy_path)
+
     return {
         "status": "healthy" if cache_age is not None and cache_age < 48 else "stale",
         "cache_age_hours": round(cache_age, 1) if cache_age else None,
         "cache_size_mb": round(cache_size / 1024 / 1024, 1) if cache_size else 0,
-        "needs_refresh": health.get("needs_refresh", True),
-        "stocks_count": health.get("stock_count", 0),
+        "needs_refresh": cache_age is None or cache_age > 24,
+        "stocks_count": stocks_count,
+        "spy_ok": spy_ok,
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 

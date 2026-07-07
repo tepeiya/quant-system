@@ -222,7 +222,11 @@ def get_realtime_prices(tickers: list[str]) -> dict[str, float]:
         dict: {ticker: latest_price, ...}
     """
     from datetime import timezone
-    from alpaca.data.enums import DataFeed
+    try:
+        from alpaca.data.enums import DataFeed
+    except ImportError:
+        logger.warning("alpaca-py未安装，跳过Alpaca实时价格")
+        DataFeed = None
 
     for label, KEY, SECRET in [
         ("日内", os.environ.get("ALPACA_INTRADAY_KEY_ID", ""), os.environ.get("ALPACA_INTRADAY_SECRET", "")),
@@ -244,7 +248,8 @@ def get_realtime_prices(tickers: list[str]) -> dict[str, float]:
                     result[t] = round(float(q.ask_price + q.bid_price) / 2, 2)
             if result:
                 return result
-        except:
+        except Exception as e:
+            logger.warning(f"Alpaca[{label}]实时价格失败: {str(e)[:60]}")
             continue
 
     # Alpaca双账户都失败，回退新浪实时行情
@@ -257,10 +262,12 @@ def get_realtime_prices(tickers: list[str]) -> dict[str, float]:
                 q = us_quote_sina(t)
                 if q and q.get("price", 0) > 0:
                     result[t] = q["price"]
-            except:
+            except Exception as e:
+                logger.debug(f"新浪[{t}]失败: {e}")
                 continue
         return result
-    except:
+    except Exception as e:
+        logger.warning(f"实时价格所有源失败: {e}")
         return {}
 
 
@@ -412,6 +419,7 @@ def fetch_prices(tickers: list[str],
 def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """纯NumPy向量化技术指标（兼容仅Close列的情况）"""
     if df is None or len(df) < 250:
+        logger.debug(f"compute_indicators: 数据不足({len(df) if df is not None else 0}行)，跳过指标计算")
         return df
     d = df.copy()
     c = d["Close"].values.astype(float)
@@ -472,7 +480,11 @@ def _fetch_alpaca_batch(tickers: list[str], result: dict, start: str, end: str, 
     min_bars: 最少需要多少行才保存（增量更新设为0即可）
     """
     import pickle as _pkl
-    from alpaca.data.enums import DataFeed
+    try:
+        from alpaca.data.enums import DataFeed
+    except ImportError:
+        logger.warning("alpaca-py未安装，跳过Alpaca批量获取")
+        return 0
 
     for label, KEY, SECRET in [
         ("日内", os.environ.get("ALPACA_INTRADAY_KEY_ID", ""), os.environ.get("ALPACA_INTRADAY_SECRET", "")),
@@ -508,7 +520,7 @@ def _fetch_alpaca_batch(tickers: list[str], result: dict, start: str, end: str, 
                             if len(tdf) >= min_bars:
                                 result[t] = compute_indicators(tdf)
                                 ok += 1
-                        except:
+                        except Exception:
                             pass
                 except Exception as e:
                     logger.warning(f"Alpaca[{label}] batch {i}: {str(e)[:60]}")
@@ -727,8 +739,8 @@ def _fetch_via_yfinance(tickers, result, start, end):
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.get_level_values(0)
                 result[t] = compute_indicators(df)
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"yfinance[{t}]失败: {e}")
 
 
 def _fetch_via_tiingo(tickers, result, start, end):

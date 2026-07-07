@@ -87,7 +87,8 @@ def us_quote_sina(ticker: str) -> dict:
             "pe": float(fields[31]) if len(fields) > 31 and fields[31] else 0,
             "source": "sina",
         }
-    except Exception:
+    except Exception as e:
+        logger.warning(f"us_quote_sina[{ticker}]失败: {e}")
         return {}
 
 
@@ -117,7 +118,8 @@ def us_kline_sina(ticker: str, num: int = 120) -> list[dict]:
                 "volume": int(item.get("v", 0)),
             })
         return result
-    except Exception:
+    except Exception as e:
+        logger.warning(f"us_kline_sina[{ticker}]失败: {e}")
         return []
 
 
@@ -164,7 +166,8 @@ def us_quote_tencent(ticker: str) -> dict:
             "dividend": _v(51),
             "source": "tencent",
         }
-    except Exception:
+    except Exception as e:
+        logger.warning(f"us_quote_tencent[{ticker}]失败: {e}")
         return {}
 
 
@@ -203,7 +206,8 @@ def hk_quote_tencent(code: str) -> dict:
             "dividend": _v(55),
             "source": "tencent_hk",
         }
-    except Exception:
+    except Exception as e:
+        logger.warning(f"hk_quote_tencent[{code}]失败: {e}")
         return {}
 
 
@@ -247,7 +251,8 @@ def quote_eastmoney(ticker: str, market: str = "us") -> dict:
             "pb": d.get("f60", 0) / 100 if d.get("f60") else 0,
             "source": "eastmoney",
         }
-    except Exception:
+    except Exception as e:
+        logger.warning(f"quote_eastmoney[{ticker}]失败: {e}")
         return {}
 
 
@@ -274,7 +279,8 @@ def fund_flow_daily(ticker: str, market: str = "us", days: int = 5) -> list[dict
                     "total_net": float(parts[5]),
                 })
         return result
-    except Exception:
+    except Exception as e:
+        logger.warning(f"fund_flow_daily[{ticker}]失败: {e}")
         return []
 
 
@@ -291,7 +297,8 @@ def financial_statements(sec_code: str, statement: str = "balance", market: str 
     try:
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
         return r.json().get("data", [])
-    except Exception:
+    except Exception as e:
+        logger.warning(f"financial_statements失败: {e}")
         return []
 
 
@@ -302,7 +309,8 @@ def stock_search(keyword: str, count: int = 10) -> list[dict]:
     try:
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
         return r.json().get("quotes", [])
-    except Exception:
+    except Exception as e:
+        logger.warning(f"stock_search[{keyword}]失败: {e}")
         return []
 
 
@@ -341,7 +349,8 @@ def market_stock_list(market: str = "us", sort_field: str = "f3", sort_dir: str 
                 "pb": d.get("f24", 0),
             })
         return result
-    except Exception:
+    except Exception as e:
+        logger.warning(f"market_stock_list失败: {e}")
         return []
 
 
@@ -379,7 +388,8 @@ def kline_yahoo(symbol: str, interval: str = "1d", range_: str = "2y") -> list[d
                     "adjclose": adjcloses[i] if i < len(adjcloses) and adjcloses[i] is not None else 0,
                 })
         return klines
-    except Exception:
+    except Exception as e:
+        logger.warning(f"kline_yahoo[{symbol}]失败: {e}")
         return []
 
 
@@ -392,7 +402,8 @@ def quote_summary_yahoo(symbol: str, modules: Optional[list[str]] = None) -> dic
         s = _get_yahoo_session()
         r = s.get(url, timeout=15)
         return r.json().get("quoteSummary", {}).get("result", [{}])[0]
-    except Exception:
+    except Exception as e:
+        logger.warning(f"quote_summary_yahoo[{symbol}]失败: {e}")
         return {}
 
 
@@ -408,7 +419,8 @@ def options_chain(symbol: str) -> dict:
             "calls": data.get("options", [{}])[0].get("calls", []),
             "puts": data.get("options", [{}])[0].get("puts", []),
         }
-    except Exception:
+    except Exception as e:
+        logger.warning(f"options_chain[{symbol}]失败: {e}")
         return {}
 
 
@@ -564,8 +576,8 @@ def get_us_tickers(min_price: float = 5.0, max_count: int = 500) -> list[str]:
                     result.append(sym)
             if len(result) >= 50:
                 return sorted(set(result))[:max_count]
-    except:
-        pass
+    except Exception as e:
+        logger.warning(f"get_us_tickers东财获取失败: {e}")
     return sorted(set(default_tickers))[:max_count]
 
 
@@ -632,8 +644,8 @@ def fetch_batch_data(tickers: list[str], days: int = 730,
                 result[sym] = df
             if progress_callback and (i + 1) % 20 == 0:
                 progress_callback(i + 1, total, len(result))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"fetch_batch_data[{sym}]失败: {e}")
         # 请求间隔避免限频
         if (i + 1) % 10 == 0:
             time.sleep(random.uniform(0.3, 1.0))

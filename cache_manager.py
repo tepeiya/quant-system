@@ -470,7 +470,7 @@ def get_cache_stats() -> dict:
 def print_cache_stats():
     """打印缓存统计"""
     stats = get_cache_stats()
-    
+
     print("\n📊 缓存状态")
     print("=" * 50)
     print(f"  Redis: {'✅ 已连接' if stats['redis_available'] else '❌ 未连接'}")
@@ -480,6 +480,54 @@ def print_cache_stats():
     print("=" * 50)
 
 
+def check_cache_health() -> dict:
+    """
+    检查本地数据缓存健康状态
+    返回缓存文件年龄、大小、股票数量等指标
+    """
+    import os as _os
+    import pickle as _pkl
+
+    cache_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "data_cache")
+    cache_path = _os.path.join(cache_dir, "prices.pkl")
+
+    result = {
+        "status": "stale",
+        "cache_age_hours": None,
+        "cache_size_mb": 0,
+        "stock_count": 0,
+        "needs_refresh": True,
+    }
+
+    if not _os.path.exists(cache_path):
+        result["status"] = "empty"
+        return result
+
+    try:
+        mtime = _os.path.getmtime(cache_path)
+        cache_age = (time.time() - mtime) / 3600  # 小时
+        cache_size = _os.path.getsize(cache_path)
+
+        stock_count = 0
+        try:
+            with open(cache_path, "rb") as f:
+                data = _pkl.load(f)
+            if isinstance(data, dict):
+                stock_count = len(data)
+        except Exception:
+            pass
+
+        result["cache_age_hours"] = round(cache_age, 1)
+        result["cache_size_mb"] = round(cache_size / 1024 / 1024, 1)
+        result["stock_count"] = stock_count
+        result["needs_refresh"] = cache_age is None or cache_age > 24
+        result["status"] = "healthy" if cache_age < 48 else "stale"
+    except Exception as e:
+        logger.warning(f"check_cache_health失败: {e}")
+
+    return result
+
+
 # 导出
 __all__ = [
     "cache_get", "cache_set", "cache_delete", "cache_exists", "cache_clear",
@@ -487,6 +535,6 @@ __all__ = [
     "redis_get", "redis_set", "redis_delete", "redis_clear", "redis_exists",
     "cached",
     "PriceCache", "SignalCache", "ConfigCache",
-    "warmup_cache", "get_cache_stats", "print_cache_stats",
+    "warmup_cache", "get_cache_stats", "print_cache_stats", "check_cache_health",
     "DEFAULT_TTL", "PRICE_CACHE_TTL", "SIGNAL_CACHE_TTL", "CONFIG_CACHE_TTL"
 ]
