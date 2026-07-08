@@ -472,7 +472,11 @@ def _fetch_alpaca_batch(tickers: list[str], result: dict, start: str, end: str, 
     min_bars: 最少需要多少行才保存（增量更新设为0即可）
     """
     import pickle as _pkl
-    from alpaca.data.enums import DataFeed
+    try:
+        from alpaca.data.enums import DataFeed
+    except ImportError:
+        logger.warning("alpaca-py未安装，跳过Alpaca批量获取")
+        return 0
 
     for label, KEY, SECRET in [
         ("日内", os.environ.get("ALPACA_INTRADAY_KEY_ID", ""), os.environ.get("ALPACA_INTRADAY_SECRET", "")),

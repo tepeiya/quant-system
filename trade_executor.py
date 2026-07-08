@@ -259,11 +259,16 @@ class TradeExecutor:
                 if client:
                     acct = client.get_account()
                     current_equity = float(acct.get("equity", acct.get("portfolio_value", 0)))
-                    initial_equity = float(acct.get("equity", 100000))
-                    cb_result = self._circuit_breaker.check(current_equity, initial_equity)
-                    if cb_result.get("should_stop"):
-                        logger.warning(f"⛔ 熔断触发: {cb_result.get('reason')}，停止本次执行")
-                        return [{"status": "circuit_breaker", "reason": cb_result["reason"]}]
+                    last_equity = float(acct.get("last_equity", current_equity))
+                    if current_equity <= 0:
+                        logger.debug("熔断检查跳过: 当前权益为0")
+                    elif last_equity <= 0:
+                        logger.debug("熔断检查跳过: 上次权益为0")
+                    else:
+                        cb_result = self._circuit_breaker.check(current_equity, last_equity)
+                        if cb_result.get("should_stop"):
+                            logger.warning(f"⛔ 熔断触发: {cb_result.get('reason')}，停止本次执行")
+                            return [{"status": "circuit_breaker", "reason": cb_result["reason"]}]
             except Exception as e:
                 logger.debug(f"熔断检查跳过: {e}")
 

@@ -45,7 +45,7 @@ ASSETS = {
 
 
 def fetch_multi_asset(start="2018-01-01", end=None):
-    """获取所有资产的历史数据"""
+    """获取所有资产的历史数据（优先data_global，yfinance备选）"""
     if end is None:
         end = datetime.now().strftime("%Y-%m-%d")
 
@@ -61,7 +61,18 @@ def fetch_multi_asset(start="2018-01-01", end=None):
         return cache
 
     for sym in need:
-        for attempt in range(3):
+        df = None
+        try:
+            from data_global import fetch_stock_data
+            df = fetch_stock_data(sym, days=730)
+            if df is not None and len(df) > 200:
+                logger.info(f"  {sym}: data_global {len(df)}行")
+                cache[sym] = df
+                continue
+        except Exception:
+            pass
+
+        for attempt in range(2):
             try:
                 df = yf.download(sym, start=start, end=end,
                                  progress=False, auto_adjust=True)
@@ -69,11 +80,11 @@ def fetch_multi_asset(start="2018-01-01", end=None):
                     if isinstance(df.columns, pd.MultiIndex):
                         df.columns = df.columns.get_level_values(0)
                     cache[sym] = df
-                    logger.info(f"  {sym}: {len(df)}行")
+                    logger.info(f"  {sym}: yfinance {len(df)}行")
                     break
             except Exception as e:
                 logger.warning(f"  {sym}: attempt {attempt+1}: {str(e)[:50]}")
-                time.sleep(2 + random.random() * 3)
+                time.sleep(1 + random.random() * 2)
 
     with open(MULTI_CACHE, "wb") as f:
         pickle.dump(cache, f)
@@ -125,6 +136,8 @@ def multi_asset_signal(cache: dict = None) -> dict:
         })
 
     df = pd.DataFrame(results)
+    if df.empty:
+        return {"top2": [], "all": []}
     df = df.sort_values("avg_mom", ascending=False)
 
     # 动量为正且排名前2的资产

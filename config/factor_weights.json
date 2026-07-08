@@ -1,8 +1,8 @@
 {
-  "momentum": 45,
-  "quality": 26,
+  "momentum": 50,
+  "quality": 25,
   "trend": 13,
-  "value": 8,
-  "lowvol": 6,
-  "volume": 6
+  "value": 4,
+  "lowvol": 4,
+  "volume": 4
 }

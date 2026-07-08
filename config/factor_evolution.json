@@ -140,5 +140,229 @@
     "consecutive_losses": 0,
     "expected_monthly_return": 0.0605,
     "expected_sharpe": 0.21
+  },
+  {
+    "timestamp": "2026-07-08 02:34:30",
+    "old_weights": {
+      "momentum": 45,
+      "quality": 26,
+      "trend": 13,
+      "value": 8,
+      "lowvol": 6,
+      "volume": 6
+    },
+    "new_weights": {
+      "momentum": 45,
+      "quality": 25,
+      "trend": 13,
+      "value": 7,
+      "lowvol": 5,
+      "volume": 5
+    },
+    "weighted_ic": {
+      "momentum": 0.0792,
+      "quality": 0.3306,
+      "trend": 0.2508
+    },
+    "monthly_ics": [
+      {
+        "momentum": 0.0515,
+        "quality": 0.628,
+        "trend": 0.3703,
+        "lowvol": 0.324,
+        "value": -0.1865,
+        "_month": "2026-06",
+        "_weight": 0.5
+      },
+      {
+        "momentum": 0.1077,
+        "quality": 0.2335,
+        "trend": 0.0703,
+        "lowvol": -0.2302,
+        "value": 0.2815,
+        "_month": "2026-05",
+        "_weight": 0.3
+      },
+      {
+        "momentum": 0.1056,
+        "quality": -0.267,
+        "trend": 0.2226,
+        "lowvol": -0.3944,
+        "value": 0.0981,
+        "_month": "2026-04",
+        "_weight": 0.2
+      }
+    ],
+    "consecutive_losses": 0,
+    "expected_monthly_return": 0.0632,
+    "expected_sharpe": 28.0
+  },
+  {
+    "timestamp": "2026-07-08 02:36:45",
+    "old_weights": {
+      "momentum": 45,
+      "quality": 25,
+      "trend": 13,
+      "value": 7,
+      "lowvol": 5,
+      "volume": 5
+    },
+    "new_weights": {
+      "momentum": 48,
+      "quality": 25,
+      "trend": 13,
+      "value": 6,
+      "lowvol": 4,
+      "volume": 4
+    },
+    "weighted_ic": {
+      "momentum": 0.0792,
+      "quality": 0.3306,
+      "trend": 0.2508
+    },
+    "monthly_ics": [
+      {
+        "momentum": 0.0515,
+        "quality": 0.628,
+        "trend": 0.3703,
+        "lowvol": 0.324,
+        "value": -0.1865,
+        "_month": "2026-06",
+        "_weight": 0.5
+      },
+      {
+        "momentum": 0.1077,
+        "quality": 0.2335,
+        "trend": 0.0703,
+        "lowvol": -0.2302,
+        "value": 0.2815,
+        "_month": "2026-05",
+        "_weight": 0.3
+      },
+      {
+        "momentum": 0.1056,
+        "quality": -0.267,
+        "trend": 0.2226,
+        "lowvol": -0.3944,
+        "value": 0.0981,
+        "_month": "2026-04",
+        "_weight": 0.2
+      }
+    ],
+    "consecutive_losses": 0,
+    "expected_monthly_return": 0.0957,
+    "expected_sharpe": 8.03
+  },
+  {
+    "timestamp": "2026-07-08 02:40:03",
+    "old_weights": {
+      "momentum": 48,
+      "quality": 25,
+      "trend": 13,
+      "value": 6,
+      "lowvol": 4,
+      "volume": 4
+    },
+    "new_weights": {
+      "momentum": 49,
+      "quality": 25,
+      "trend": 13,
+      "value": 5,
+      "lowvol": 4,
+      "volume": 4
+    },
+    "weighted_ic": {
+      "momentum": 0.0792,
+      "quality": 0.3306,
+      "trend": 0.2508
+    },
+    "monthly_ics": [
+      {
+        "momentum": 0.0515,
+        "quality": 0.628,
+        "trend": 0.3703,
+        "lowvol": 0.324,
+        "value": -0.1865,
+        "_month": "2026-06",
+        "_weight": 0.5
+      },
+      {
+        "momentum": 0.1077,
+        "quality": 0.2335,
+        "trend": 0.0703,
+        "lowvol": -0.2302,
+        "value": 0.2815,
+        "_month": "2026-05",
+        "_weight": 0.3
+      },
+      {
+        "momentum": 0.1056,
+        "quality": -0.267,
+        "trend": 0.2226,
+        "lowvol": -0.3944,
+        "value": 0.0981,
+        "_month": "2026-04",
+        "_weight": 0.2
+      }
+    ],
+    "consecutive_losses": 0,
+    "expected_monthly_return": 0.1279,
+    "expected_sharpe": 11.96
+  },
+  {
+    "timestamp": "2026-07-08 02:47:38",
+    "old_weights": {
+      "momentum": 49,
+      "quality": 25,
+      "trend": 13,
+      "value": 5,
+      "lowvol": 4,
+      "volume": 4
+    },
+    "new_weights": {
+      "momentum": 50,
+      "quality": 25,
+      "trend": 13,
+      "value": 4,
+      "lowvol": 4,
+      "volume": 4
+    },
+    "weighted_ic": {
+      "momentum": 0.0792,
+      "quality": 0.3306,
+      "trend": 0.2508
+    },
+    "monthly_ics": [
+      {
+        "momentum": 0.0515,
+        "quality": 0.628,
+        "trend": 0.3703,
+        "lowvol": 0.324,
+        "value": -0.1865,
+        "_month": "2026-06",
+        "_weight": 0.5
+      },
+      {
+        "momentum": 0.1077,
+        "quality": 0.2335,
+        "trend": 0.0703,
+        "lowvol": -0.2302,
+        "value": 0.2815,
+        "_month": "2026-05",
+        "_weight": 0.3
+      },
+      {
+        "momentum": 0.1056,
+        "quality": -0.267,
+        "trend": 0.2226,
+        "lowvol": -0.3944,
+        "value": 0.0981,
+        "_month": "2026-04",
+        "_weight": 0.2
+      }
+    ],
+    "consecutive_losses": 0,
+    "expected_monthly_return": 0.1549,
+    "expected_sharpe": 0.54
   }
 ]

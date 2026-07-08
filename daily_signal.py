@@ -112,21 +112,21 @@ _ts = _dt.datetime.now()
 def generate_signals(use_cached_quality=True):
     import datetime as _dt
     
-    # 0. 增量更新数据（后台静默执行，不阻塞）
-    try:
-        import subprocess, sys, threading
-        def _bg_update():
-            try:
-                subprocess.run(
-                    [sys.executable, "data_update.py"],
-                    capture_output=True, timeout=120
-                )
-            except:
-                pass
-        t = threading.Thread(target=_bg_update, daemon=True)
-        t.start()
-    except:
-        pass
+    # 0. 增量更新数据（后台静默执行，不阻塞）- 临时禁用，避免卡住
+    # try:
+    #     import subprocess, sys, threading
+    #     def _bg_update():
+    #         try:
+    #             subprocess.run(
+    #                 [sys.executable, "data_update.py"],
+    #                 capture_output=True, timeout=120
+    #             )
+    #         except:
+    #             pass
+    #     t = threading.Thread(target=_bg_update, daemon=True)
+    #     t.start()
+    # except:
+    #     pass
 
     ts = _dt.datetime.now()
     dt_str = _dt.datetime.now().strftime("%Y-%m-%d")
@@ -134,22 +134,26 @@ def generate_signals(use_cached_quality=True):
     logger.info(f"信号: {dt_str}")
 
     # 1. 加载缓存
+    logger.info("Step 1: 加载缓存")
     cache = load_price_cache()
     if not cache:
         logger.error("无数据"); return
+    logger.info(f"  缓存加载完成: {len(cache)}只")
 
     # 1.5 实时价格更新（只更新Top30，加快速度）
     # cache = _update_realtime_prices(cache, max_tickers=30)
 
     # 2. SPY大盘——优先用真实SPY，回退到合成
+    logger.info("Step 2: 获取SPY")
     spy = None
     try:
         from spy_source import get_spy
         spy = get_spy()
         if spy is not None:
             spy = compute_indicators(spy)
-    except:
-        pass
+        logger.info(f"  SPY获取完成: {spy is not None}")
+    except Exception as e:
+        logger.info(f"  SPY获取失败: {e}")
 
     if spy is None or len(spy) < 50:
         # 备选：从个股缓存构造合成SPY
@@ -193,27 +197,39 @@ def generate_signals(use_cached_quality=True):
         ml, ma = "⚪ 震荡", "部分仓位"
 
     # 3. 多资产信号
+    logger.info("Step 3: 多资产信号")
     try:
         multi = multi_asset_signal()
-    except:
+        logger.info(f"  多资产信号完成: {multi is not None}")
+    except Exception as e:
         multi = None
+        logger.info(f"  多资产信号失败: {e}")
     if multi and multi.get("top2"):
         top_names = [ASSETS.get(s, {}).get("name", s) if False else s for s in multi["top2"]]
 
     # 4. 质量分
+    logger.info("Step 4: 质量分")
     qc = f"{OUTPUT_DIR}/quality_scores.json"
     if use_cached_quality and os.path.exists(qc):
+        logger.info("  使用缓存质量分")
         with open(qc) as f:
             quality = json.load(f)
     else:
+        logger.info("  计算质量分")
         quality = compute_quality_scores(cache)
         with open(qc, "w") as f:
             json.dump(quality, f, default=str)
+    logger.info(f"  质量分完成: {len(quality)}只")
 
     # 4. 评分
+    logger.info("Step 5: 评分")
     tickers = sorted(cache.keys())[:200]
     scores = []
-    for t in tickers:
+    from time_utils import align_ts
+    weights = load_factor_weights()
+    for i, t in enumerate(tickers):
+        if i % 10 == 0:
+            logger.info(f"  评分进度: {i}/{len(tickers)}")
         df = cache.get(t)
         if df is None: continue
         from time_utils import align_ts
@@ -269,41 +285,10 @@ def generate_signals(use_cached_quality=True):
             "atr": round(atr,1) if not pd.isna(atr) else None,
         })
     scores.sort(key=lambda x: -x["score"])
+    logger.info(f"  评分完成: {len(scores)}只")
 
-    # 4.6 AlphaManager 339因子增强 — 对Top20候选股票计算全因子并融合
-    if _alpha_manager_loaded:
-        try:
-            alpha_mgr = get_alpha_manager()
-            top_n = min(20, len(scores))
-            alpha_scores = {}
-            count_valid = 0
-            for i in range(top_n):
-                tkr = scores[i]["ticker"]
-                df = cache.get(tkr)
-                if df is None or len(df) < 60:
-                    continue
-                try:
-                    factors = alpha_mgr.compute_all(df)
-                    valid_vals = [v for v in factors.values() if v is not None and not pd.isna(v) and isinstance(v, (int, float)) and not np.isinf(v)]
-                    if len(valid_vals) > 10:
-                        vals_arr = np.array(valid_vals)
-                        z_scores = (vals_arr - vals_arr.mean()) / (vals_arr.std() + 1e-8) if vals_arr.std() > 0 else np.zeros_like(vals_arr)
-                        alpha_scores[tkr] = float(np.nanmean(z_scores))
-                        count_valid += 1
-                except Exception:
-                    continue
-            if count_valid >= 3:
-                all_z = [v for v in alpha_scores.values() if not pd.isna(v)]
-                max_abs = max(abs(v) for v in all_z) if all_z else 1
-                for s in scores:
-                    if s["ticker"] in alpha_scores and max_abs > 0:
-                        normalized_alpha = alpha_scores[s["ticker"]] / max_abs
-                        s["alpha_score"] = round(normalized_alpha, 3)
-                        s["score"] = round(s["score"] * 0.75 + normalized_alpha * 25, 1)
-                scores.sort(key=lambda x: -x["score"])
-                logger.info(f"AlphaManager因子增强: {count_valid}只有效, 权重25%")
-        except Exception as e:
-            logger.debug(f"AlphaManager因子增强跳过: {e}")
+    # 4.6 AlphaManager 339因子增强 — 对Top20候选股票计算全因子并融合（临时禁用，太慢，单只48秒）
+    logger.info("Step 6: AlphaManager (已禁用)")
 
     # 4.7 FRED宏观温度过滤 — 根据宏观环境动态调整仓位
     macro_info = None

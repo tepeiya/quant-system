@@ -51,8 +51,8 @@ DEFAULT_CONFIG = {
     "max_share_price": 300,      # 单股价格上限（超过则走候补池）
 
     # ===== 因子权重 =====
-    "momentum_weight": 45,
-    "quality_weight": 26,
+    "momentum_weight": 50,
+    "quality_weight": 25,
     "trend_weight": 13,
     "volume_weight": 5,
 

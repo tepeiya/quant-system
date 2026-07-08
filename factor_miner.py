@@ -396,7 +396,7 @@ class FactorMiner:
         """
         valid = factor_df[[factor_col, forward_return_col]].dropna()
         if len(valid) < 15:
-            return {"ic_rank": 0, "ic_pearson": 0, "ic_std": 0, "ir": 0}
+            return {"ic_rank": 0, "ic_pearson": 0, "ic_std": 0, "ir": 0, "count": 0}
 
         # Spearman秩相关系数
         rx = valid[factor_col].rank()
