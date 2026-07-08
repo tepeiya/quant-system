@@ -1,0 +1,204 @@
+{
+  "date": "2026-07-08",
+  "market": {
+    "spy": 747.71,
+    "rsi": 44.86735870818914,
+    "trend": "\ud83d\udfe2 \u591a\u5934",
+    "action": "\u6b63\u5e38\u4e70\u5165"
+  },
+  "macro": {
+    "temperature": 75.0,
+    "position_adjust": 1.0,
+    "info": {
+      "date": "2026-07-08 04:06",
+      "macro_temperature": 75,
+      "raw_score": 0,
+      "status": "\ud83d\udfe2 \u5b8f\u89c2\u5411\u597d",
+      "details": {}
+    }
+  },
+  "top_scores": [
+    {
+      "ticker": "PANW",
+      "score": 64.4,
+      "price": 337.04,
+      "mom": 67.0,
+      "quality": 5.9,
+      "volume": 0,
+      "value_lv": 2.0,
+      "rsi": 71.0,
+      "atr": 4.5,
+      "enhance_score": 1.15
+    },
+    {
+      "ticker": "AMD",
+      "score": 63.8,
+      "price": 516.11,
+      "mom": 274.2,
+      "quality": 5.0,
+      "volume": 0,
+      "value_lv": 2.0,
+      "rsi": 45.0,
+      "atr": 7.5,
+      "enhance_score": 0.81
+    },
+    {
+      "ticker": "JNJ",
+      "score": 43.6,
+      "price": 267.24,
+      "mom": 71.3,
+      "quality": 5.9,
+      "volume": 0,
+      "value_lv": 3.2,
+      "rsi": 75.0,
+      "atr": 2.5,
+      "enhance_score": 0.26
+    },
+    {
+      "ticker": "GOOGL",
+      "score": 40.1,
+      "price": 367.03,
+      "mom": 104.4,
+      "quality": 6.0,
+      "volume": 0,
+      "value_lv": 4.4,
+      "rsi": 49.0,
+      "atr": 3.2,
+      "enhance_score": -0.19
+    },
+    {
+      "ticker": "CAT",
+      "score": 38.9,
+      "price": 940.12,
+      "mom": 136.3,
+      "quality": 6.7,
+      "volume": 0,
+      "value_lv": 3.2,
+      "rsi": 51.0,
+      "atr": 5.0,
+      "enhance_score": -0.22
+    },
+    {
+      "ticker": "LLY",
+      "score": 38.3,
+      "price": 1235.56,
+      "mom": 58.3,
+      "quality": 5.5,
+      "volume": 0,
+      "value_lv": 4.4,
+      "rsi": 70.0,
+      "atr": 3.2,
+      "enhance_score": 0.21
+    },
+    {
+      "ticker": "MRK",
+      "score": 33.4,
+      "price": 128.86,
+      "mom": 59.2,
+      "quality": 7.1,
+      "volume": 0,
+      "value_lv": 3.2,
+      "rsi": 73.0,
+      "atr": 2.7,
+      "enhance_score": -0.0
+    },
+    {
+      "ticker": "GE",
+      "score": 32.8,
+      "price": 366.98,
+      "mom": 48.6,
+      "quality": 7.1,
+      "volume": 0,
+      "value_lv": 3.2,
+      "rsi": 71.0,
+      "atr": 2.7,
+      "enhance_score": 0.12
+    },
+    {
+      "ticker": "MS",
+      "score": 30.5,
+      "price": 222.04,
+      "mom": 54.0,
+      "quality": 7.3,
+      "volume": 0,
+      "value_lv": 4.4,
+      "rsi": 54.0,
+      "atr": 2.7,
+      "enhance_score": -0.08
+    },
+    {
+      "ticker": "ABBV",
+      "score": 29.6,
+      "price": 254.65,
+      "mom": 34.5,
+      "quality": 7.6,
+      "volume": 0,
+      "value_lv": 3.2,
+      "rsi": 76.0,
+      "atr": 2.9,
+      "enhance_score": 0.17
+    }
+  ],
+  "buy_candidates": [
+    {
+      "ticker": "PANW",
+      "score": 64.4,
+      "price": 337.04,
+      "mom": 67.0,
+      "quality": 5.9,
+      "volume": 0,
+      "value_lv": 2.0,
+      "rsi": 71.0,
+      "atr": 4.5,
+      "enhance_score": 1.15
+    },
+    {
+      "ticker": "AMD",
+      "score": 63.8,
+      "price": 516.11,
+      "mom": 274.2,
+      "quality": 5.0,
+      "volume": 0,
+      "value_lv": 2.0,
+      "rsi": 45.0,
+      "atr": 7.5,
+      "enhance_score": 0.81
+    },
+    {
+      "ticker": "JNJ",
+      "score": 43.6,
+      "price": 267.24,
+      "mom": 71.3,
+      "quality": 5.9,
+      "volume": 0,
+      "value_lv": 3.2,
+      "rsi": 75.0,
+      "atr": 2.5,
+      "enhance_score": 0.26
+    },
+    {
+      "ticker": "GOOGL",
+      "score": 40.1,
+      "price": 367.03,
+      "mom": 104.4,
+      "quality": 6.0,
+      "volume": 0,
+      "value_lv": 4.4,
+      "rsi": 49.0,
+      "atr": 3.2,
+      "enhance_score": -0.19
+    },
+    {
+      "ticker": "CAT",
+      "score": 38.9,
+      "price": 940.12,
+      "mom": 136.3,
+      "quality": 6.7,
+      "volume": 0,
+      "value_lv": 3.2,
+      "rsi": 51.0,
+      "atr": 5.0,
+      "enhance_score": -0.22
+    }
+  ]
+}

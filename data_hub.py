@@ -46,7 +46,7 @@ CONFIG_FILE = "config/data_hub_config.json"
 DEFAULT_CONFIG = {
     "source_priority": {
         "ashare": ["tushare", "akshare", "eastmoney", "sina"],
-        "us": ["data_global", "yfinance", "akshare"],
+        "us": ["yfinance", "stooq"],
         "hk": ["yfinance", "futu", "tushare"],
         "crypto": ["okx", "ccxt"],
         "futures": ["akshare", "tushare"],
@@ -545,37 +545,6 @@ class FutuLoader(BaseLoader):
 
 
 # ============================================================
-# 7. DataGlobal 数据源（零鉴权，新浪/Yahoo v8/东财）
-# ============================================================
-
-class DataGlobalLoader(BaseLoader):
-    name = "data_global"
-    markets = ["us", "hk"]
-    requires_api_key = False
-
-    def is_available(self) -> bool:
-        try:
-            from data_global import fetch_stock_data
-            return True
-        except ImportError:
-            return False
-
-    def load_daily(self, symbol: str, start_date: str = None, end_date: str = None) -> Optional[pd.DataFrame]:
-        try:
-            from data_global import fetch_stock_data
-            market = detect_market(symbol)
-            if market not in ["us", "hk"]:
-                return None
-            # data_global 内部会尝试新浪 → Yahoo 多源降级
-            df = fetch_stock_data(symbol, days=730)
-            if df is not None and len(df) > 0:
-                return self._normalize_ohlcv(df, symbol)
-        except Exception as e:
-            logger.debug(f"data_global加载失败 {symbol}: {e}")
-        return None
-
-
-# ============================================================
 # 统一数据源管理器
 # ============================================================
 
@@ -591,7 +560,6 @@ class DataHub:
             "okx": OKXLoader(self.config),
             "ccxt": CCXTLoader(self.config),
             "futu": FutuLoader(self.config),
-            "data_global": DataGlobalLoader(self.config),
         }
 
     def get_available_sources(self) -> Dict[str, Dict]:

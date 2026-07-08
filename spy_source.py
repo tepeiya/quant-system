@@ -49,10 +49,10 @@ def fetch_spy():
         logger.info(f"SPY(Alpaca)已缓存: {len(df)}行, ${df['Close'].iloc[-1]:.2f}")
         return df
     except ImportError:
-        logger.warning("alpaca-py未安装，跳过Alpaca数据源")
+        logger.warning("alpaca-py未安装，跳过Alpaca")
         return None
     except Exception as e:
-        logger.warning(f"fetch_spy(Alpaca)失败: {e}")
+        logger.warning(f"SPY(Alpaca)获取失败: {e}")
         return None
 
 
@@ -81,7 +81,7 @@ def fetch_spy_yfinance():
         logger.info(f"SPY(yfinance)已缓存: {len(df)}行, ${df['Close'].iloc[-1]:.2f}")
         return df
     except Exception as e:
-        logger.warning(f"fetch_spy_yfinance失败: {e}")
+        logger.warning(f"SPY(yfinance)获取失败: {e}")
         return None
 
 
@@ -106,7 +106,7 @@ def fetch_spy_data_global():
         logger.info(f"SPY(data_global)已缓存: {len(df)}行, ${df['Close'].iloc[-1]:.2f}")
         return df
     except Exception as e:
-        logger.warning(f"fetch_spy_data_global失败: {e}")
+        logger.warning(f"SPY(data_global)获取失败: {e}")
         return None
 
 
@@ -125,8 +125,7 @@ def fetch_spy_tiingo():
         if r.status_code != 200:
             return None
         data = r.json()
-        if not data or len(data) < 30:
-            logger.warning(f"Tiingo SPY数据不足: {len(data) if data else 0}行")
+        if not data or len(data) < 200:
             return None
         df = pd.DataFrame(data)
         df["Date"] = pd.to_datetime(df["date"])
@@ -142,8 +141,7 @@ def fetch_spy_tiingo():
             pickle.dump(df, f)
         logger.info(f"SPY(Tiingo)已缓存: {len(df)}行, ${df['Close'].iloc[-1]:.2f}")
         return df
-    except Exception as e:
-        logger.warning(f"fetch_spy_tiingo失败: {e}")
+    except:
         return None
 
 
