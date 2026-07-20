@@ -1,0 +1,353 @@
+{
+  "broker_config": {
+    "alpaca_paper": {
+      "name": "Alpaca 纸交易",
+      "enabled": true,
+      "type": "alpaca",
+      "paper": true,
+      "env_key_id": "ALPACA_API_KEY_ID",
+      "env_secret": "ALPACA_SECRET_KEY",
+      "base_url": "https://paper-api.alpaca.markets",
+      "data_url": "https://data.alpaca.markets",
+      "strategies": [
+        "conservative",
+        "momentum"
+      ]
+    },
+    "alpaca_paper_intraday": {
+      "name": "Alpaca 日内专用",
+      "enabled": true,
+      "type": "alpaca",
+      "paper": true,
+      "env_key_id": "ALPACA_INTRADAY_KEY_ID",
+      "env_secret": "ALPACA_INTRADAY_SECRET",
+      "base_url": "https://paper-api.alpaca.markets",
+      "data_url": "https://data.alpaca.markets",
+      "strategies": [
+        "intraday"
+      ]
+    },
+    "alpaca_live": {
+      "name": "★ Alpaca 实盘",
+      "enabled": false,
+      "type": "alpaca",
+      "paper": false,
+      "env_key_id": "ALPACA_LIVE_KEY_ID",
+      "env_secret": "ALPACA_LIVE_SECRET",
+      "base_url": "https://api.alpaca.markets",
+      "data_url": "https://data.alpaca.markets",
+      "strategies": [
+        "conservative",
+        "momentum"
+      ]
+    },
+    "alpaca_live_intraday": {
+      "name": "★ Alpaca 实盘日内",
+      "enabled": false,
+      "type": "alpaca",
+      "paper": false,
+      "env_key_id": "ALPACA_LIVE_INTRADAY_KEY_ID",
+      "env_secret": "ALPACA_LIVE_INTRADAY_SECRET",
+      "base_url": "https://api.alpaca.markets",
+      "data_url": "https://data.alpaca.markets",
+      "strategies": [
+        "intraday"
+      ]
+    },
+    "ibkr": {
+      "name": "盈透证券",
+      "enabled": false,
+      "type": "ibkr",
+      "env_key_id": "IBKR_ACCOUNT_ID",
+      "env_secret": "IBKR_TOKEN",
+      "host": "localhost",
+      "port": 7496
+    },
+    "longbridge": {
+      "name": "长桥证券",
+      "enabled": false,
+      "type": "longbridge",
+      "env_key_id": "LONGBRIDGE_APP_KEY",
+      "env_secret": "LONGBRIDGE_APP_SECRET"
+    }
+  },
+  "intraday_config": {
+    "enabled": true,
+    "max_positions": 5,
+    "per_position_pct": 0.18,
+    "capital_pct": 0.2,
+    "stop_loss_pct": 1.5,
+    "take_profit_pct": 2.5,
+    "trailing_stop_pct": 1.0,
+    "trailing_stop_enabled": false,
+    "scan_interval_minutes": 15,
+    "close_time": "15:50",
+    "momentum_windows": [
+      5,
+      15,
+      30
+    ],
+    "min_price": 5,
+    "max_price": 500,
+    "min_volume_ratio": 1.5,
+    "min_avg_volume": 500000,
+    "rsi_overbought": 82,
+    "rsi_oversold": 25,
+    "max_daily_loss_pct": 3.0,
+    "backtest_result": {
+      "total_return_pct": 0,
+      "max_drawdown": 0,
+      "win_rate": 0,
+      "total_trades": 0
+    },
+    "stop_loss_atr_multiple": 1.5,
+    "take_profit_atr_multiple": 2.5,
+    "trailing_stop_atr_multiple": 1.0,
+    "stop_loss_min_pct": 0.5,
+    "stop_loss_max_pct": 4.0
+  },
+  "system_config": {
+    "stop_loss_pct": 14,
+    "stop_loss_atr_multiple": 2.8,
+    "stop_loss_min_pct": 5,
+    "stop_loss_max_pct": 25,
+    "trailing_stop_activate_pct": 12,
+    "trailing_stop_atr_multiple": 1.8,
+    "trailing_stop_min_pct": 6,
+    "rsi_exit": 90,
+    "rsi_entry": 82,
+    "market_overheat_rsi": 81,
+    "market_extreme_rsi": 86,
+    "market_reduce_ratio": 0.3,
+    "max_positions": 10,
+    "score_threshold": 52,
+    "mom_rank_top_pct": 0.6,
+    "max_position_pct": 0.14,
+    "max_sector_pct": 0.38,
+    "semi_single_limit": 0.08,
+    "semi_total_limit": 0.25,
+    "atr_low_threshold": 2.5,
+    "atr_medium_threshold": 4.0,
+    "atr_high_threshold": 6.0,
+    "atr_cap_low": 0.15,
+    "atr_cap_medium": 0.12,
+    "atr_cap_high": 0.08,
+    "atr_cap_extreme": 0.06,
+    "buy_cash_ratio": 0.95,
+    "max_share_price": 300,
+    "momentum_weight": 50,
+    "quality_weight": 20,
+    "trend_weight": 15,
+    "volume_weight": 5,
+    "bond_weight": 0.3,
+    "dollar_weight": 0.2,
+    "gold_weight": 0.2,
+    "inflation_weight": 0.3,
+    "notify_on_trade": true,
+    "notify_on_alert": true,
+    "daily_report": true,
+    "push_to_phone": true,
+    "alert_total_drawdown": 10,
+    "alert_single_loss": 15,
+    "min_hold_days": 5,
+    "churn_keep_score": 40,
+    "split_buy_first": 0.6,
+    "split_buy_drop": 2.0,
+    "split_sell_first": 0.5,
+    "split_sell_rise": 3.0,
+    "split_min_wait": 120,
+    "circuit_daily_loss": 10.0,
+    "circuit_consecutive_loss": 5.0,
+    "circuit_max_drawdown": 25.0,
+    "circuit_cooldown_hours": 24,
+    "hedge_spy_ma200": true,
+    "hedge_vix_trigger": 30,
+    "hedge_ratio_base": 0.5,
+    "hedge_ratio_max": 0.75,
+    "hedge_signal_timeout": 3,
+    "timezone": "Asia/Shanghai",
+    "language": "zh"
+  },
+  "factor_weights": {
+    "momentum": 50,
+    "quality": 25,
+    "trend": 13,
+    "value": 4,
+    "lowvol": 4,
+    "volume": 4
+  },
+  "trade_mode": {
+    "mode": "paper"
+  },
+  "factor_ranking": {
+    "timestamp": "2026-07-08 02:48:51.150733",
+    "total_factors": 21,
+    "factors": [
+      {
+        "factor": "momentum_21d",
+        "ic_rank": 0.9307,
+        "ic_pearson": 0.95,
+        "samples": 55,
+        "abs_ic": 0.9307
+      },
+      {
+        "factor": "price_to_sma50",
+        "ic_rank": 0.8911,
+        "ic_pearson": 0.9015,
+        "samples": 55,
+        "abs_ic": 0.8911
+      },
+      {
+        "factor": "momentum_accel",
+        "ic_rank": -0.8456,
+        "ic_pearson": -0.8834,
+        "samples": 55,
+        "abs_ic": 0.8456
+      },
+      {
+        "factor": "sma20_to_sma50",
+        "ic_rank": 0.8181,
+        "ic_pearson": 0.7794,
+        "samples": 55,
+        "abs_ic": 0.8181
+      },
+      {
+        "factor": "trend_strength",
+        "ic_rank": -0.7843,
+        "ic_pearson": -0.6743,
+        "samples": 55,
+        "abs_ic": 0.7843
+      },
+      {
+        "factor": "rsi",
+        "ic_rank": 0.7838,
+        "ic_pearson": 0.7923,
+        "samples": 55,
+        "abs_ic": 0.7838
+      },
+      {
+        "factor": "price_to_sma20",
+        "ic_rank": 0.6633,
+        "ic_pearson": 0.7689,
+        "samples": 55,
+        "abs_ic": 0.6633
+      },
+      {
+        "factor": "momentum_63d",
+        "ic_rank": 0.586,
+        "ic_pearson": 0.4868,
+        "samples": 55,
+        "abs_ic": 0.586
+      },
+      {
+        "factor": "momentum_126d",
+        "ic_rank": 0.5424,
+        "ic_pearson": 0.5331,
+        "samples": 55,
+        "abs_ic": 0.5424
+      },
+      {
+        "factor": "momentum_252d",
+        "ic_rank": 0.4763,
+        "ic_pearson": 0.4253,
+        "samples": 55,
+        "abs_ic": 0.4763
+      },
+      {
+        "factor": "momentum_10d",
+        "ic_rank": 0.4337,
+        "ic_pearson": 0.552,
+        "samples": 55,
+        "abs_ic": 0.4337
+      },
+      {
+        "factor": "volume_ratio_20",
+        "ic_rank": -0.2561,
+        "ic_pearson": -0.2375,
+        "samples": 55,
+        "abs_ic": 0.2561
+      },
+      {
+        "factor": "sma50_to_sma200",
+        "ic_rank": 0.2284,
+        "ic_pearson": 0.2838,
+        "samples": 55,
+        "abs_ic": 0.2284
+      },
+      {
+        "factor": "atr_pct",
+        "ic_rank": -0.1966,
+        "ic_pearson": -0.2524,
+        "samples": 55,
+        "abs_ic": 0.1966
+      },
+      {
+        "factor": "atr_ratio",
+        "ic_rank": 0.1913,
+        "ic_pearson": 0.2858,
+        "samples": 55,
+        "abs_ic": 0.1913
+      },
+      {
+        "factor": "volatility_20d",
+        "ic_rank": -0.1912,
+        "ic_pearson": -0.125,
+        "samples": 55,
+        "abs_ic": 0.1912
+      },
+      {
+        "factor": "atr_zscore",
+        "ic_rank": 0.1592,
+        "ic_pearson": 0.1473,
+        "samples": 55,
+        "abs_ic": 0.1592
+      },
+      {
+        "factor": "vpr",
+        "ic_rank": 0.0853,
+        "ic_pearson": 0.1451,
+        "samples": 55,
+        "abs_ic": 0.0853
+      },
+      {
+        "factor": "volume_ratio_1",
+        "ic_rank": 0.0634,
+        "ic_pearson": -0.1444,
+        "samples": 55,
+        "abs_ic": 0.0634
+      },
+      {
+        "factor": "volatility_ratio",
+        "ic_rank": 0.0409,
+        "ic_pearson": 0.064,
+        "samples": 55,
+        "abs_ic": 0.0409
+      },
+      {
+        "factor": "momentum_5d",
+        "ic_rank": 0.0196,
+        "ic_pearson": 0.1136,
+        "samples": 55,
+        "abs_ic": 0.0196
+      }
+    ],
+    "top_factors": [
+      "momentum_21d",
+      "price_to_sma50",
+      "momentum_accel",
+      "sma20_to_sma50",
+      "trend_strength",
+      "rsi",
+      "price_to_sma20",
+      "momentum_63d",
+      "momentum_126d",
+      "momentum_252d"
+    ],
+    "stock_count": 55
+  },
+  "__meta__": {
+    "backup_at": "2026-07-20 16:40:48",
+    "label": "daily",
+    "version": "1.0"
+  }
+}
