@@ -226,6 +226,40 @@ class TradeExecutor:
                         filled_qty=qty,
                     )
 
+                    # 写入交易日志（trade_log.json）和数据库
+                    try:
+                        from portfolio_tracker import record_trade
+                        record_trade(
+                            symbol=ticker, side=side, qty=qty,
+                            price=price, order_id=order_id,
+                        )
+                    except Exception as e:
+                        logger.debug(f"写入trade_log失败: {e}")
+
+                    try:
+                        from database import get_session, Trade, User
+                        session = get_session()
+                        try:
+                            default_user = session.query(User).first()
+                            if default_user:
+                                trade = Trade(
+                                    user_id=default_user.id,
+                                    ticker=ticker,
+                                    side=side.upper(),
+                                    quantity=qty,
+                                    price=price,
+                                    amount=qty * price,
+                                    strategy=strategy,
+                                    source="executor",
+                                    notes=f"order_id={order_id}; reason={reason}",
+                                )
+                                session.add(trade)
+                                session.commit()
+                        finally:
+                            session.close()
+                    except Exception as e:
+                        logger.debug(f"写入数据库trades表失败: {e}")
+
                     results.append({
                         "ticker": ticker, "side": side, "qty": qty,
                         "status": "submitted", "order_id": order_id,

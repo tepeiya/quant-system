@@ -103,20 +103,57 @@ def api_submit():
     qty = int(data.get("qty", 0))
     if not symbol or qty <= 0:
         return err("参数错误")
+    intent_id = None
     try:
         from broker_manager import BrokerManager
         from order_manager import new_intent, mark, STATUS_SUBMITTED, STATUS_REJECTED
         bm = BrokerManager(username=session.get("user"))
         broker = bm.get_current()
         intent = new_intent(symbol, side.upper(), qty, getattr(bm, '_current_id', 'broker'))
+        intent_id = intent['intent_id']
         result = broker.submit_order(symbol, qty, side, "market")
         if isinstance(result, dict) and result.get('error'):
-            mark(intent['intent_id'], STATUS_REJECTED, last_error=result.get('error'))
+            mark(intent_id, STATUS_REJECTED, last_error=result.get('error'))
             return err(result.get('error'))
-        mark(intent['intent_id'], STATUS_SUBMITTED, broker_order=result)
+        mark(intent_id, STATUS_SUBMITTED, broker_order=result)
+
+        # 同步写入交易日志和数据库
+        try:
+            from portfolio_tracker import record_trade
+            record_trade(symbol=symbol, side=side.upper(), qty=qty,
+                         price=float(data.get("price", 0)),
+                         order_id=str(result)[:100] if result else "")
+        except Exception:
+            pass
+        try:
+            from database import get_session, Trade, User
+            sess = get_session()
+            try:
+                default_user = sess.query(User).first()
+                if default_user:
+                    sess.add(Trade(
+                        user_id=default_user.id,
+                        ticker=symbol, side=side.upper(),
+                        quantity=qty, price=float(data.get("price", 0)),
+                        amount=qty * float(data.get("price", 0)),
+                        strategy="manual", source="manual",
+                    ))
+                    sess.commit()
+            finally:
+                sess.close()
+        except Exception:
+            pass
+
         log_audit("ORDER", session.get("user", "?"), f"{side.upper()} {symbol} x{qty}")
-        return ok({"intent_id": intent['intent_id'], "broker_order": result}, "下单请求已发送")
+        return ok({"intent_id": intent_id, "broker_order": result}, "下单请求已发送")
     except Exception as e:
+        # 异常时把订单标记为 REJECTED，避免永久停留 NEW
+        if intent_id:
+            try:
+                from order_manager import mark, STATUS_REJECTED
+                mark(intent_id, STATUS_REJECTED, last_error=str(e)[:200])
+            except Exception:
+                pass
         return err(str(e))
 
 
