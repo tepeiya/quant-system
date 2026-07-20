@@ -342,6 +342,12 @@ def api_intraday_config():
         "enabled": False, "max_positions": 3, "per_position_pct": 0.15,
         "capital_pct": 0.20, "stop_loss_pct": 2.0, "take_profit_pct": 3.0,
         "scan_interval_minutes": 30, "min_volume_ratio": 1.2,
+        # ATR 止损/止盈相关字段（与 intraday.html 模板对齐）
+        "stop_loss_atr_multiple": 1.5,
+        "take_profit_atr_multiple": 2.5,
+        "trailing_stop_atr_multiple": 1.0,
+        "stop_loss_min_pct": 0.5,
+        "stop_loss_max_pct": 4.0,
     })
 
 

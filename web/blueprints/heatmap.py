@@ -47,23 +47,39 @@ def _get_data():
             if len(df) >= 5:
                 week_ago = df["Close"].iloc[-5]
                 week_change = (price / week_ago - 1) * 100
+            # 综合评分: 动量(40) + 周涨跌(40) + RSI(20)
+            mom_score = max(0, min(100, 50 + (float(mom * 100) if not np.isnan(mom) else 0)))
+            chg_score = max(0, min(100, 50 + float(week_change) * 2))
+            rsi_score = 50.0
+            if not np.isnan(rsi):
+                rsi_val = float(rsi)
+                if rsi_val < 30:
+                    rsi_score = 80.0
+                elif rsi_val > 70:
+                    rsi_score = 30.0
+                else:
+                    rsi_score = 50.0 + (50.0 - rsi_val) * 0.4
+            score = round(mom_score * 0.4 + chg_score * 0.4 + rsi_score * 0.2, 1)
             stocks.append({
                 "ticker": t,
                 "price": round(float(price), 2),
                 "momentum": round(float(mom * 100), 1) if not np.isnan(mom) else 0,
                 "rsi": round(float(rsi), 0) if not np.isnan(rsi) else None,
                 "weekly_change": round(float(week_change), 2),
+                "score": score,
             })
         if stocks:
+            avg_score = round(sum(s["score"] for s in stocks) / len(stocks), 1)
             sectors.append({
                 "name": sector_name,
                 "stocks": stocks[:20],
                 "count": len(stocks),
+                "avg_score": avg_score,
             })
-    
+
     total = sum(s["count"] for s in sectors)
     expected = sum(len(v) for v in SECTOR_MAP.values())
-    
+
     return {
         "sectors": sectors,
         "coverage": f"{total}/{expected}",

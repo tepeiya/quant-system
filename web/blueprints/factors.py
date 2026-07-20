@@ -238,11 +238,24 @@ def api_ic_history():
             if monthly:
                 result = []
                 for m in monthly:
+                    mom_ic = m.get("momentum", 0)
+                    qual_ic = m.get("quality", 0)
+                    trend_ic = m.get("trend", 0)
+                    val_ic = m.get("value", 0)
+                    lv_ic = m.get("lowvol", 0)
                     result.append({
                         "month": m.get("_month", ""),
-                        "momentum_ic": m.get("momentum", 0),
-                        "quality_ic": m.get("quality", 0),
-                        "trend_ic": m.get("trend", 0),
+                        "momentum_ic": mom_ic,
+                        "quality_ic": qual_ic,
+                        "trend_ic": trend_ic,
+                        "value_ic": val_ic,
+                        "lowvol_ic": lv_ic,
+                        # 兼容模板使用的缩写前缀
+                        "mom_ic": mom_ic,
+                        "qual_ic": qual_ic,
+                        "trend_ic": trend_ic,
+                        "val_ic": val_ic,
+                        "lv_ic": lv_ic,
                     })
                 return jsonify(_fix(result))
 

@@ -335,27 +335,36 @@ def api_beta_analysis():
             curr = equity_history[i]["total_equity"]
             if prev > 0:
                 portfolio_returns.append((curr - prev) / prev)
-        
+
         # 简化：假设市场波动为组合波动的1.1倍
         market_returns = np.array(portfolio_returns) / 1.1
         portfolio = np.array(portfolio_returns)
-        
+
         beta = calculate_beta(portfolio, market_returns)
         rolling_beta = calculate_rolling_beta(portfolio, market_returns, window=min(60, len(portfolio)//2))
     else:
         # 回退：使用模拟数据
         np.random.seed(42)
-        market = np.random.normal(0.0004, 0.015, 252)
-        portfolio = 0.8 * market + np.random.normal(0.0001, 0.01, 252)
-        
-        beta = calculate_beta(portfolio, market)
-        rolling_beta = calculate_rolling_beta(portfolio, market, window=60)
-    
+        market_returns = np.random.normal(0.0004, 0.015, 252)
+        portfolio = 0.8 * market_returns + np.random.normal(0.0001, 0.01, 252)
+
+        beta = calculate_beta(portfolio, market_returns)
+        rolling_beta = calculate_rolling_beta(portfolio, market_returns, window=60)
+
+    # correlation: 组合与市场的相关系数
+    corr = None
+    try:
+        if len(portfolio) == len(market_returns) and np.std(portfolio) > 0 and np.std(market_returns) > 0:
+            corr = float(np.corrcoef(portfolio, market_returns)[0, 1])
+    except Exception:
+        corr = None
+
     return jsonify(_fix({
         "current_beta": beta,
         "avg_beta": np.mean(rolling_beta) if len(rolling_beta) > 0 else beta,
         "rolling_beta": rolling_beta.tolist()[-30:],
-        "interpretation": "偏高" if beta > 1.2 else "适中" if beta > 0.8 else "偏低"
+        "interpretation": "偏高" if beta > 1.2 else "适中" if beta > 0.8 else "偏低",
+        "correlation": corr,
     }))
 
 
@@ -368,7 +377,8 @@ def api_risk_report():
     
     # 尝试获取真实数据
     equity_history = get_equity_from_db(days=252)
-    
+
+    equity_values = None  # 显式初始化, 避免边界条件 NameError
     if equity_history and len(equity_history) > 1:
         # 使用真实权益数据
         equity_values = np.array([e["total_equity"] for e in equity_history])
@@ -379,22 +389,22 @@ def api_risk_report():
             if prev > 0:
                 returns.append((curr - prev) / prev)
         returns = np.array(returns)
-        
+
         # 简化：使用组合收益作为基准
         benchmark = returns * 1.1  # 假设基准波动略高
     else:
         # 回退：使用模拟数据
         np.random.seed(42)
         returns = np.random.normal(0.0005, 0.02, 252)
-        equity = 100000 * np.cumprod(1 + returns)
+        equity_values = 100000 * np.cumprod(1 + returns)
         benchmark = np.random.normal(0.0004, 0.015, 252)
-    
+
     report = generate_risk_report(
-        returns, equity_values if equity_history else None,
+        returns, equity_values,
         benchmark_returns=benchmark,
         confidence=0.95
     )
-    
+
     return jsonify(_fix(report))
 
 

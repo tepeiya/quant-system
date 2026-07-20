@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, render_template
 import numpy as np
 
 import os, json, logging
+from datetime import datetime
 logger = logging.getLogger("quant.dashboard")
 
 from api_response import ok, err
@@ -217,4 +218,36 @@ def api_equity_history():
                     except:
                         pass
                     break
+
+    # 备用源1: 从数据库 equity_history 表读取
+    if not history:
+        try:
+            from database import get_session, EquityHistory
+            sess = get_session()
+            try:
+                rows = sess.query(EquityHistory).order_by(EquityHistory.date.asc()).limit(365).all()
+                for r in rows:
+                    if r.total_equity and r.date:
+                        history.append({
+                            "date": r.date.strftime("%Y-%m-%d") if hasattr(r.date, 'strftime') else str(r.date)[:10],
+                            "equity": float(r.total_equity),
+                        })
+            finally:
+                sess.close()
+        except Exception:
+            pass
+
+    # 备用源2: 从缓存的portfolio文件读取
+    if not history:
+        try:
+            pf_path = "signals/cached_portfolio.json"
+            if os.path.exists(pf_path):
+                with open(pf_path) as f:
+                    pf = json.load(f)
+                eq = pf.get("equity") or pf.get("total_equity") or pf.get("portfolio_value")
+                if eq:
+                    history.append({"date": datetime.now().strftime("%Y-%m-%d"), "equity": float(eq)})
+        except Exception:
+            pass
+
     return jsonify(history[-90:])
