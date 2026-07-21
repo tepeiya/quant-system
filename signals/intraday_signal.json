@@ -1,7 +1,25 @@
 {
   "strategy": "intraday",
-  "time": "2026-07-08 04:44:48.039285",
-  "date": "2026-07-08",
-  "candidates": [],
-  "all_scanned": 0
+  "time": "2026-07-21 15:56:35.560554",
+  "date": "2026-07-21",
+  "candidates": [
+    {
+      "ticker": "ISRG",
+      "score": -4.6728334162978244,
+      "price": 356.32,
+      "today_chg": 0.89,
+      "has_realtime": true,
+      "vol_ratio": 1.63,
+      "atr_pct": 5.16,
+      "rsi": 35.7,
+      "avg_vol": 3501130,
+      "stop_loss_pct": 4.0,
+      "take_profit_pct": 12.9,
+      "ma20": 400.72,
+      "ma50": 415.0,
+      "rel_strength": 1.05,
+      "micro_rel_bonus": 1.58
+    }
+  ],
+  "all_scanned": 1
 }
