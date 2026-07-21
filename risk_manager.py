@@ -52,8 +52,11 @@ class PositionRisk:
     def __init__(self, config: dict = None):
         if config:
             self.MAX_POSITIONS = config.get("max_positions", self.MAX_POSITIONS)
-            self.MAX_SECTOR_PCT = config.get("max_sector_pct", self.MAX_SECTOR_PCT)
-            self.MAX_POSITION_PCT = config.get("max_position_pct", self.MAX_POSITION_PCT)
+            # 兼容小数和百分比两种格式（配置文件用0.14表示14%）
+            sector_pct = config.get("max_sector_pct", self.MAX_SECTOR_PCT)
+            self.MAX_SECTOR_PCT = sector_pct * 100 if sector_pct < 1 else sector_pct
+            pos_pct = config.get("max_position_pct", self.MAX_POSITION_PCT)
+            self.MAX_POSITION_PCT = pos_pct * 100 if pos_pct < 1 else pos_pct
             self.RISK_PER_TRADE = config.get("risk_per_trade", self.RISK_PER_TRADE)
 
     def within_position_limit(self, total_active: int) -> tuple:

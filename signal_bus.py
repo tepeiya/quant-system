@@ -212,14 +212,14 @@ def read_pending_messages(consumer: str = "executor", limit: int = 20) -> list[d
     row = c.fetchone()
     last_id = row["last_msg_id"] if row else 0
 
-    # 读取新消息
+    # 读取新消息（只取 status='pending' 的）
     c.execute(
         "SELECT * FROM messages WHERE id > ? AND status='pending' ORDER BY id ASC LIMIT ?",
         (last_id, limit)
     )
     rows = c.fetchall()
 
-    # 标记为已读（逻辑消费，实际删除由执行器决定）
+    # 更新消费偏移量 + 标记消息为 processing（防止重复消费）
     if rows:
         max_id = rows[-1]["id"]
         c.execute(
@@ -227,6 +227,13 @@ def read_pending_messages(consumer: str = "executor", limit: int = 20) -> list[d
             "VALUES (?,?,?) ON CONFLICT(consumer) DO UPDATE SET "
             "last_msg_id=excluded.last_msg_id, updated_at=excluded.updated_at",
             (consumer, max_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+        # 将读取的消息标记为 processing，避免重复消费
+        msg_ids = [r["msg_id"] for r in rows]
+        placeholders = ",".join("?" * len(msg_ids))
+        c.execute(
+            f"UPDATE messages SET status='processing' WHERE msg_id IN ({placeholders})",
+            tuple(msg_ids)
         )
 
     conn.commit()
