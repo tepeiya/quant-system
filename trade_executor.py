@@ -55,7 +55,11 @@ class TradeExecutor:
     def get_client(self):
         """获取当前券商的交易客户端 (BrokerInterface)"""
         if self._client is None:
-            self._client = self.bm.use(self.broker_id)
+            try:
+                self._client = self.bm.use(self.broker_id)
+            except Exception as e:
+                logger.warning(f"券商 {self.broker_id} 使用失败: {e}，尝试默认券商")
+                self._client = self.bm.get_current()
         return self._client
 
     def set_broker(self, broker_id: str):

@@ -36,14 +36,15 @@ def load_intraday_config() -> dict:
 
 
 def get_alpaca(strategy: str = "intraday"):
-    from broker_manager import BrokerManager, load_config
+    from broker_manager import BrokerManager, load_config, PaperBroker
+    
     bm = BrokerManager()
     broker_id = bm.get_strategy_broker_id(strategy)
     cfg = load_config().get(broker_id, {})
     if not cfg.get("enabled", False):
         logger.error(f"券商 {broker_id} 未启用")
         return None
-    from alpaca.trading.client import TradingClient
+    
     key_name = cfg.get("env_key_id", "ALPACA_API_KEY_ID")
     sec_name = cfg.get("env_secret", "ALPACA_SECRET_KEY")
     try:
@@ -53,10 +54,14 @@ def get_alpaca(strategy: str = "intraday"):
     except:
         key = os.environ.get(key_name, "")
         secret = os.environ.get(sec_name, "")
-    if not key or not secret:
-        logger.error(f"Key未配置: {key_name}/{sec_name}")
-        return None
-    return TradingClient(key, secret, paper=cfg.get("paper", True))
+    
+    if key and secret:
+        from alpaca.trading.client import TradingClient
+        return TradingClient(key, secret, paper=cfg.get("paper", True))
+    else:
+        logger.warning(f"Key未配置: {key_name}/{sec_name}，使用模拟券商")
+        return PaperBroker()
+
 
 
 def load_signal() -> dict:

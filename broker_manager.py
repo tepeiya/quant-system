@@ -166,6 +166,184 @@ class BrokerInterface:
         raise NotImplementedError
 
 
+class PaperAccount:
+    """模拟账户对象（兼容Alpaca API 和 字典访问）"""
+    def __init__(self, cash, equity, buying_power):
+        self.id = "paper_account"
+        self.cash = cash
+        self.equity = equity
+        self.last_equity = equity
+        self.buying_power = buying_power
+        self.status = "ACTIVE"
+    
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+
+
+class PaperOrder:
+    """模拟订单对象（兼容Alpaca API 和 字典访问）"""
+    def __init__(self, order_id, symbol, side, qty, status):
+        self.id = order_id
+        self.order_id = order_id
+        self.symbol = symbol
+        self.side = side
+        self.qty = qty
+        self.status = status
+        self.filled_qty = qty if status == "FILLED" else 0
+    
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+
+
+class PaperPosition:
+    """模拟持仓对象（兼容Alpaca API）"""
+    def __init__(self, symbol, qty, avg_entry_price, current_price):
+        self.symbol = symbol
+        self.qty = qty
+        self.avg_entry_price = avg_entry_price
+        self.current_price = current_price
+        self.market_value = qty * current_price
+        self.cost_basis = qty * avg_entry_price
+        self.unrealized_pl = (current_price - avg_entry_price) * qty
+        self.unrealized_plpc = ((current_price - avg_entry_price) / avg_entry_price * 100) if avg_entry_price > 0 else 0
+
+
+class PaperBroker(BrokerInterface):
+    """模拟券商（无API Key时的fallback）"""
+    
+    def __init__(self, config: dict = None):
+        self._cash = 100000.0
+        self._positions = {}
+        self._orders = []
+        self._equity = 100000.0
+        import time
+        self._order_id_counter = int(time.time())
+    
+    def get_account(self) -> object:
+        """兼容Alpaca的get_account API"""
+        return PaperAccount(self._cash, self._equity, self._cash * 4)
+    
+    def get_positions(self) -> list[dict]:
+        result = []
+        for sym, pos in self._positions.items():
+            result.append({
+                "symbol": sym,
+                "ticker": sym,
+                "qty": pos["qty"],
+                "qty_available": pos["qty"],
+                "avg_entry_price": pos["avg_cost"],
+                "current_price": pos["current_price"],
+                "market_value": pos["qty"] * pos["current_price"],
+                "cost_basis": pos["qty"] * pos["avg_cost"],
+                "pnl": (pos["current_price"] - pos["avg_cost"]) * pos["qty"],
+                "pnl_pct": ((pos["current_price"] - pos["avg_cost"]) / pos["avg_cost"] * 100) if pos["avg_cost"] > 0 else 0,
+            })
+        return result
+    
+    def submit_order(self, *args, **kwargs) -> object:
+        """兼容Alpaca的submit_order API 和 BrokerInterface的submit_order(symbol, qty, side, order_type)"""
+        import time
+        self._order_id_counter += 1
+        order_id = f"paper_{self._order_id_counter}"
+        
+        if len(args) >= 3:
+            symbol, qty, side = args[:3]
+        elif len(args) == 1:
+            order_request = args[0]
+            symbol = getattr(order_request, 'symbol', '')
+            qty = int(getattr(order_request, 'qty', 0))
+            side = getattr(order_request, 'side', '').value if hasattr(order_request, 'side') else 'BUY'
+        else:
+            symbol = kwargs.get('symbol', '')
+            qty = int(kwargs.get('qty', 0))
+            side = kwargs.get('side', 'BUY')
+        
+        side = side.upper()
+        
+        if side == "BUY":
+            price = self._get_simulated_price(symbol)
+            cost = qty * price
+            if cost <= self._cash:
+                self._cash -= cost
+                if symbol in self._positions:
+                    old_qty = self._positions[symbol]["qty"]
+                    old_cost = self._positions[symbol]["avg_cost"] * old_qty
+                    new_qty = old_qty + qty
+                    self._positions[symbol] = {
+                        "qty": new_qty,
+                        "avg_cost": (old_cost + cost) / new_qty,
+                        "current_price": price,
+                    }
+                else:
+                    self._positions[symbol] = {
+                        "qty": qty,
+                        "avg_cost": price,
+                        "current_price": price,
+                    }
+                self._update_equity()
+                status = "FILLED"
+            else:
+                status = "REJECTED"
+        else:
+            if symbol in self._positions and self._positions[symbol]["qty"] >= qty:
+                price = self._get_simulated_price(symbol)
+                proceeds = qty * price
+                self._cash += proceeds
+                self._positions[symbol]["qty"] -= qty
+                self._positions[symbol]["current_price"] = price
+                if self._positions[symbol]["qty"] <= 0:
+                    del self._positions[symbol]
+                self._update_equity()
+                status = "FILLED"
+            else:
+                status = "REJECTED"
+        
+        return PaperOrder(order_id, symbol, side, qty, status)
+    
+    def get_orders(self, status="all") -> list:
+        """兼容Alpaca的get_orders API"""
+        result = []
+        for o in self._orders:
+            if status == "all" or o.get("status", "") == status:
+                result.append(PaperOrder(
+                    o.get("order_id", ""),
+                    o.get("symbol", ""),
+                    o.get("side", ""),
+                    o.get("qty", 0),
+                    o.get("status", ""),
+                ))
+        return result
+    
+    def get_all_positions(self) -> list:
+        """兼容Alpaca的get_all_positions API"""
+        result = []
+        for sym, pos in self._positions.items():
+            result.append(PaperPosition(
+                sym,
+                pos["qty"],
+                pos["avg_cost"],
+                pos["current_price"],
+            ))
+        return result
+    
+    def _get_simulated_price(self, symbol: str) -> float:
+        """获取模拟价格（基于股票代码的伪随机值）"""
+        import hashlib
+        hash_val = int(hashlib.md5(symbol.encode()).hexdigest(), 16)
+        return round(20 + (hash_val % 480), 2)
+    
+    def _update_equity(self):
+        """更新总权益"""
+        mv = sum(p["qty"] * p["current_price"] for p in self._positions.values())
+        self._equity = self._cash + mv
+    
+    def cancel_order(self, order_id: str) -> bool:
+        return True
+    
+    def get_orders(self, limit=10, status="all") -> list[dict]:
+        return self._orders[-limit:]
+
+
 class AlpacaBroker(BrokerInterface):
     """Alpaca 券商实现（纸交易+实盘）"""
     
@@ -181,6 +359,10 @@ class AlpacaBroker(BrokerInterface):
         except:
             self.key = os.environ.get(config.get("env_key_id", "ALPACA_API_KEY_ID"), "")
             self.secret = os.environ.get(config.get("env_secret", "ALPACA_SECRET_KEY"), "")
+        
+        if not self.key or not self.secret:
+            raise RuntimeError(f"Alpaca API Key 未配置 (key_id={config.get('env_key_id','')})")
+        
         self._auth = (self.key, self.secret)
     
     def _get(self, path):
@@ -620,15 +802,24 @@ class BrokerManager:
         if self._current is None:
             available = self.list_available()
             if not available:
-                raise RuntimeError("没有可用的券商")
+                logger.warning("没有可用的真实券商，使用模拟券商")
+                self._current = PaperBroker()
+                self._current_id = "paper"
+                return self._current
 
-            # 优先使用默认券商（若已启用）
             default_id = get_default_broker_id()
             ids = [b["id"] for b in available]
             if default_id in ids:
-                self.use(default_id)
+                broker_id = default_id
             else:
-                self.use(available[0]["id"])
+                broker_id = available[0]["id"]
+            
+            try:
+                self.use(broker_id)
+            except Exception as e:
+                logger.warning(f"券商 {broker_id} 初始化失败: {e}，使用模拟券商")
+                self._current = PaperBroker()
+                self._current_id = "paper"
         return self._current
     
     def get_for_strategy(self, strategy: str) -> "BrokerInterface":
